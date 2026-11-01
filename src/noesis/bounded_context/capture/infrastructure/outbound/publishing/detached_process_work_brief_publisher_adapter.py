@@ -6,6 +6,7 @@ writes its JSON result next to the brief, and is not killed when the hook exits.
 
 import os
 import shutil
+import subprocess
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 
@@ -69,16 +70,41 @@ def _spawn_detached(
         os.open(stderr, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o644),
     ]
     try:
-        os.posix_spawn(
-            executable,
-            list(argv),
-            dict(environment),
-            file_actions=[
-                (os.POSIX_SPAWN_DUP2, descriptor, target)
-                for target, descriptor in enumerate(descriptors)
-            ],
-            setsid=True,
-        )
+        try:
+            os.posix_spawn(
+                executable,
+                list(argv),
+                dict(environment),
+                file_actions=[
+                    (os.POSIX_SPAWN_DUP2, descriptor, target)
+                    for target, descriptor in enumerate(descriptors)
+                ],
+                setsid=True,
+            )
+        except NotImplementedError:
+            # Some Python builds (e.g. python-build-standalone) lack posix_spawn's setsid.
+            _popen_detached(executable, argv, environment, descriptors)
     finally:
         for descriptor in descriptors:
             os.close(descriptor)
+
+
+def _popen_detached(
+    executable: str,
+    argv: Sequence[str],
+    environment: Mapping[str, str],
+    descriptors: Sequence[int],
+) -> None:
+    """Fallback for `_spawn_detached`: same contract, via `Popen(start_new_session=True)`.
+
+    The handle is released at once so nothing waits on, or warns about, the running child.
+    """
+    process = subprocess.Popen(  # noqa: S603  # argv is built from our own fixed command
+        [executable, *argv[1:]],
+        env=dict(environment),
+        stdin=descriptors[0],
+        stdout=descriptors[1],
+        stderr=descriptors[2],
+        start_new_session=True,
+    )
+    process.returncode = 0  # detach on purpose: suppresses the "still running" ResourceWarning
