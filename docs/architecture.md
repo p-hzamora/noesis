@@ -38,7 +38,8 @@ errors are `AppException`s with a stable `__error_code__`, an `__exit_code__`, a
 
 ```text
 WorkBriefContract ──► CurateWorkBriefHandler
-                        ├─ INoteReadRepository.search(goal + commit subjects)   related notes
+                        ├─ WorkBriefMapper.to_domain(contract) -> WorkBrief      ACL into Knowledge's model
+                        ├─ INoteReadRepository.search(brief.search_text())       related notes
                         ├─ ICurator.curate(brief, related)                       LLM judgment (retry once)
                         ├─ AutoCurationPolicy.apply(decision, existing notes)    domain rules
                         └─ IKnowledgeUnitOfWork: notes.save(...) + commit        all or nothing
@@ -48,15 +49,19 @@ WorkBriefContract ──► CurateWorkBriefHandler
 | Piece | Where | Notes |
 |---|---|---|
 | `Note` aggregate | `domain/entities/note.py` | Required sections per kind, canonical headings, `Not recorded` filler; manual notes cannot be revised by automation. |
+| `WorkBrief` | `domain/value_objects/work_brief.py`, `application/mappers/` | Knowledge's own copy of the brief, translated from the contract by `WorkBriefMapper`; owns the rules on it (area, search text, provenance). The contract stays data-only; the parked queue stores the contract so a retry re-enters through the command. |
 | `NoteLocation` | `domain/value_objects/` | Auto: `<area>/auto/<kind>s/<slug>.md`; manual: `<area>/<kind>s/<slug>.md`. |
 | `AutoCurationPolicy` | `domain/services/` | Manual note on the same topic wins (`covered by <path>`); create/update both upsert the auto note. |
-| `ClaudeCliCuratorAdapter` | `infrastructure/outbound/curation/` | `claude -p --output-format json --json-schema` with no tools, no settings, no saved session, a budget cap; prompt on stdin; reads `structured_output`. The system prompt (`prompts/curator_system.md`) holds the admission rule. |
+| `ClaudeCliCuratorAdapter` | `infrastructure/outbound/curation/` | `claude -p --output-format json --json-schema` with no tools, no settings, no saved session, a budget cap; prompt on stdin; reads `structured_output`. The system prompt holds the admission rule; the adapter receives it as text from the composition root (`build_curator`), which reads `NOESIS_CURATOR_SYSTEM_PROMPT_FILE` or falls back to the packaged `prompts/curator_system.md` (`default_system_prompt()`). |
 | `curator_response_schema.py` | same folder | Anti-corruption layer: pydantic schema sent to the CLI, translated into domain decisions; malformed entries become reported skips. |
 | Filesystem adapters | `infrastructure/outbound/storage/` | Markdown + YAML frontmatter under `NOESIS_VAULT_DIR`; writes are staged and committed atomically. Works for Obsidian vaults, plain folders and NFS. |
 | Parked queue | `infrastructure/outbound/queue/` | One JSON file per failed brief under `$NOESIS_STATE_DIR/knowledge/parked/`. |
 
-Tuning the curator: read the `skipped` list of `noesis knowledge curate --json`, then edit
-`prompts/curator_system.md`. Storage and validation do not change.
+Tuning the curator: read the `skipped` list of `noesis knowledge curate --json`, copy
+`prompts/curator_system.md` to a file of your own, edit it, and point
+`NOESIS_CURATOR_SYSTEM_PROMPT_FILE` at it (an installed package is overwritten on upgrade).
+An unreadable or empty file fails with `CORE_005_CURATOR_PROMPT_UNREADABLE`. Storage and
+validation do not change.
 
 ## Capture context
 
