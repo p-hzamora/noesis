@@ -41,7 +41,7 @@ class JsonlCaptureJournalAdapter(ICaptureJournal):
         runs: list[CaptureRunDto] = []
         for line in path.read_text(encoding="utf-8").splitlines():
             try:
-                run: CaptureRunDto = CaptureRunDto.model_validate(json.loads(line))
+                run = CaptureRunDto.model_validate(json.loads(line))
             except json.JSONDecodeError, ValidationError:
                 continue
             result: JsonObject | None = (

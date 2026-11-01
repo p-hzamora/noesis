@@ -43,7 +43,7 @@ class FilesystemNoteReadRepositoryAdapter(INoteReadRepository):
             if any(part.startswith(".") for part in relative.parts):
                 continue
             try:
-                location: NoteLocation = NoteLocation.parse(relative.as_posix())
+                location = NoteLocation.parse(relative.as_posix())
                 text: str = path.read_text(encoding="utf-8")
             except DomainException, OSError:
                 continue  # index files, attachments notes and unreadable files are not notes

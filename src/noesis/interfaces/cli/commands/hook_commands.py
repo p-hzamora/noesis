@@ -61,7 +61,7 @@ def claude_code(context: typer.Context) -> None:
         return
     environment: Environment | None = None
     try:
-        payload: ClaudeCodeHookPayload = ClaudeCodeHookPayload.model_validate(json.load(sys.stdin))
+        payload = ClaudeCodeHookPayload.model_validate(json.load(sys.stdin))
         command: CaptureCommand | None = route(payload)
         if command is None:
             return

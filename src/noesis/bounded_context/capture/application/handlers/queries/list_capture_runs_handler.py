@@ -29,6 +29,6 @@ class ListCaptureRunsHandler(IHandler[ListCaptureRunsQuery, CaptureRunListDto]):
 
     async def handle(self, action: ListCaptureRunsQuery) -> CaptureRunListDto:
         """The journal entries."""
-        session_id: SessionId = SessionId(value=action.session_id)
+        session_id = SessionId(value=action.session_id)
         runs: list[CaptureRunDto] = await self._journal.read(session_id)
         return CaptureRunListDto(session_id=session_id.value, runs=tuple(runs[-action.limit :]))

@@ -167,19 +167,17 @@ def build_knowledge(
         The wired handlers.
     """
     vault: Path = require_vault(environment)
-    mapper: NoteMapper = NoteMapper()
+    mapper = NoteMapper()
     notices: list[str] = []
-    read_repository: INoteReadRepository = build_read_repository(
-        environment, vault, mapper, notices
-    )
-    queue: JsonFileParkedCurationQueueAdapter = JsonFileParkedCurationQueueAdapter(
+    read_repository = build_read_repository(environment, vault, mapper, notices)
+    queue = JsonFileParkedCurationQueueAdapter(
         environment.runtime.state_dir.joinpath(*PARKED_FOLDER)
     )
 
     def unit_of_work() -> IKnowledgeUnitOfWork:
         return FilesystemKnowledgeUnitOfWorkAdapter(FilesystemNoteRepositoryAdapter(vault, mapper))
 
-    curate: CurateWorkBriefHandler = CurateWorkBriefHandler(
+    curate = CurateWorkBriefHandler(
         uow_factory=unit_of_work,
         read_repository=read_repository,
         curator=curator or build_curator(environment),

@@ -124,9 +124,7 @@ class ClaudeCliCuratorAdapter(ICurator):
                 },
             )
         try:
-            response: CuratorResponseModel = CuratorResponseModel.model_validate(
-                envelope.get("structured_output")
-            )
+            response = CuratorResponseModel.model_validate(envelope.get("structured_output"))
         except ValidationError as error:
             raise CuratorFailedError(
                 "The curator answer did not match the schema.",

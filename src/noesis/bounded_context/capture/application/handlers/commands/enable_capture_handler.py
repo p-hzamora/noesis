@@ -39,7 +39,7 @@ class EnableCaptureHandler(IHandler[EnableCaptureCommand, CaptureStatusDto]):
 
     async def handle(self, action: EnableCaptureCommand) -> CaptureStatusDto:
         """Switch capture on and return the new status."""
-        session_id: SessionId = SessionId(value=action.session_id)
+        session_id = SessionId(value=action.session_id)
         async with self._uow_factory(session_id) as uow:
             session: CaptureSession = await uow.sessions.get(session_id) or CaptureSession.create(
                 session_id, now=self._clock.now()

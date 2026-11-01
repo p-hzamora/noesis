@@ -37,7 +37,7 @@ class DisableCaptureHandler(IHandler[DisableCaptureCommand, CaptureStatusDto]):
 
     async def handle(self, action: DisableCaptureCommand) -> CaptureStatusDto:
         """Switch capture off and return the new status."""
-        session_id: SessionId = SessionId(value=action.session_id)
+        session_id = SessionId(value=action.session_id)
         async with self._uow_factory(session_id) as uow:
             session: CaptureSession | None = await uow.sessions.get(session_id)
             if session is not None:

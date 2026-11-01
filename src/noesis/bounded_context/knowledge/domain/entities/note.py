@@ -108,9 +108,7 @@ class Note(AggregateRoot["Note"]):
         Returns:
             The new note, with a `NoteCreated` event pending.
         """
-        location: NoteLocation = NoteLocation(
-            area=area, origin=origin, kind=draft.kind, slug=draft.slug
-        )
+        location = NoteLocation(area=area, origin=origin, kind=draft.kind, slug=draft.slug)
         note: Self = cls(
             location=location,
             title=draft.title.strip(),

@@ -86,13 +86,11 @@ def curate(
     as_json: JsonOption = False,
 ) -> None:
     """Ask the curator what in a work brief is worth keeping, and store it as auto notes."""
-    command: CurateWorkBriefCommand = CurateWorkBriefCommand(
+    command = CurateWorkBriefCommand(
         brief=_load_brief(brief_file), max_attempts=max_attempts, park_on_failure=park
     )
-    handlers: KnowledgeHandlers = _handlers(context)
-    result: CurationResponse = CurationResponse.model_validate(
-        asyncio.run(handlers.curate.handle(command))
-    )
+    handlers = _handlers(context)
+    result = CurationResponse.model_validate(asyncio.run(handlers.curate.handle(command)))
     _warn(handlers)
     output.emit(result)
 
@@ -104,7 +102,7 @@ def retry(
     as_json: JsonOption = False,
 ) -> None:
     """Retry a parked curation once, in the foreground."""
-    result: CurationResponse = CurationResponse.model_validate(
+    result = CurationResponse.model_validate(
         asyncio.run(_handlers(context).retry.handle(RetryParkedCurationCommand(ticket=ticket)))
     )
     output.emit(result)
@@ -113,7 +111,7 @@ def retry(
 @knowledge_app.command("parked")
 def parked(context: typer.Context, as_json: JsonOption = False) -> None:
     """List work briefs whose curation failed and wait for `retry`."""
-    result: ParkedCurationListResponse = ParkedCurationListResponse.model_validate(
+    result = ParkedCurationListResponse.model_validate(
         asyncio.run(_handlers(context).list_parked.handle(ListParkedCurationsQuery()))
     )
     output.emit(result)
@@ -129,11 +127,9 @@ def search(
     as_json: JsonOption = False,
 ) -> None:
     """Find notes by free text, best match first."""
-    query: SearchNotesQuery = SearchNotesQuery(text=text, area=_area(area, repo), limit=limit)
-    handlers: KnowledgeHandlers = _handlers(context)
-    found: NoteSearchResponse = NoteSearchResponse.model_validate(
-        asyncio.run(handlers.search.handle(query))
-    )
+    query = SearchNotesQuery(text=text, area=_area(area, repo), limit=limit)
+    handlers = _handlers(context)
+    found = NoteSearchResponse.model_validate(asyncio.run(handlers.search.handle(query)))
     if not handlers.notices:
         output.emit(found)
         return
@@ -152,8 +148,8 @@ def list_notes(
     as_json: JsonOption = False,
 ) -> None:
     """List notes, optionally of one area and one origin."""
-    query: ListNotesQuery = ListNotesQuery(area=_area(area, repo), origin=origin)
-    result: NoteListResponse = NoteListResponse.model_validate(
+    query = ListNotesQuery(area=_area(area, repo), origin=origin)
+    result = NoteListResponse.model_validate(
         asyncio.run(_handlers(context).list_notes.handle(query))
     )
     output.emit(result)

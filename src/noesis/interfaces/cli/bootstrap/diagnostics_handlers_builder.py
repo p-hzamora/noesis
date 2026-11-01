@@ -71,7 +71,7 @@ async def run_diagnostics(
         installed_events = tuple(hooks.installed)
     except AgentSettingsInvalidError, OSError:
         installed_events = None
-    query: RunDiagnosticsQuery = RunDiagnosticsQuery(
+    query = RunDiagnosticsQuery(
         env_file=environment.env_file,
         vault_dir=environment.knowledge.vault_dir,
         state_dir=environment.runtime.state_dir,

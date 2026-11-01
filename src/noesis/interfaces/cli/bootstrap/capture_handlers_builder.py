@@ -87,14 +87,12 @@ def build_capture(environment: Environment) -> CaptureHandlers:
         The wired handlers.
     """
     root: Path = environment.runtime.state_dir / CAPTURE_FOLDER
-    clock: SystemClockAdapter = SystemClockAdapter()
-    mapper: CaptureSessionMapper = CaptureSessionMapper()
-    journal: JsonlCaptureJournalAdapter = JsonlCaptureJournalAdapter(root / "journal")
-    recorder: CaptureJournalRecorder = CaptureJournalRecorder(
-        journal=journal, clock=clock, trace=environment.capture.trace
-    )
-    vcs: GitCliVcsReaderAdapter = GitCliVcsReaderAdapter()
-    files: BriefFiles = BriefFiles(root / "briefs")
+    clock = SystemClockAdapter()
+    mapper = CaptureSessionMapper()
+    journal = JsonlCaptureJournalAdapter(root / "journal")
+    recorder = CaptureJournalRecorder(journal=journal, clock=clock, trace=environment.capture.trace)
+    vcs = GitCliVcsReaderAdapter()
+    files = BriefFiles(root / "briefs")
 
     def unit_of_work(session_id: SessionId) -> ICaptureUnitOfWork:
         return JsonFileCaptureUnitOfWorkAdapter(
@@ -103,7 +101,7 @@ def build_capture(environment: Environment) -> CaptureHandlers:
             lock_timeout_seconds=LOCK_TIMEOUT_SECONDS,
         )
 
-    publishers: WorkBriefPublisherResolver = WorkBriefPublisherResolver(
+    publishers = WorkBriefPublisherResolver(
         {
             CaptureModeEnum.LIVE: DetachedProcessWorkBriefPublisherAdapter(
                 files=files,

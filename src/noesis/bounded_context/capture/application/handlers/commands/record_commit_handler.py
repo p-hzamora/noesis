@@ -43,7 +43,7 @@ class RecordCommitHandler(IHandler[RecordCommitCommand, CaptureOutcomeDto]):
 
     async def handle(self, action: RecordCommitCommand) -> CaptureOutcomeDto:
         """Mark the commit, or say why not."""
-        session_id: SessionId = SessionId(value=action.session_id)
+        session_id = SessionId(value=action.session_id)
         return await self._recorder.record(await self._record(session_id, action.cwd))
 
     async def _record(self, session_id: SessionId, cwd: Path) -> CaptureOutcomeDto:

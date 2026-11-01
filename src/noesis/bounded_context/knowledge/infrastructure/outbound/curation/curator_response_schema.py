@@ -61,7 +61,7 @@ class CuratorResponseModel(_Strict):
 
 def _to_decision(model: CuratorDecisionModel) -> CurationDecision:
     """One model to one domain decision."""
-    action: CurationActionEnum = CurationActionEnum(model.action)
+    action = CurationActionEnum(model.action)
     if action is CurationActionEnum.SKIP:
         return CurationDecision(action=action, candidate=model.candidate, reason=model.reason)
     if model.kind is None or not model.title:
@@ -76,7 +76,7 @@ def _to_decision(model: CuratorDecisionModel) -> CurationDecision:
         )
     except DomainException:
         slug = NoteSlug.from_title(model.slug or model.title)
-    draft: NoteDraft = NoteDraft(
+    draft = NoteDraft(
         kind=NoteKindEnum(model.kind),
         slug=slug,
         title=model.title,

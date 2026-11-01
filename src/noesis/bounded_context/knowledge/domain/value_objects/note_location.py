@@ -58,7 +58,7 @@ class NoteLocation(ValueObject):
         Raises:
             InvalidNoteLocationError: The path does not follow the note layout.
         """
-        path: PurePosixPath = PurePosixPath(relative_path)
+        path = PurePosixPath(relative_path)
         parts: tuple[str, ...] = path.parts
         kind: NoteKindEnum | None = NoteKindEnum.from_folder(parts[-2]) if len(parts) >= 3 else None
         if path.suffix != NOTE_SUFFIX or kind is None:

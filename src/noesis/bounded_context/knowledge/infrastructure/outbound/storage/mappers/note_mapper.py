@@ -122,7 +122,7 @@ class NoteMapper:
         created: datetime | None = _as_datetime(parsed.frontmatter.get("date"))
         updated: datetime | None = _as_datetime(parsed.frontmatter.get("updated")) or created
         session: object = parsed.frontmatter.get("session")
-        note: Note = Note(
+        note = Note(
             location=location,
             title=parsed.title or location.slug.value,
             sections=parsed.sections,

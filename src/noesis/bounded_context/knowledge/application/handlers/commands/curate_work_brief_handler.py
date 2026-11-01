@@ -146,7 +146,7 @@ class CurateWorkBriefHandler(IHandler[CurateWorkBriefCommand, CurationResultDto]
                 existing_auto: Note | None = None
                 existing_manual: Note | None = None
                 if decision.draft is not None:
-                    location: NoteLocation = NoteLocation(
+                    location = NoteLocation(
                         area=area,
                         origin=NoteOriginEnum.AUTO,
                         kind=decision.draft.kind,

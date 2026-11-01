@@ -26,7 +26,7 @@ class NoteArea(ValueObject):
     @field_validator("value")
     @classmethod
     def _safe(cls, value: str) -> str:
-        path: PurePosixPath = PurePosixPath(value)
+        path = PurePosixPath(value)
         if (
             not value
             or path.is_absolute()

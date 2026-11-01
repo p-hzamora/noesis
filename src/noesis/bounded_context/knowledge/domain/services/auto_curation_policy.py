@@ -100,7 +100,7 @@ class AutoCurationPolicy:
                 reason=decision.reason,
                 note=existing_auto,
             )
-        note: Note = Note.create(
+        note = Note.create(
             area=area,
             origin=NoteOriginEnum.AUTO,
             draft=draft,

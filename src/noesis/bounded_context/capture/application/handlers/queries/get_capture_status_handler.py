@@ -27,7 +27,7 @@ class GetCaptureStatusHandler(IHandler[GetCaptureStatusQuery, CaptureStatusDto])
 
     async def handle(self, action: GetCaptureStatusQuery) -> CaptureStatusDto:
         """The session's status."""
-        session_id: SessionId = SessionId(value=action.session_id)
+        session_id = SessionId(value=action.session_id)
         async with self._uow_factory(session_id) as uow:
             session: CaptureSession | None = await uow.sessions.get(session_id)
         return CaptureSessionAssembler.to_dto(session, session_id)

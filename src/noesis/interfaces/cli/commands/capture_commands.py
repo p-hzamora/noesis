@@ -57,7 +57,7 @@ def capture_on(
     as_json: JsonOption = False,
 ) -> None:
     """Switch capture on for a session."""
-    command: EnableCaptureCommand = EnableCaptureCommand(session_id=session, mode=mode)
+    command = EnableCaptureCommand(session_id=session, mode=mode)
     status: CaptureStatusResponse = _status(
         context, asyncio.run(_handlers(context).enable.handle(command))
     )
@@ -98,8 +98,6 @@ def capture_runs(
     as_json: JsonOption = False,
 ) -> None:
     """Show the session journal: marks, hand-overs, skips, and curation results."""
-    query: ListCaptureRunsQuery = ListCaptureRunsQuery(session_id=session, limit=limit)
-    runs: CaptureRunListResponse = CaptureRunListResponse.model_validate(
-        asyncio.run(_handlers(context).runs.handle(query))
-    )
+    query = ListCaptureRunsQuery(session_id=session, limit=limit)
+    runs = CaptureRunListResponse.model_validate(asyncio.run(_handlers(context).runs.handle(query)))
     output.emit(runs)
