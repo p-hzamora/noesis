@@ -12,9 +12,17 @@ from noesis.bounded_context.capture.application.handlers.commands.flush_capture_
     FlushCaptureCommand,
     FlushCaptureHandler,
 )
+from noesis.bounded_context.capture.application.handlers.commands.install_agent_hooks_handler import (
+    InstallAgentHooksCommand,
+    InstallAgentHooksHandler,
+)
 from noesis.bounded_context.capture.application.handlers.commands.record_commit_handler import (
     RecordCommitCommand,
     RecordCommitHandler,
+)
+from noesis.bounded_context.capture.application.handlers.commands.uninstall_agent_hooks_handler import (
+    UninstallAgentHooksCommand,
+    UninstallAgentHooksHandler,
 )
 
 __all__ = [
@@ -24,6 +32,10 @@ __all__ = [
     "EnableCaptureHandler",
     "FlushCaptureCommand",
     "FlushCaptureHandler",
+    "InstallAgentHooksCommand",
+    "InstallAgentHooksHandler",
     "RecordCommitCommand",
     "RecordCommitHandler",
+    "UninstallAgentHooksCommand",
+    "UninstallAgentHooksHandler",
 ]

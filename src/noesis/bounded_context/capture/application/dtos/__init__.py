@@ -1,5 +1,10 @@
 """Capture DTOs."""
 
+from noesis.bounded_context.capture.application.dtos.agent_hook_change_dto import (
+    AgentHookChangeDto,
+)
+from noesis.bounded_context.capture.application.dtos.agent_hook_plan_dto import AgentHookPlanDto
+from noesis.bounded_context.capture.application.dtos.agent_hooks_dto import AgentHooksDto
 from noesis.bounded_context.capture.application.dtos.capture_outcome_dto import (
     CaptureOutcomeDto,
     CaptureOutcomeEnum,
@@ -15,6 +20,9 @@ from noesis.bounded_context.capture.application.dtos.transcript_snapshot_dto imp
 )
 
 __all__ = [
+    "AgentHookChangeDto",
+    "AgentHookPlanDto",
+    "AgentHooksDto",
     "CaptureOutcomeDto",
     "CaptureOutcomeEnum",
     "CaptureRunDto",
