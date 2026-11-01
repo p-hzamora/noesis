@@ -14,7 +14,7 @@ with any of them.
 ## Install
 
 ```bash
-uv tool install ~/Desktop/noesis        # or: uv tool install -e . from a checkout
+uv tool install git+https://github.com/p-hzamora/noesis   # or: uv tool install -e . from a checkout
 noesis config init --vault-dir ~/brain  # writes ~/.config/noesis/.env
 noesis doctor                           # checks folders, git, and the curator CLI
 ```
@@ -79,3 +79,13 @@ make init     # uv sync
 make check    # ruff, format check, mypy --strict, import-linter, pytest with coverage
 make help     # every target
 ```
+
+## Contributing
+
+Issues and pull requests are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) first; it covers
+setup, `make check`, the architecture rules and the commit style. Please follow the
+[Code of Conduct](CODE_OF_CONDUCT.md). Security reports: see [SECURITY.md](SECURITY.md).
+
+## License
+
+[MIT](LICENSE)
