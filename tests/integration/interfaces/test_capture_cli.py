@@ -126,3 +126,49 @@ def test_capture_needs_a_valid_session(capsys: pytest.CaptureFixture[str]) -> No
     assert run(["capture", "status"]) == 2
     assert run(["capture", "status", "--session", "bad id", "--json"]) == 1
     assert json.loads(capsys.readouterr().out)["error"]["code"] == "CAPTURE_001_INVALID_SESSION_ID"
+
+
+def test_capture_on_reports_the_env_file_state_dir_and_vault_the_hooks_must_share(
+    tmp_path: Path,
+    repo: Path,
+    transcript: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    pinned_state: Path = tmp_path / "lab/state"
+    env_file: Path = tmp_path / "lab/noesis.env"
+    env_file.parent.mkdir()
+    env_file.write_text(
+        f"NOESIS_STATE_DIR={pinned_state}\nNOESIS_VAULT_DIR={tmp_path / 'lab/vault'}\n"
+        "NOESIS_CAPTURE_MIN_FILES=1\n",
+        encoding="utf-8",
+    )
+    pinned: list[str] = ["--env-file", str(env_file)]
+
+    assert run([*pinned, "capture", "on", "--session", SESSION, "--mode", "dry-run", "--json"]) == 0
+    result = json.loads(capsys.readouterr().out)["result"]
+    assert (result["enabled"], result["env_file"], result["state_dir"], result["vault_dir"]) == (
+        True,
+        str(env_file),
+        str(pinned_state),
+        str(tmp_path / "lab/vault"),
+    )
+
+    # Without the pinned env file, the default state dir knows nothing about the session.
+    assert run(["capture", "status", "--session", SESSION, "--json"]) == 0
+    assert json.loads(capsys.readouterr().out)["result"]["enabled"] is False
+
+    commit = {
+        "session_id": SESSION,
+        "hook_event_name": "PostToolUse",
+        "tool_name": "Bash",
+        "tool_input": {"command": "git commit -m x"},
+        "cwd": str(repo),
+        "transcript_path": str(transcript),
+    }
+    monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps(commit)))
+    assert run([*pinned, "hook", "claude-code"]) == 0
+    assert run([*pinned, "capture", "status", "--session", SESSION]) == 0
+    text: str = capsys.readouterr().out
+    assert "pending: 1 commit(s)" in text
+    assert f"state dir: {pinned_state}" in text

@@ -130,7 +130,7 @@ def test_skills_list_and_get_serve_the_packaged_guide(capsys: pytest.CaptureFixt
     assert run(["skills", "get", "noesis"]) == 0
     guide: str = capsys.readouterr().out
     assert guide.startswith("# noesis: guide for agents")
-    assert "noesis capture on --session" in guide
+    assert "capture on --session" in guide
 
     assert run(["skills", "get", "nope", "--json"]) == 2
     assert json.loads(capsys.readouterr().out)["error"]["metadata"]["available"] == ["noesis"]
@@ -142,6 +142,19 @@ def test_the_installable_skill_stub_defers_to_the_cli_guide() -> None:
     assert stub.startswith("---\nname: noesis\ndescription: ")
     assert "noesis skills get noesis" in stub
     assert "${CLAUDE_SESSION_ID}" in stub
+    assert ".claude/settings.local.json" in stub
+    assert "noesis --env-file <path> capture on" in stub
+
+
+def test_the_guide_pins_the_hooks_env_file_and_verifies_capture(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    run(["skills", "get", "noesis"])
+    guide: str = capsys.readouterr().out
+
+    assert "## Which env file" in guide
+    assert "noesis [--env-file <path>] capture on --session" in guide
+    assert "`result.enabled` is `true`" in guide
 
 
 def test_every_command_in_the_guide_exists(capsys: pytest.CaptureFixture[str]) -> None:
@@ -153,7 +166,7 @@ def test_every_command_in_the_guide_exists(capsys: pytest.CaptureFixture[str]) -
         if line.startswith("```"):
             in_code = not in_code
         elif in_code and line.startswith("noesis "):
-            words: list[str] = line.split()
+            words: list[str] = line.replace("[--env-file <path>] ", "").split()
             if len(words) > 2 and not words[2].startswith(("-", "<", '"')):
                 commands.add((words[1], words[2]))
     assert len(commands) >= 10
