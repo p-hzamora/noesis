@@ -1,0 +1,33 @@
+"""Reusable Typer option declarations, so every command spells them the same way."""
+
+from pathlib import Path
+from typing import Annotated
+
+import typer
+
+from noesis.interfaces.cli.output import remember_json_mode
+
+JsonOption = Annotated[
+    bool,
+    typer.Option(
+        "--json", help="Print a JSON envelope instead of text.", callback=remember_json_mode
+    ),
+]
+EnvFileOption = Annotated[
+    Path | None,
+    typer.Option(
+        "--env-file",
+        envvar="NOESIS_ENV_FILE",
+        help="Configuration file to read (default: ~/.config/noesis/.env).",
+        dir_okay=False,
+    ),
+]
+SessionOption = Annotated[
+    str,
+    typer.Option(
+        "--session",
+        envvar="NOESIS_SESSION_ID",
+        help="Agent session id (in Claude Code skills: ${CLAUDE_SESSION_ID}).",
+        show_envvar=True,
+    ),
+]
