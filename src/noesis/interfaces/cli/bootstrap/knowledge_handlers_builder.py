@@ -17,6 +17,7 @@ from noesis.bounded_context.knowledge.application.ports.uow import IKnowledgeUni
 from noesis.bounded_context.knowledge.domain.services import AutoCurationPolicy
 from noesis.bounded_context.knowledge.infrastructure.outbound.curation import (
     ClaudeCliCuratorAdapter,
+    default_system_prompt,
 )
 from noesis.bounded_context.knowledge.infrastructure.outbound.queue import (
     JsonFileParkedCurationQueueAdapter,
@@ -28,7 +29,7 @@ from noesis.bounded_context.knowledge.infrastructure.outbound.storage import (
 )
 from noesis.bounded_context.knowledge.infrastructure.outbound.storage.mappers import NoteMapper
 from noesis.core import Environment
-from noesis.exceptions import VaultNotConfiguredError
+from noesis.exceptions import CuratorPromptUnreadableError, VaultNotConfiguredError
 from noesis.shared_kernel.infrastructure.outbound.clock import SystemClockAdapter
 
 PARKED_FOLDER: tuple[str, ...] = ("knowledge", "parked")
@@ -69,6 +70,48 @@ def require_vault(environment: Environment) -> Path:
     return vault
 
 
+def curator_system_prompt(environment: Environment) -> str:
+    """The curator's system prompt: the configured file, else the packaged one.
+
+    Raises:
+        CuratorPromptUnreadableError: `NOESIS_CURATOR_SYSTEM_PROMPT_FILE` cannot be read.
+    """
+    prompt_file: Path | None = environment.curator.system_prompt_file
+    if prompt_file is None:
+        return default_system_prompt()
+    path: Path = prompt_file.expanduser()
+    try:
+        prompt: str = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as error:
+        raise CuratorPromptUnreadableError(
+            f"Cannot read the curator system prompt {path}: {error}",
+            {"setting": "NOESIS_CURATOR_SYSTEM_PROMPT_FILE", "path": str(path)},
+            next_steps=[
+                "Fix the file, or unset NOESIS_CURATOR_SYSTEM_PROMPT_FILE to use the packaged prompt."
+            ],
+        ) from error
+    if not prompt.strip():
+        raise CuratorPromptUnreadableError(
+            f"The curator system prompt {path} is empty.",
+            {"setting": "NOESIS_CURATOR_SYSTEM_PROMPT_FILE", "path": str(path)},
+            next_steps=[
+                "Write the prompt, or unset NOESIS_CURATOR_SYSTEM_PROMPT_FILE to use the packaged prompt."
+            ],
+        )
+    return prompt
+
+
+def build_curator(environment: Environment) -> ICurator:
+    """The Claude CLI curator configured by `environment`."""
+    return ClaudeCliCuratorAdapter(
+        claude_bin=environment.curator.claude_bin,
+        model=environment.curator.model,
+        max_budget_usd=environment.curator.max_budget_usd,
+        timeout_seconds=environment.curator.timeout_seconds,
+        system_prompt=curator_system_prompt(environment),
+    )
+
+
 def build_knowledge(
     environment: Environment, *, curator: ICurator | None = None
 ) -> KnowledgeHandlers:
@@ -96,13 +139,7 @@ def build_knowledge(
     curate: CurateWorkBriefHandler = CurateWorkBriefHandler(
         uow_factory=unit_of_work,
         read_repository=read_repository,
-        curator=curator
-        or ClaudeCliCuratorAdapter(
-            claude_bin=environment.curator.claude_bin,
-            model=environment.curator.model,
-            max_budget_usd=environment.curator.max_budget_usd,
-            timeout_seconds=environment.curator.timeout_seconds,
-        ),
+        curator=curator or build_curator(environment),
         queue=queue,
         clock=SystemClockAdapter(),
         policy=AutoCurationPolicy(),

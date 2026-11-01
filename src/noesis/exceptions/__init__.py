@@ -12,6 +12,7 @@ from .capture_errors import CaptureNotEnabledError, CaptureStateError, InvalidSe
 from .core_errors import (
     ConfigFileExistsError,
     ConfigTemplateMissingError,
+    CuratorPromptUnreadableError,
     InvalidConfigurationError,
     VaultNotConfiguredError,
 )
@@ -40,6 +41,7 @@ __all__ = [
     "CoreException",
     "CurationFailedError",
     "CuratorFailedError",
+    "CuratorPromptUnreadableError",
     "DomainException",
     "ExitCodeEnum",
     "InfrastructureException",

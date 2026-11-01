@@ -20,11 +20,17 @@ from noesis.exceptions import (
     CuratorFailedError,
 )
 
+from . import prompts
 from .curator_response_schema import RESPONSE_JSON_SCHEMA, CuratorResponseModel
 
 SYSTEM_PROMPT_RESOURCE: str = "curator_system.md"
 RECURSION_GUARD: Mapping[str, str] = {"NOESIS_HOOK": "1"}
 ERROR_TAIL_LENGTH: int = 300
+
+
+def default_system_prompt() -> str:
+    """The packaged system prompt of this adapter: the admission rule, written for `claude -p`."""
+    return files(prompts).joinpath(SYSTEM_PROMPT_RESOURCE).read_text(encoding="utf-8")
 
 
 def render_user_prompt(brief: WorkBrief, related: Sequence[NoteSummaryDto]) -> str:
@@ -63,19 +69,16 @@ class ClaudeCliCuratorAdapter(ICurator):
         model: str,
         max_budget_usd: float,
         timeout_seconds: float,
+        system_prompt: str,
         environment: Mapping[str, str] | None = None,
     ) -> None:
         self._claude_bin: str = claude_bin
         self._model: str = model
         self._max_budget_usd: float = max_budget_usd
         self._timeout_seconds: float = timeout_seconds
+        self._system_prompt: str = system_prompt
         self._environment: Mapping[str, str] = (
             environment if environment is not None else os.environ
-        )
-        self._system_prompt: str = (
-            files("noesis.bounded_context.knowledge.infrastructure.outbound.curation.prompts")
-            .joinpath(SYSTEM_PROMPT_RESOURCE)
-            .read_text(encoding="utf-8")
         )
 
     def command(self) -> list[str]:

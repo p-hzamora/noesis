@@ -25,3 +25,9 @@ class ConfigTemplateMissingError(CoreException):
     """The packaged `.env.example` template cannot be found."""
 
     __error_code__ = "CORE_004_CONFIG_TEMPLATE_MISSING"
+
+
+class CuratorPromptUnreadableError(CoreException):
+    """The configured curator system prompt file cannot be read."""
+
+    __error_code__ = "CORE_005_CURATOR_PROMPT_UNREADABLE"

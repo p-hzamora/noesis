@@ -17,7 +17,9 @@ from .diagnostics_handlers_builder import build_diagnostics, run_diagnostics
 from .knowledge_handlers_builder import (
     PARKED_FOLDER,
     KnowledgeHandlers,
+    build_curator,
     build_knowledge,
+    curator_system_prompt,
     require_vault,
 )
 
@@ -30,9 +32,11 @@ __all__ = [
     "PARKED_FOLDER",
     "build_agent_hooks",
     "build_capture",
+    "build_curator",
     "build_diagnostics",
     "build_knowledge",
     "curator_command",
+    "curator_system_prompt",
     "require_vault",
     "run_diagnostics",
 ]
