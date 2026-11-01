@@ -51,7 +51,7 @@ def render_user_prompt(brief: WorkBrief, related: Sequence[NoteSummaryDto]) -> s
     if related:
         lines.append("Related existing notes:")
         lines += [
-            f"- {note.path} ({note.origin} {note.kind}): {note.title} -- {note.snippet}"
+            f"- {note.path} ({note.origin} {note.kind or 'note'}): {note.title} -- {note.snippet}"
             for note in related
         ]
     else:

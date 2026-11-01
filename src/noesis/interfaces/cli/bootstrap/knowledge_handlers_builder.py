@@ -13,6 +13,7 @@ from noesis.bounded_context.knowledge.application.handlers.queries import (
     SearchNotesHandler,
 )
 from noesis.bounded_context.knowledge.application.ports.curation import ICurator
+from noesis.bounded_context.knowledge.application.ports.read_repositories import INoteReadRepository
 from noesis.bounded_context.knowledge.application.ports.uow import IKnowledgeUnitOfWork
 from noesis.bounded_context.knowledge.domain.services import AutoCurationPolicy
 from noesis.bounded_context.knowledge.infrastructure.outbound.curation import (
@@ -23,16 +24,20 @@ from noesis.bounded_context.knowledge.infrastructure.outbound.queue import (
     JsonFileParkedCurationQueueAdapter,
 )
 from noesis.bounded_context.knowledge.infrastructure.outbound.storage import (
+    FallbackNoteReadRepositoryAdapter,
     FilesystemKnowledgeUnitOfWorkAdapter,
     FilesystemNoteReadRepositoryAdapter,
     FilesystemNoteRepositoryAdapter,
+    ObsidianMcpNoteReadRepositoryAdapter,
 )
 from noesis.bounded_context.knowledge.infrastructure.outbound.storage.mappers import NoteMapper
-from noesis.core import Environment
+from noesis.core import Environment, SearchBackendEnum
 from noesis.exceptions import CuratorPromptUnreadableError, VaultNotConfiguredError
 from noesis.shared_kernel.infrastructure.outbound.clock import SystemClockAdapter
+from noesis.shared_kernel.infrastructure.outbound.mcp import ObsidianMcpClient
 
 PARKED_FOLDER: tuple[str, ...] = ("knowledge", "parked")
+MCP_FALLBACK_NOTICE: str = "Obsidian MCP unreachable, searched files instead"
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -45,6 +50,8 @@ class KnowledgeHandlers:
         search: Free-text note search.
         list_notes: List notes.
         list_parked: List parked curations.
+        notices: Messages the adapters raised while the handlers ran (e.g. the search fell
+            back to files); the commands show them. Empty on the default backend.
     """
 
     curate: CurateWorkBriefHandler
@@ -52,6 +59,7 @@ class KnowledgeHandlers:
     search: SearchNotesHandler
     list_notes: ListNotesHandler
     list_parked: ListParkedCurationsHandler
+    notices: list[str]
 
 
 def require_vault(environment: Environment) -> Path:
@@ -112,6 +120,35 @@ def build_curator(environment: Environment) -> ICurator:
     )
 
 
+def build_read_repository(
+    environment: Environment, vault: Path, mapper: NoteMapper, notices: list[str]
+) -> INoteReadRepository:
+    """The note read repository for `NOESIS_SEARCH_BACKEND`.
+
+    `filesystem` (default) never touches the network. `obsidian-mcp` searches through Obsidian
+    and degrades to the filesystem, appending one notice to `notices`, when it is unreachable.
+    The same repository serves `knowledge search`, `knowledge list` and the curator's
+    related-notes lookup, so curation never fails because Obsidian is closed.
+    """
+    files: FilesystemNoteReadRepositoryAdapter = FilesystemNoteReadRepositoryAdapter(vault, mapper)
+    settings = environment.knowledge
+    if settings.search_backend is not SearchBackendEnum.OBSIDIAN_MCP:
+        return files
+    token: str | None = (
+        settings.obsidian_mcp_token.get_secret_value() if settings.obsidian_mcp_token else None
+    )
+    client: ObsidianMcpClient = ObsidianMcpClient(
+        settings.obsidian_mcp_url,
+        token=token,
+        timeout_seconds=settings.obsidian_mcp_timeout_seconds,
+    )
+    return FallbackNoteReadRepositoryAdapter(
+        ObsidianMcpNoteReadRepositoryAdapter(client, mapper, listing=files),
+        files,
+        on_fallback=lambda _error: notices.append(MCP_FALLBACK_NOTICE),
+    )
+
+
 def build_knowledge(
     environment: Environment, *, curator: ICurator | None = None
 ) -> KnowledgeHandlers:
@@ -126,8 +163,9 @@ def build_knowledge(
     """
     vault: Path = require_vault(environment)
     mapper: NoteMapper = NoteMapper()
-    read_repository: FilesystemNoteReadRepositoryAdapter = FilesystemNoteReadRepositoryAdapter(
-        vault, mapper
+    notices: list[str] = []
+    read_repository: INoteReadRepository = build_read_repository(
+        environment, vault, mapper, notices
     )
     queue: JsonFileParkedCurationQueueAdapter = JsonFileParkedCurationQueueAdapter(
         environment.runtime.state_dir.joinpath(*PARKED_FOLDER)
@@ -151,4 +189,5 @@ def build_knowledge(
         search=SearchNotesHandler(read_repository=read_repository),
         list_notes=ListNotesHandler(read_repository=read_repository),
         list_parked=ListParkedCurationsHandler(queue=queue),
+        notices=notices,
     )

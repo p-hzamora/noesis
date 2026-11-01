@@ -17,7 +17,11 @@ from .core_errors import (
     VaultNotConfiguredError,
 )
 from .exit_code_enum import ExitCodeEnum
-from .integration_errors import AgentSettingsInvalidError, SkillGuideNotFoundError
+from .integration_errors import (
+    AgentSettingsInvalidError,
+    ObsidianMcpError,
+    SkillGuideNotFoundError,
+)
 from .interface_errors import InvalidWorkBriefError
 from .knowledge_errors import (
     CurationFailedError,
@@ -54,6 +58,7 @@ __all__ = [
     "InvalidWorkBriefError",
     "ManualNoteProtectedError",
     "NoteStorageError",
+    "ObsidianMcpError",
     "ParkedCurationNotFoundError",
     "SkillGuideNotFoundError",
     "VaultNotConfiguredError",

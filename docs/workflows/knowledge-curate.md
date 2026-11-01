@@ -7,7 +7,7 @@ sequenceDiagram
     participant Boot as build_knowledge
     participant H as CurateWorkBriefHandler
     participant Map as WorkBriefMapper
-    participant Read as INoteReadRepository<br/>(filesystem keyword search)
+    participant Read as INoteReadRepository<br/>(filesystem keyword search, or Obsidian MCP<br/>with filesystem fallback)
     participant Cur as ICurator<br/>(ClaudeCliCuratorAdapter)
     participant Pol as AutoCurationPolicy (domain)
     participant UoW as IKnowledgeUnitOfWork
@@ -19,7 +19,7 @@ sequenceDiagram
     H->>Map: to_domain(contract)
     Map-->>H: WorkBrief (area, search_text, provenance)
     H->>Read: search(brief.search_text(), area, limit=8)
-    Read-->>H: related NoteSummaryDto[]
+    Read-->>H: related NoteSummaryDto[]<br/>(never fails: MCP errors fall back to files)
     loop up to max_attempts
         H->>Cur: curate(brief, related)
         Cur-->>H: CurationDecision[] or CuratorFailedError
@@ -29,7 +29,7 @@ sequenceDiagram
         H-->>Cmd: CurationFailedError (next step: knowledge retry ticket)
     else decisions
         loop each decision
-            H->>UoW: get existing auto note and manual note
+            H->>UoW: get existing auto note and manual note (always files)
             H->>Pol: apply(decision, existing, commits, session)
             Pol-->>H: created / updated / skipped (manual note wins)
             H->>UoW: notes.save(note)

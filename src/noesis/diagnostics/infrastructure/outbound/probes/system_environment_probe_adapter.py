@@ -31,3 +31,10 @@ class SystemEnvironmentProbeAdapter(IEnvironmentProbe):
     def find_executable(self, command: str) -> str | None:
         """`shutil.which` of `command`."""
         return shutil.which(command)
+
+    def list_entries(self, folder: Path) -> tuple[str, ...]:
+        """Sorted names directly inside `folder`; empty when it cannot be listed."""
+        try:
+            return tuple(sorted(entry.name for entry in folder.iterdir()))
+        except OSError:
+            return ()

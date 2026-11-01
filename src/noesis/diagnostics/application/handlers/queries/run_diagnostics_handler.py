@@ -3,7 +3,8 @@
 from pathlib import Path
 
 from noesis.diagnostics.application.dtos import DiagnosticCheckDto, DiagnosticReportDto
-from noesis.diagnostics.application.ports.probes import IEnvironmentProbe
+from noesis.diagnostics.application.ports.probes import IEnvironmentProbe, IObsidianMcpProbe
+from noesis.exceptions import ObsidianMcpError
 from noesis.shared_kernel.application.handlers import IHandler
 from noesis.utils import FrozenObject
 
@@ -19,6 +20,8 @@ class RunDiagnosticsQuery(FrozenObject):
         hooks_settings_file: Agent settings file whose hooks were inspected.
         installed_hook_events: Events with a noesis hook, or None when the settings file
             could not be read.
+        obsidian_mcp_url: Obsidian MCP endpoint to probe, or None when notes are searched
+            on the filesystem (then no MCP call is made).
     """
 
     env_file: Path
@@ -27,13 +30,17 @@ class RunDiagnosticsQuery(FrozenObject):
     curator_binary: str
     hooks_settings_file: Path
     installed_hook_events: tuple[str, ...] | None
+    obsidian_mcp_url: str | None = None
 
 
 class RunDiagnosticsHandler(IHandler[RunDiagnosticsQuery, DiagnosticReportDto]):
     """Runs every check, in a fixed order, against the probe."""
 
-    def __init__(self, *, probe: IEnvironmentProbe) -> None:
+    def __init__(
+        self, *, probe: IEnvironmentProbe, obsidian: IObsidianMcpProbe | None = None
+    ) -> None:
         self._probe: IEnvironmentProbe = probe
+        self._obsidian: IObsidianMcpProbe | None = obsidian
 
     async def handle(self, action: RunDiagnosticsQuery) -> DiagnosticReportDto:
         """The report; `ok` is False when any check failed."""
@@ -46,6 +53,7 @@ class RunDiagnosticsHandler(IHandler[RunDiagnosticsQuery, DiagnosticReportDto]):
                 "curator", action.curator_binary, "the Claude Code CLI runs the curator"
             ),
             self._check_agent_hooks(action.hooks_settings_file, action.installed_hook_events),
+            await self._check_search_backend(action),
         )
         return DiagnosticReportDto(ok=all(check.ok for check in checks), checks=checks)
 
@@ -120,4 +128,58 @@ class RunDiagnosticsHandler(IHandler[RunDiagnosticsQuery, DiagnosticReportDto]):
             ok=True,
             detail="not installed (capture from Claude Code is off)",
             next_step="Run `noesis integrate claude-code install` to enable capture.",
+        )
+
+    async def _check_search_backend(self, action: RunDiagnosticsQuery) -> DiagnosticCheckDto:
+        """Whether Obsidian's MCP answers and serves the folder `NOESIS_VAULT_DIR` points at.
+
+        Obsidian does not tell which folder it serves, so the root listings are compared:
+        the same non-hidden names on both sides means the same vault.
+        """
+        if action.obsidian_mcp_url is None or self._obsidian is None:
+            return DiagnosticCheckDto(
+                name="search_backend",
+                ok=True,
+                detail="filesystem (Obsidian MCP not used)",
+                next_step="Set NOESIS_SEARCH_BACKEND=obsidian-mcp to search through Obsidian.",
+            )
+        url: str = action.obsidian_mcp_url
+        try:
+            served: set[str] = {
+                name for name in await self._obsidian.list_root() if not name.startswith(".")
+            }
+        except ObsidianMcpError as error:
+            return DiagnosticCheckDto(
+                name="search_backend",
+                ok=False,
+                detail=f"obsidian-mcp unreachable at {url}: {error.message}",
+                next_step=(
+                    "Start Obsidian with its MCP server (searches use files meanwhile), "
+                    "or check NOESIS_OBSIDIAN_MCP_URL and NOESIS_OBSIDIAN_MCP_TOKEN."
+                ),
+            )
+        if action.vault_dir is None:
+            return DiagnosticCheckDto(
+                name="search_backend",
+                ok=True,
+                detail=f"obsidian-mcp reachable at {url} (vault not compared: NOESIS_VAULT_DIR is not set)",
+            )
+        local: set[str] = {
+            name for name in self._probe.list_entries(action.vault_dir) if not name.startswith(".")
+        }
+        if served != local:
+            differing: list[str] = sorted(served ^ local)[:5]
+            return DiagnosticCheckDto(
+                name="search_backend",
+                ok=False,
+                detail=(
+                    f"obsidian-mcp at {url} serves a different vault than {action.vault_dir} "
+                    f"(entries only on one side: {', '.join(differing)})"
+                ),
+                next_step="Open the vault of NOESIS_VAULT_DIR in Obsidian, or point NOESIS_VAULT_DIR at the vault Obsidian serves.",
+            )
+        return DiagnosticCheckDto(
+            name="search_backend",
+            ok=True,
+            detail=f"obsidian-mcp reachable at {url}, serving {action.vault_dir}",
         )

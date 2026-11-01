@@ -8,7 +8,8 @@ from noesis.diagnostics.application.handlers.queries import (
     RunDiagnosticsHandler,
     RunDiagnosticsQuery,
 )
-from noesis.diagnostics.application.ports.probes import IEnvironmentProbe
+from noesis.diagnostics.application.ports.probes import IEnvironmentProbe, IObsidianMcpProbe
+from noesis.exceptions import ObsidianMcpError
 
 pytestmark = pytest.mark.unit
 
@@ -21,7 +22,9 @@ class _Probe(IEnvironmentProbe):
         folders: set[Path] | None = None,
         writable: set[Path] | None = None,
         executables: dict[str, str] | None = None,
+        entries: dict[Path, tuple[str, ...]] | None = None,
     ) -> None:
+        self.entries: dict[Path, tuple[str, ...]] = entries or {}
         self.files: set[Path] = files or set()
         self.folders: set[Path] = folders or set()
         self.writable: set[Path] = writable or set()
@@ -38,6 +41,9 @@ class _Probe(IEnvironmentProbe):
 
     def find_executable(self, command: str) -> str | None:
         return self.executables.get(command)
+
+    def list_entries(self, folder: Path) -> tuple[str, ...]:
+        return self.entries.get(folder, ())
 
 
 VAULT: Path = Path("/vault")
@@ -71,6 +77,7 @@ async def test_a_healthy_machine_passes_every_check() -> None:
     assert report.ok
     assert [check.name for check in report.checks] == [
         "config_file", "vault", "state_dir", "git", "curator", "claude_code_hooks",
+        "search_backend",
     ]  # fmt: skip
     assert report.checks[0].detail == "/cfg/.env (found)"
     assert report.checks[2].detail == str(
@@ -110,3 +117,71 @@ async def test_installed_events_are_listed_sorted() -> None:
 
     assert report.checks[5].detail == "installed: PostToolUse, Stop"
     assert report.checks[5].next_step is None
+
+
+class _Obsidian(IObsidianMcpProbe):
+    def __init__(self, root: tuple[str, ...] | None) -> None:
+        self.root: tuple[str, ...] | None = root
+        self.calls: int = 0
+
+    async def list_root(self) -> tuple[str, ...]:
+        self.calls += 1
+        if self.root is None:
+            raise ObsidianMcpError("Obsidian MCP at http://x/mcp/ is unreachable (refused).")
+        return self.root
+
+
+MCP_URL: str = "http://127.0.0.1:27123/mcp/"
+
+
+async def _search_check(obsidian: _Obsidian | None, **changes: object) -> tuple[bool, str]:
+    probe: _Probe = _healthy()
+    probe.entries[VAULT] = (".obsidian", "repos", "learning")
+    report = await RunDiagnosticsHandler(probe=probe, obsidian=obsidian).handle(_query(**changes))
+    check = report.checks[-1]
+    assert check.name == "search_backend"
+    return check.ok, check.detail
+
+
+async def test_the_filesystem_backend_makes_no_mcp_call() -> None:
+    obsidian: _Obsidian = _Obsidian(("repos",))
+
+    ok, detail = await _search_check(obsidian)
+
+    assert ok
+    assert "filesystem" in detail
+    assert obsidian.calls == 0
+
+
+async def test_obsidian_serving_the_same_vault_passes_ignoring_hidden_entries() -> None:
+    ok, detail = await _search_check(
+        _Obsidian((".obsidian", "learning", "repos")), obsidian_mcp_url=MCP_URL
+    )
+
+    assert ok
+    assert detail == f"obsidian-mcp reachable at {MCP_URL}, serving {VAULT}"
+
+
+async def test_obsidian_serving_another_vault_is_flagged() -> None:
+    ok, detail = await _search_check(_Obsidian(("projects", "repos")), obsidian_mcp_url=MCP_URL)
+
+    assert not ok
+    assert "different vault" in detail
+    assert "learning" in detail
+    assert "projects" in detail
+
+
+async def test_an_unreachable_obsidian_is_flagged_with_the_fallback_hint() -> None:
+    ok, detail = await _search_check(_Obsidian(None), obsidian_mcp_url=MCP_URL)
+
+    assert not ok
+    assert "unreachable" in detail
+
+
+async def test_without_a_vault_folder_the_comparison_is_skipped() -> None:
+    ok, detail = await _search_check(
+        _Obsidian(("repos",)), obsidian_mcp_url=MCP_URL, vault_dir=None
+    )
+
+    assert ok
+    assert "not compared" in detail

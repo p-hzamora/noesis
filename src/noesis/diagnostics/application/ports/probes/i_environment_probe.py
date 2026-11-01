@@ -26,3 +26,8 @@ class IEnvironmentProbe(abc.ABC):
     def find_executable(self, command: str) -> str | None:
         """Full path of `command` on the executable search path, or None."""
         ...
+
+    @abc.abstractmethod
+    def list_entries(self, folder: Path) -> tuple[str, ...]:
+        """Names of the files and folders directly inside `folder` (empty when it is missing)."""
+        ...

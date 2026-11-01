@@ -81,3 +81,32 @@ def test_the_env_example_template_documents_every_setting() -> None:
         "NOESIS_CURATOR_SYSTEM_PROMPT_FILE",
     ):
         assert variable in template
+
+
+def test_search_backend_defaults_to_the_filesystem_and_hides_the_token(
+    tmp_path: Path, isolated_environment: Path
+) -> None:
+    default = load_environment(tmp_path / "missing.env").knowledge
+    assert default.search_backend.value == "filesystem"
+    assert default.obsidian_mcp_url == "http://127.0.0.1:27123/mcp/"
+    assert default.obsidian_mcp_token is None
+
+    env_file: Path = tmp_path / "noesis.env"
+    env_file.write_text(
+        "NOESIS_SEARCH_BACKEND=obsidian-mcp\nNOESIS_OBSIDIAN_MCP_TOKEN=abc123\n", encoding="utf-8"
+    )
+    configured = load_environment(env_file).knowledge
+    assert configured.search_backend.value == "obsidian-mcp"
+    assert configured.obsidian_mcp_token is not None
+    assert configured.obsidian_mcp_token.get_secret_value() == "abc123"
+    assert "abc123" not in repr(configured)
+
+
+def test_an_unknown_search_backend_is_rejected(tmp_path: Path) -> None:
+    env_file: Path = tmp_path / "noesis.env"
+    env_file.write_text("NOESIS_SEARCH_BACKEND=elasticsearch\n", encoding="utf-8")
+
+    with pytest.raises(InvalidConfigurationError) as raised:
+        load_environment(env_file)
+
+    assert "NOESIS_SEARCH_BACKEND" in str(raised.value.metadata["problems"])

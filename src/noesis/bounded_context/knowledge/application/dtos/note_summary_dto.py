@@ -9,7 +9,7 @@ class NoteSummaryDto(BaseDto):
     Attributes:
         path: Vault-relative path.
         title: Note title.
-        kind: Note kind value.
+        kind: Note kind value; None for a note outside the noesis layout (found by Obsidian search).
         origin: `manual` or `auto`.
         updated: Last update date (ISO), when known.
         snippet: Start of the first section, for context.
@@ -17,7 +17,7 @@ class NoteSummaryDto(BaseDto):
 
     path: str
     title: str
-    kind: str
+    kind: str | None
     origin: str
     updated: str | None
     snippet: str

@@ -1,6 +1,7 @@
 """`noesis knowledge`: curate work briefs, retry parked ones, search and list notes."""
 
 import asyncio
+import sys
 from pathlib import Path
 from typing import Annotated
 
@@ -26,6 +27,7 @@ from noesis.interfaces.cli.output import emit
 from noesis.interfaces.cli.responses import (
     CurationResponse,
     NoteListResponse,
+    NoteSearchFallbackResponse,
     ParkedCurationListResponse,
 )
 from noesis.interfaces.cli.state import cli_state
@@ -48,6 +50,12 @@ def _handlers(context: typer.Context) -> KnowledgeHandlers:
 
 def _area(area: str | None, repo: str | None) -> str | None:
     return NoteArea.for_repository(repo).value if repo else area
+
+
+def _warn(handlers: KnowledgeHandlers) -> None:
+    """Show adapter notices on stderr, which never breaks the JSON on stdout."""
+    for notice in handlers.notices:
+        sys.stderr.write(f"notice: {notice}\n")
 
 
 def _load_brief(path: Path) -> WorkBriefContract:
@@ -77,7 +85,7 @@ def _format_notes(result: NoteListResponse) -> str:
     if not result.notes:
         return "no notes"
     return "\n".join(
-        f"{note.path}  [{note.origin} {note.kind}]  {note.title}" for note in result.notes
+        f"{note.path}  [{note.origin} {note.kind or 'note'}]  {note.title}" for note in result.notes
     )
 
 
@@ -107,9 +115,11 @@ def curate(
     command: CurateWorkBriefCommand = CurateWorkBriefCommand(
         brief=_load_brief(brief_file), max_attempts=max_attempts, park_on_failure=park
     )
+    handlers: KnowledgeHandlers = _handlers(context)
     result: CurationResponse = CurationResponse.model_validate(
-        asyncio.run(_handlers(context).curate.handle(command))
+        asyncio.run(handlers.curate.handle(command))
     )
+    _warn(handlers)
     emit(result, _format_result)
 
 
@@ -146,10 +156,18 @@ def search(
 ) -> None:
     """Find notes by free text, best match first."""
     query: SearchNotesQuery = SearchNotesQuery(text=text, area=_area(area, repo), limit=limit)
-    result: NoteListResponse = NoteListResponse.model_validate(
-        asyncio.run(_handlers(context).search.handle(query))
+    handlers: KnowledgeHandlers = _handlers(context)
+    found: NoteListResponse = NoteListResponse.model_validate(
+        asyncio.run(handlers.search.handle(query))
     )
-    emit(result, _format_notes)
+    if not handlers.notices:
+        emit(found, _format_notes)
+        return
+    notice: str = handlers.notices[0]
+    emit(
+        NoteSearchFallbackResponse(notes=found.notes, notice=notice),
+        lambda result: f"{_format_notes(result)}\nnotice: {result.notice}",
+    )
 
 
 @knowledge_app.command("list")

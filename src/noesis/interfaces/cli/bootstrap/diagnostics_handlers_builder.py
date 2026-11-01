@@ -4,21 +4,45 @@ from pathlib import Path
 
 from noesis.bounded_context.capture.application.dtos import AgentHooksDto
 from noesis.bounded_context.capture.application.handlers.queries import GetAgentHooksStatusQuery
-from noesis.core import ClaudeCodeSettings, Environment
+from noesis.core import ClaudeCodeSettings, Environment, SearchBackendEnum
 from noesis.diagnostics.application.dtos import DiagnosticReportDto
 from noesis.diagnostics.application.handlers.queries import (
     RunDiagnosticsHandler,
     RunDiagnosticsQuery,
 )
-from noesis.diagnostics.infrastructure.outbound.probes import SystemEnvironmentProbeAdapter
+from noesis.diagnostics.infrastructure.outbound.probes import (
+    ObsidianMcpProbeAdapter,
+    SystemEnvironmentProbeAdapter,
+)
 from noesis.exceptions import AgentSettingsInvalidError
+from noesis.shared_kernel.infrastructure.outbound.mcp import ObsidianMcpClient
 
 from .agent_hooks_handlers_builder import build_agent_hooks
 
 
-def build_diagnostics() -> RunDiagnosticsHandler:
-    """Wire the diagnostics handler with the probe of the real system."""
-    return RunDiagnosticsHandler(probe=SystemEnvironmentProbeAdapter())
+def build_diagnostics(environment: Environment | None = None) -> RunDiagnosticsHandler:
+    """Wire the diagnostics handler with the probes of the real system.
+
+    The Obsidian MCP probe is wired only when `NOESIS_SEARCH_BACKEND=obsidian-mcp`, so the
+    default configuration never makes an MCP call.
+    """
+    obsidian: ObsidianMcpProbeAdapter | None = None
+    if environment is not None and uses_obsidian_mcp(environment):
+        settings = environment.knowledge
+        token = settings.obsidian_mcp_token
+        obsidian = ObsidianMcpProbeAdapter(
+            ObsidianMcpClient(
+                settings.obsidian_mcp_url,
+                token=token.get_secret_value() if token else None,
+                timeout_seconds=settings.obsidian_mcp_timeout_seconds,
+            )
+        )
+    return RunDiagnosticsHandler(probe=SystemEnvironmentProbeAdapter(), obsidian=obsidian)
+
+
+def uses_obsidian_mcp(environment: Environment) -> bool:
+    """Whether notes are searched through Obsidian's MCP server."""
+    return environment.knowledge.search_backend is SearchBackendEnum.OBSIDIAN_MCP
 
 
 async def run_diagnostics(
@@ -53,5 +77,8 @@ async def run_diagnostics(
         curator_binary=environment.curator.claude_bin,
         hooks_settings_file=settings_file,
         installed_hook_events=installed_events,
+        obsidian_mcp_url=environment.knowledge.obsidian_mcp_url
+        if uses_obsidian_mcp(environment)
+        else None,
     )
-    return await build_diagnostics().handle(query)
+    return await build_diagnostics(environment).handle(query)

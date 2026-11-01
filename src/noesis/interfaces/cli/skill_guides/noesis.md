@@ -40,6 +40,12 @@ noesis knowledge search "<words>" --repo <repo> --json   # best match first
 noesis knowledge list --repo <repo> --origin auto --json  # auto | manual
 ```
 
+If the user set `NOESIS_SEARCH_BACKEND=obsidian-mcp`, search goes through Obsidian (it also finds
+notes noesis did not write; those have `kind: null`). When Obsidian is closed the same command
+still exits 0 with file results and the message `Obsidian MCP unreachable, searched files instead`
+(in `--json`, as `result.notice`): tell the user, do not retry. `noesis doctor` shows whether the
+MCP answers and serves the vault of `NOESIS_VAULT_DIR`.
+
 Results carry each note's `path`; read the file under the vault folder
 (`noesis config show --json` -> `settings.knowledge.vault_dir`) for the full text.
 
@@ -53,7 +59,7 @@ noesis knowledge retry <TICKET> --json   # retry one, in the foreground
 ## Setup and diagnosis
 
 ```bash
-noesis doctor --json                                   # vault, state dir, git, curator CLI, hooks
+noesis doctor --json                                   # vault, state dir, git, curator CLI, hooks, search backend
 noesis config show --json                              # effective settings and their file
 noesis config init --vault-dir <folder>                # create ~/.config/noesis/.env
 noesis integrate claude-code status --json             # are the hooks registered?
