@@ -15,7 +15,8 @@ src/noesis/
   diagnostics/     host-level checks behind `noesis doctor` (not a bounded context, not kernel)
     application/     RunDiagnosticsHandler, IEnvironmentProbe, DiagnosticReportDto
     infrastructure/  SystemEnvironmentProbeAdapter
-  interfaces/cli/  Typer CLI: the composition root (`bootstrap.py`) and the only delivery adapter
+  interfaces/cli/  Typer CLI: the composition root (`bootstrap/`, one `<context>_handlers_builder.py`
+                   per context) and the only delivery adapter
     skill_guides/    Markdown guides served by `noesis skills get` (documents the CLI surface)
 ```
 
