@@ -1,0 +1,15 @@
+{
+  "contract_version": 1,
+  "session_id": "example-session-0001",
+  "repository": "demo",
+  "repository_path": "/work/demo",
+  "branch": "main",
+  "head": "8e6d3b5fe598c6bf",
+  "commits": [
+    {"sha": "8e6d3b5fe598c6bf", "subject": "feat: add TTL cache for token lookups"},
+    {"sha": "1a2b3c4d5e6f7a8b", "subject": "chore: fix typo in README"}
+  ],
+  "diff_stat": ["app.py    | 36 ++++++++++", "README.md |  2 +-"],
+  "goal": "make login faster",
+  "session_excerpt": "U: login is slow, every request hits the auth API\nA: I chose an in-process TTL cache over Redis: there is a single instance and no shared state, so Redis would add a service to run for no gain. Gotcha found: tokens must be evicted on logout, otherwise a logged-out token stays valid until the TTL expires. Fixed by calling cache.invalidate(token) in logout().\nU: also fix the README typo"
+}
