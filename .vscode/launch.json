@@ -1,0 +1,25 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "noesis CLI",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/.venv/bin/noesis",
+      "args": ["--help"],
+      "console": "integratedTerminal",
+      "justMyCode": false
+    },
+    {
+      "name": "noesis CLI (prompt for args)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/.venv/bin/noesis",
+      "args": "${input:cliArgs}",
+      "console": "integratedTerminal"
+    }
+  ],
+  "inputs": [
+    { "id": "cliArgs", "type": "promptString", "description": "noesis args" }
+  ]
+}
