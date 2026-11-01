@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -121,7 +122,16 @@ async def test_dry_run_publisher_stores_the_brief(tmp_path: Path) -> None:
     assert json.loads(Path(publication.reference).read_text())["repository"] == "demo"
 
 
-async def test_live_publisher_detaches_the_curator_and_captures_its_output(tmp_path: Path) -> None:
+@pytest.mark.parametrize("setsid_supported", [True, False], ids=["posix_spawn", "popen_fallback"])
+async def test_live_publisher_detaches_the_curator_and_captures_its_output(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, setsid_supported: bool
+) -> None:
+    if not setsid_supported:
+
+        def _no_setsid(*_args: object, **_kwargs: object) -> int:
+            raise NotImplementedError("posix_spawn: setsid unavailable on this platform")
+
+        monkeypatch.setattr(os, "posix_spawn", _no_setsid)
     fake: Path = tmp_path / "fake_noesis.py"
     fake.write_text(
         "import json, os, sys\n"
