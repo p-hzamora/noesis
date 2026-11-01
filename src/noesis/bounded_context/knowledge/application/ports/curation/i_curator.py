@@ -4,8 +4,7 @@ import abc
 from collections.abc import Sequence
 
 from noesis.bounded_context.knowledge.application.dtos import NoteSummaryDto
-from noesis.bounded_context.knowledge.domain.value_objects import CurationDecision
-from noesis.shared_kernel.contracts import WorkBriefContract
+from noesis.bounded_context.knowledge.domain.value_objects import CurationDecision, WorkBrief
 
 
 class ICurator(abc.ABC):
@@ -13,7 +12,7 @@ class ICurator(abc.ABC):
 
     @abc.abstractmethod
     async def curate(
-        self, brief: WorkBriefContract, related: Sequence[NoteSummaryDto]
+        self, brief: WorkBrief, related: Sequence[NoteSummaryDto]
     ) -> tuple[CurationDecision, ...]:
         """Decide what in `brief` is worth keeping.
 

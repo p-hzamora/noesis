@@ -15,11 +15,10 @@ from pydantic import ValidationError
 
 from noesis.bounded_context.knowledge.application.dtos import NoteSummaryDto
 from noesis.bounded_context.knowledge.application.ports.curation import ICurator
-from noesis.bounded_context.knowledge.domain.value_objects import CurationDecision
+from noesis.bounded_context.knowledge.domain.value_objects import CurationDecision, WorkBrief
 from noesis.exceptions import (
     CuratorFailedError,
 )
-from noesis.shared_kernel.contracts import WorkBriefContract
 
 from .curator_response_schema import RESPONSE_JSON_SCHEMA, CuratorResponseModel
 
@@ -28,7 +27,7 @@ RECURSION_GUARD: Mapping[str, str] = {"NOESIS_HOOK": "1"}
 ERROR_TAIL_LENGTH: int = 300
 
 
-def render_user_prompt(brief: WorkBriefContract, related: Sequence[NoteSummaryDto]) -> str:
+def render_user_prompt(brief: WorkBrief, related: Sequence[NoteSummaryDto]) -> str:
     """The per-run message: the brief as JSON plus the related notes.
 
     Args:
@@ -94,7 +93,7 @@ class ClaudeCliCuratorAdapter(ICurator):
         return [*arguments, "--model", self._model] if self._model else arguments
 
     async def curate(
-        self, brief: WorkBriefContract, related: Sequence[NoteSummaryDto]
+        self, brief: WorkBrief, related: Sequence[NoteSummaryDto]
     ) -> tuple[CurationDecision, ...]:
         """Run the curator once.
 

@@ -7,8 +7,10 @@ from .note_location import NoteLocation
 from .note_origin_enum import NoteOriginEnum
 from .note_section import NoteSection
 from .note_slug import NoteSlug
+from .work_brief import CommitRef, WorkBrief
 
 __all__ = [
+    "CommitRef",
     "CurationActionEnum",
     "CurationDecision",
     "NoteArea",
@@ -18,4 +20,5 @@ __all__ = [
     "NoteOriginEnum",
     "NoteSection",
     "NoteSlug",
+    "WorkBrief",
 ]

@@ -9,6 +9,7 @@ from noesis.bounded_context.knowledge.application.dtos import (
     NoteSummaryDto,
     SkippedCandidateDto,
 )
+from noesis.bounded_context.knowledge.application.mappers import WorkBriefMapper
 from noesis.bounded_context.knowledge.application.ports.curation import ICurator
 from noesis.bounded_context.knowledge.application.ports.queue import IParkedCurationQueue
 from noesis.bounded_context.knowledge.application.ports.read_repositories import INoteReadRepository
@@ -24,6 +25,7 @@ from noesis.bounded_context.knowledge.domain.value_objects import (
     NoteArea,
     NoteLocation,
     NoteOriginEnum,
+    WorkBrief,
 )
 from noesis.exceptions import (
     CurationFailedError,
@@ -35,7 +37,6 @@ from noesis.shared_kernel.contracts import WorkBriefContract
 from noesis.utils import FrozenObject
 
 RELATED_NOTES_LIMIT: int = 8
-SESSION_ID_LENGTH: int = 8
 
 type Sleeper = Callable[[float], Awaitable[None]]
 
@@ -84,13 +85,12 @@ class CurateWorkBriefHandler(IHandler[CurateWorkBriefCommand, CurationResultDto]
         Raises:
             CurationFailedError: Every curator attempt failed (the brief is parked when asked).
         """
-        brief: WorkBriefContract = action.brief
-        area: NoteArea = NoteArea.for_repository(brief.repository)
+        brief: WorkBrief = WorkBriefMapper.to_domain(action.brief)
         related: list[NoteSummaryDto] = await self._read_repository.search(
-            _search_text(brief), area=area, limit=RELATED_NOTES_LIMIT
+            brief.search_text(), area=brief.area, limit=RELATED_NOTES_LIMIT
         )
-        decisions: tuple[CurationDecision, ...] = await self._curate(action, related)
-        outcomes: list[CurationOutcome] = await self._store(brief, area, decisions)
+        decisions: tuple[CurationDecision, ...] = await self._curate(action, brief, related)
+        outcomes: list[CurationOutcome] = await self._store(brief, decisions)
         return CurationResultDto(
             repository=brief.repository,
             created=_paths(outcomes, CurationOutcomeEnum.CREATED),
@@ -103,13 +103,17 @@ class CurateWorkBriefHandler(IHandler[CurateWorkBriefCommand, CurationResultDto]
         )
 
     async def _curate(
-        self, action: CurateWorkBriefCommand, related: list[NoteSummaryDto]
+        self, action: CurateWorkBriefCommand, brief: WorkBrief, related: list[NoteSummaryDto]
     ) -> tuple[CurationDecision, ...]:
-        """Run the curator, retrying after a pause; park and raise when it keeps failing."""
+        """Run the curator, retrying after a pause; park and raise when it keeps failing.
+
+        The queue parks the published contract, not `brief`: a retry re-enters through the
+        command, so the parked payload must stay the versioned contract.
+        """
         last_error: CuratorFailedError | None = None
         for attempt in range(1, action.max_attempts + 1):
             try:
-                return await self._curator.curate(action.brief, related)
+                return await self._curator.curate(brief, related)
             except CuratorFailedError as error:
                 last_error = error
                 if attempt < action.max_attempts:
@@ -127,12 +131,13 @@ class CurateWorkBriefHandler(IHandler[CurateWorkBriefCommand, CurationResultDto]
         ) from last_error
 
     async def _store(
-        self, brief: WorkBriefContract, area: NoteArea, decisions: tuple[CurationDecision, ...]
+        self, brief: WorkBrief, decisions: tuple[CurationDecision, ...]
     ) -> list[CurationOutcome]:
         """Apply the policy to every decision and commit the resulting notes together."""
         now: datetime = self._clock.now()
-        commits: tuple[str, ...] = tuple(commit.sha for commit in brief.commits)
-        session: str = brief.session_id[:SESSION_ID_LENGTH]
+        area: NoteArea = brief.area
+        commits: tuple[str, ...] = brief.commit_shas()
+        session: str = brief.short_session()
         outcomes: list[CurationOutcome] = []
         async with self._uow_factory() as uow:
             for decision in decisions:
@@ -163,11 +168,6 @@ class CurateWorkBriefHandler(IHandler[CurateWorkBriefCommand, CurationResultDto]
                 outcomes.append(outcome)
             await uow.commit()
         return outcomes
-
-
-def _search_text(brief: WorkBriefContract) -> str:
-    """Query used to find notes the curator should know about."""
-    return " ".join([brief.goal, *(commit.subject for commit in brief.commits)])
 
 
 def _paths(outcomes: list[CurationOutcome], kind: CurationOutcomeEnum) -> tuple[str, ...]:
