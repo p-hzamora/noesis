@@ -16,6 +16,9 @@ class CaptureStatusResponse(FrozenObject):
         pending_lines: Lines they change.
         last_handover_at: Time of the last hand-over (ISO), if any.
         failed_handovers: Consecutive hand-overs that could not start.
+        env_file: The `.env` file this invocation read; hooks must read the same one.
+        state_dir: Folder holding the capture flag and journal.
+        vault_dir: Vault the curator writes to, or None when unset.
     """
 
     session_id: str
@@ -27,3 +30,6 @@ class CaptureStatusResponse(FrozenObject):
     pending_lines: int
     last_handover_at: str | None
     failed_handovers: int
+    env_file: str | None = None
+    state_dir: str | None = None
+    vault_dir: str | None = None

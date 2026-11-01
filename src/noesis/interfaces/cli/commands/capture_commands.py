@@ -1,10 +1,12 @@
 """`noesis capture`: switch capture on or off for a session, and inspect it."""
 
 import asyncio
+from pathlib import Path
 from typing import Annotated
 
 import typer
 
+from noesis.bounded_context.capture.application.dtos import CaptureStatusDto
 from noesis.bounded_context.capture.application.handlers.commands import (
     DisableCaptureCommand,
     EnableCaptureCommand,
@@ -14,6 +16,7 @@ from noesis.bounded_context.capture.application.handlers.queries import (
     ListCaptureRunsQuery,
 )
 from noesis.bounded_context.capture.domain.value_objects import CaptureModeEnum
+from noesis.core import Environment
 from noesis.interfaces.cli.bootstrap import CaptureHandlers, build_capture
 from noesis.interfaces.cli.options import JsonOption, SessionOption
 from noesis.interfaces.cli.output import emit
@@ -30,6 +33,19 @@ def _handlers(context: typer.Context) -> CaptureHandlers:
     return build_capture(cli_state(context).environment())
 
 
+def _status(context: typer.Context, dto: CaptureStatusDto) -> CaptureStatusResponse:
+    """The status plus where it lives, so callers can match it against the hooks' config."""
+    environment: Environment = cli_state(context).environment()
+    vault: Path | None = environment.knowledge.vault_dir
+    return CaptureStatusResponse.model_validate(dto).model_copy(
+        update={
+            "env_file": str(environment.env_file),
+            "state_dir": str(environment.runtime.state_dir),
+            "vault_dir": str(vault) if vault is not None else None,
+        }
+    )
+
+
 def _format_status(status: CaptureStatusResponse) -> str:
     state: str = f"on ({status.mode})" if status.enabled else "off"
     pending: str = (
@@ -40,7 +56,10 @@ def _format_status(status: CaptureStatusResponse) -> str:
     return (
         f"session {status.session_id}: {state}\n"
         f"pending: {pending}\n"
-        f"last hand-over: {status.last_handover_at or 'never'}"
+        f"last hand-over: {status.last_handover_at or 'never'}\n"
+        f"env file: {status.env_file}\n"
+        f"state dir: {status.state_dir}\n"
+        f"vault: {status.vault_dir or 'not set'}"
     )
 
 
@@ -69,8 +88,8 @@ def capture_on(
 ) -> None:
     """Switch capture on for a session."""
     command: EnableCaptureCommand = EnableCaptureCommand(session_id=session, mode=mode)
-    status: CaptureStatusResponse = CaptureStatusResponse.model_validate(
-        asyncio.run(_handlers(context).enable.handle(command))
+    status: CaptureStatusResponse = _status(
+        context, asyncio.run(_handlers(context).enable.handle(command))
     )
     emit(status, _format_status)
 
@@ -80,8 +99,9 @@ def capture_off(
     context: typer.Context, session: SessionOption, as_json: JsonOption = False
 ) -> None:
     """Switch capture off for a session (pending work is kept)."""
-    status: CaptureStatusResponse = CaptureStatusResponse.model_validate(
-        asyncio.run(_handlers(context).disable.handle(DisableCaptureCommand(session_id=session)))
+    status: CaptureStatusResponse = _status(
+        context,
+        asyncio.run(_handlers(context).disable.handle(DisableCaptureCommand(session_id=session))),
     )
     emit(status, _format_status)
 
@@ -91,8 +111,9 @@ def capture_status(
     context: typer.Context, session: SessionOption, as_json: JsonOption = False
 ) -> None:
     """Show whether capture is on and what is pending."""
-    status: CaptureStatusResponse = CaptureStatusResponse.model_validate(
-        asyncio.run(_handlers(context).status.handle(GetCaptureStatusQuery(session_id=session)))
+    status: CaptureStatusResponse = _status(
+        context,
+        asyncio.run(_handlers(context).status.handle(GetCaptureStatusQuery(session_id=session))),
     )
     emit(status, _format_status)
 
