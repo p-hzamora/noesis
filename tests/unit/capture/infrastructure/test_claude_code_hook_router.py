@@ -56,6 +56,6 @@ def test_turn_and_session_end_become_flush(event: str, final: bool) -> None:
 
 
 def test_unknown_fields_are_ignored_and_missing_ones_default() -> None:
-    payload: ClaudeCodeHookPayload = ClaudeCodeHookPayload.model_validate({"extra": 1})
+    payload = ClaudeCodeHookPayload.model_validate({"extra": 1})
 
     assert (payload.session_id, payload.command, payload.transcript_path) == ("", None, None)

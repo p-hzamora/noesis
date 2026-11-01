@@ -18,7 +18,7 @@ from noesis.bounded_context.knowledge.domain.value_objects import (
 
 pytestmark = pytest.mark.unit
 
-AREA: NoteArea = NoteArea.for_repository("demo")
+AREA = NoteArea.for_repository("demo")
 
 
 def _apply(

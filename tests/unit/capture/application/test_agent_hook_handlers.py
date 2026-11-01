@@ -20,7 +20,7 @@ COMMAND: str = "noesis hook claude-code"
 
 
 async def test_install_without_apply_only_previews() -> None:
-    registry: InMemoryAgentHookRegistry = InMemoryAgentHookRegistry()
+    registry = InMemoryAgentHookRegistry()
 
     result = await InstallAgentHooksHandler(registry=registry).handle(
         InstallAgentHooksCommand(hook_command=COMMAND, apply=False)
@@ -38,7 +38,7 @@ async def test_install_without_apply_only_previews() -> None:
 
 
 async def test_install_with_apply_writes_and_reports_the_new_state() -> None:
-    registry: InMemoryAgentHookRegistry = InMemoryAgentHookRegistry()
+    registry = InMemoryAgentHookRegistry()
 
     result = await InstallAgentHooksHandler(registry=registry).handle(
         InstallAgentHooksCommand(hook_command=COMMAND, apply=True)
@@ -51,7 +51,7 @@ async def test_install_with_apply_writes_and_reports_the_new_state() -> None:
 
 
 async def test_nothing_is_written_when_nothing_would_change() -> None:
-    registry: InMemoryAgentHookRegistry = InMemoryAgentHookRegistry(changed=False)
+    registry = InMemoryAgentHookRegistry(changed=False)
 
     result = await InstallAgentHooksHandler(registry=registry).handle(
         InstallAgentHooksCommand(hook_command=COMMAND, apply=True)
@@ -62,8 +62,8 @@ async def test_nothing_is_written_when_nothing_would_change() -> None:
 
 
 async def test_uninstall_plans_a_removal_and_applies_it_on_request() -> None:
-    registry: InMemoryAgentHookRegistry = InMemoryAgentHookRegistry()
-    handler: UninstallAgentHooksHandler = UninstallAgentHooksHandler(registry=registry)
+    registry = InMemoryAgentHookRegistry()
+    handler = UninstallAgentHooksHandler(registry=registry)
 
     preview = await handler.handle(UninstallAgentHooksCommand(apply=False))
     applied = await handler.handle(UninstallAgentHooksCommand(apply=True))

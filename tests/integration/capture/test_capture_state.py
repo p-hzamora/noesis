@@ -21,7 +21,7 @@ from noesis.exceptions import (
 
 pytestmark = pytest.mark.integration
 
-SESSION_ID: SessionId = SessionId(value="s-1")
+SESSION_ID = SessionId(value="s-1")
 
 
 def _unit(folder: Path, timeout: float = 2.0) -> JsonFileCaptureUnitOfWorkAdapter:
@@ -33,7 +33,7 @@ def _unit(folder: Path, timeout: float = 2.0) -> JsonFileCaptureUnitOfWorkAdapte
 
 
 async def test_sessions_round_trip_through_json(tmp_path: Path) -> None:
-    session: CaptureSession = CaptureSession.create(SESSION_ID, now=START)
+    session = CaptureSession.create(SESSION_ID, now=START)
     session.enable(CaptureModeEnum.DRY_RUN, now=START)
     session.record_commit(a_commit(), repository_path="/work/demo", now=START)
     session.mark_handover_failed(final=False, now=START)

@@ -29,7 +29,7 @@ def test_creation_completes_required_sections_in_order_and_keeps_extras_last() -
         }
     )
 
-    note: Note = Note.create(
+    note = Note.create(
         area=NoteArea.for_repository("demo"),
         origin=NoteOriginEnum.AUTO,
         draft=draft,

@@ -27,7 +27,7 @@ pytestmark = pytest.mark.unit
 
 
 def _session(enabled: bool = True) -> CaptureSession:
-    session: CaptureSession = CaptureSession.create(SessionId(value="s-1"), now=START)
+    session = CaptureSession.create(SessionId(value="s-1"), now=START)
     if enabled:
         session.enable(CaptureModeEnum.LIVE, now=START)
     return session

@@ -20,7 +20,7 @@ COMMAND: str = "/opt/noesis hook claude-code"
 async def test_plan_apply_status_and_removal_round_trip(tmp_path: Path) -> None:
     path: Path = tmp_path / "settings.json"
     path.write_text('{"model": "opus"}', encoding="utf-8")
-    registry: ClaudeCodeSettingsAdapter = ClaudeCodeSettingsAdapter(path)
+    registry = ClaudeCodeSettingsAdapter(path)
 
     plan = await registry.plan(COMMAND)
     assert plan.changed
@@ -44,7 +44,7 @@ async def test_plan_apply_status_and_removal_round_trip(tmp_path: Path) -> None:
 
 async def test_a_missing_file_is_created_without_a_backup(tmp_path: Path) -> None:
     path: Path = tmp_path / "new" / "settings.json"
-    registry: ClaudeCodeSettingsAdapter = ClaudeCodeSettingsAdapter(path)
+    registry = ClaudeCodeSettingsAdapter(path)
 
     backup: str | None = await registry.apply(await registry.plan(COMMAND))
 

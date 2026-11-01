@@ -48,7 +48,7 @@ def test_repository_areas_know_their_repository() -> None:
     ],
 )
 def test_locations_render_and_parse_back(origin: NoteOriginEnum, path: str) -> None:
-    location: NoteLocation = NoteLocation(
+    location = NoteLocation(
         area=NoteArea.for_repository("demo"),
         origin=origin,
         kind=NoteKindEnum.GOTCHA,

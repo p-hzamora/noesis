@@ -12,7 +12,7 @@ pytestmark = pytest.mark.integration
 
 
 def test_files_and_folders_are_told_apart(tmp_path: Path) -> None:
-    probe: SystemEnvironmentProbeAdapter = SystemEnvironmentProbeAdapter()
+    probe = SystemEnvironmentProbeAdapter()
     file: Path = tmp_path / "a.txt"
     file.write_text("x", encoding="utf-8")
 
@@ -38,7 +38,7 @@ def test_executables_are_found_on_path(tmp_path: Path, monkeypatch: pytest.Monke
     tool.write_text("#!/bin/sh\n", encoding="utf-8")
     tool.chmod(0o755)
     monkeypatch.setenv("PATH", str(tmp_path))
-    probe: SystemEnvironmentProbeAdapter = SystemEnvironmentProbeAdapter()
+    probe = SystemEnvironmentProbeAdapter()
 
     assert probe.find_executable("mytool") == str(tool)
     assert probe.find_executable("nothing-here") is None

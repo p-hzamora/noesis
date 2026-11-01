@@ -46,8 +46,8 @@ class _Probe(IEnvironmentProbe):
         return self.entries.get(folder, ())
 
 
-VAULT: Path = Path("/vault")
-STATE: Path = Path("/home/u/.local/state/noesis")
+VAULT = Path("/vault")
+STATE = Path("/home/u/.local/state/noesis")
 
 
 def _query(**changes: object) -> RunDiagnosticsQuery:

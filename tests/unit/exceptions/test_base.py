@@ -12,7 +12,7 @@ pytestmark = pytest.mark.unit
 
 
 def test_errors_carry_code_title_exit_code_metadata_and_next_steps() -> None:
-    error: VaultNotConfiguredError = VaultNotConfiguredError(
+    error = VaultNotConfiguredError(
         "No vault.", {"setting": "NOESIS_VAULT_DIR"}, next_steps=["Run `noesis config init`."]
     )
 

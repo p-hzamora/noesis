@@ -26,7 +26,7 @@ from noesis.shared_kernel.contracts import WorkBriefContract
 
 START: datetime = datetime(2026, 10, 30, 12, 0, tzinfo=UTC)
 SESSION: str = "session-1"
-REPO: Path = Path("/work/demo")
+REPO = Path("/work/demo")
 
 
 def a_commit(
