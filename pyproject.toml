@@ -1,0 +1,174 @@
+[project]
+name = "noesis"
+version = "0.1.0"
+description = "Capture finished agent work, curate what is worth keeping, and store it as notes."
+readme = "README.md"
+authors = [{ name = "Pablo Hernandez" }]
+requires-python = ">=3.14,<4"
+dependencies = [
+    "pydantic>=2.12,<3",
+    "pydantic-settings>=2.11,<3",
+    "pyyaml>=6.0.2,<7",
+    "typer>=0.20,<1",
+]
+
+[project.scripts]
+noesis = "noesis.interfaces.cli.app:main"
+
+[dependency-groups]
+dev = [
+    "import-linter>=2.5",
+    "mypy>=1.19",
+    "pytest>=9",
+    "pytest-asyncio>=1.3",
+    "pytest-cov>=7",
+    "ruff>=0.14",
+    "types-pyyaml>=6.0",
+]
+
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/noesis"]
+
+[tool.hatch.build.targets.wheel.force-include]
+".env.example" = "noesis/core/env.example"  # `noesis config init` reads it after installation
+
+[tool.ruff]
+line-length = 100
+target-version = "py314"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "B", "C4", "UP", "N", "S", "T20", "SIM", "PTH", "RUF"]
+ignore = ["E501"]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["RUF022"]
+"tests/**/*.py" = ["S101", "S603", "S607"]  # tests run fixed, trusted commands
+
+[tool.ruff.lint.isort]
+known-first-party = ["noesis"]
+
+[tool.mypy]
+python_version = "3.14"
+strict = true
+mypy_path = "src"
+packages = ["noesis"]
+plugins = ["pydantic.mypy"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src", "."]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+addopts = ["--strict-config", "--strict-markers"]
+markers = [
+    "unit: fast, isolated, no I/O beyond tmp_path",
+    "integration: exercises a real adapter (files, git, subprocess)",
+    "architecture: enforces dependency rules",
+]
+filterwarnings = ["error"]
+
+[tool.coverage.run]
+source = ["noesis"]
+branch = true
+omit = ["*/__init__.py"]
+
+[tool.coverage.report]
+fail_under = 85
+show_missing = true
+skip_covered = true
+
+[tool.importlinter]
+root_package = "noesis"
+include_external_packages = true
+
+[[tool.importlinter.contracts]]
+name = "Nothing below the interface layer imports it"
+type = "forbidden"
+source_modules = [
+    "noesis.core",
+    "noesis.diagnostics",
+    "noesis.exceptions",
+    "noesis.shared_kernel",
+    "noesis.utils",
+]
+forbidden_modules = ["noesis.interfaces"]
+
+[[tool.importlinter.contracts]]
+name = "Configuration is read only through noesis.core.env"
+type = "forbidden"
+source_modules = ["noesis.interfaces"]
+forbidden_modules = ["noesis.core.configurations", "pydantic_settings"]
+allow_indirect_imports = true
+
+[[tool.importlinter.contracts]]
+name = "Shared kernel layers point inward"
+type = "layers"
+layers = ["noesis.shared_kernel.infrastructure", "noesis.shared_kernel.application", "noesis.shared_kernel.domain"]
+
+[[tool.importlinter.contracts]]
+name = "Domain stays free of delivery and process frameworks"
+type = "forbidden"
+source_modules = [
+    "noesis.shared_kernel.domain",
+    "noesis.bounded_context.knowledge.domain",
+    "noesis.bounded_context.capture.domain",
+]
+forbidden_modules = ["typer", "subprocess", "pydantic_settings", "noesis.core"]
+allow_indirect_imports = true
+
+[[tool.importlinter.contracts]]
+name = "Diagnostics layers point inward"
+type = "layers"
+layers = ["noesis.diagnostics.infrastructure", "noesis.diagnostics.application"]
+
+[[tool.importlinter.contracts]]
+name = "Diagnostics knows no bounded context and no settings"
+type = "forbidden"
+source_modules = ["noesis.diagnostics"]
+forbidden_modules = ["noesis.bounded_context", "noesis.core", "noesis.interfaces", "typer"]
+
+[[tool.importlinter.contracts]]
+name = "Knowledge layers point inward"
+type = "layers"
+layers = [
+    "noesis.bounded_context.knowledge.infrastructure",
+    "noesis.bounded_context.knowledge.application",
+    "noesis.bounded_context.knowledge.domain",
+]
+
+[[tool.importlinter.contracts]]
+name = "Bounded contexts never import the interfaces"
+type = "forbidden"
+source_modules = ["noesis.bounded_context"]
+forbidden_modules = ["noesis.interfaces", "noesis.core", "typer"]
+
+[[tool.importlinter.contracts]]
+name = "Capture layers point inward"
+type = "layers"
+layers = [
+    "noesis.bounded_context.capture.infrastructure",
+    "noesis.bounded_context.capture.application",
+    "noesis.bounded_context.capture.domain",
+]
+
+[[tool.importlinter.contracts]]
+name = "Bounded contexts are independent (they share only the kernel's contracts)"
+type = "independence"
+modules = ["noesis.bounded_context.capture", "noesis.bounded_context.knowledge"]
+
+[[tool.importlinter.contracts]]
+name = "Domain and application layers stay free of I/O libraries"
+type = "forbidden"
+source_modules = [
+    "noesis.bounded_context.knowledge.domain",
+    "noesis.bounded_context.knowledge.application",
+    "noesis.bounded_context.capture.domain",
+    "noesis.bounded_context.capture.application",
+    "noesis.diagnostics.application",
+]
+forbidden_modules = ["yaml", "subprocess", "shutil", "tempfile", "noesis.shared_kernel.infrastructure"]
