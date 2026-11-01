@@ -71,37 +71,6 @@ def _load_brief(path: Path) -> WorkBriefContract:
         ) from error
 
 
-def _format_result(result: CurationResponse) -> str:
-    lines: list[str] = [
-        f"{result.repository}: {len(result.created)} created, {len(result.updated)} updated, "
-        f"{len(result.skipped)} skipped"
-    ]
-    lines += [f"  created {path}" for path in result.created]
-    lines += [f"  updated {path}" for path in result.updated]
-    lines += [f"  skipped {item.candidate}: {item.reason}" for item in result.skipped]
-    return "\n".join(lines)
-
-
-def _format_notes(result: NoteListResponse) -> str:
-    if not result.notes:
-        return "no notes"
-    return "\n".join(
-        f"{note.path}  [{note.origin} {note.kind or 'note'}]  {note.title}" for note in result.notes
-    )
-
-
-def _format_search(result: NoteSearchResponse) -> str:
-    return f"{_format_notes(result)}\nbackend: {result.backend}"
-
-
-def _format_parked(result: ParkedCurationListResponse) -> str:
-    if not result.parked:
-        return "nothing parked"
-    return "\n".join(
-        f"{item.ticket}  {item.repository}@{item.head[:8]}  {item.error}" for item in result.parked
-    )
-
-
 @knowledge_app.command("curate")
 def curate(
     context: typer.Context,
@@ -125,7 +94,7 @@ def curate(
         asyncio.run(handlers.curate.handle(command))
     )
     _warn(handlers)
-    output.emit(result, _format_result)
+    output.emit(result)
 
 
 @knowledge_app.command("retry")
@@ -138,7 +107,7 @@ def retry(
     result: CurationResponse = CurationResponse.model_validate(
         asyncio.run(_handlers(context).retry.handle(RetryParkedCurationCommand(ticket=ticket)))
     )
-    output.emit(result, _format_result)
+    output.emit(result)
 
 
 @knowledge_app.command("parked")
@@ -147,7 +116,7 @@ def parked(context: typer.Context, as_json: JsonOption = False) -> None:
     result: ParkedCurationListResponse = ParkedCurationListResponse.model_validate(
         asyncio.run(_handlers(context).list_parked.handle(ListParkedCurationsQuery()))
     )
-    output.emit(result, _format_parked)
+    output.emit(result)
 
 
 @knowledge_app.command("search")
@@ -166,13 +135,10 @@ def search(
         asyncio.run(handlers.search.handle(query))
     )
     if not handlers.notices:
-        output.emit(found, _format_search)
+        output.emit(found)
         return
     notice: str = handlers.notices[0]
-    output.emit(
-        NoteSearchFallbackResponse(notes=found.notes, backend=found.backend, notice=notice),
-        lambda result: f"{_format_search(result)}\nnotice: {result.notice}",
-    )
+    output.emit(NoteSearchFallbackResponse(notes=found.notes, backend=found.backend, notice=notice))
 
 
 @knowledge_app.command("list")
@@ -190,4 +156,4 @@ def list_notes(
     result: NoteListResponse = NoteListResponse.model_validate(
         asyncio.run(_handlers(context).list_notes.handle(query))
     )
-    output.emit(result, _format_notes)
+    output.emit(result)

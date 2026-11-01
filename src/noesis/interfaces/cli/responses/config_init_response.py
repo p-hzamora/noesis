@@ -1,9 +1,9 @@
 """`noesis config init` output."""
 
-from noesis.utils import FrozenObject
+from .i_renderable_response import IRenderableResponse
 
 
-class ConfigInitResponse(FrozenObject):
+class ConfigInitResponse(IRenderableResponse):
     """`noesis config init`: what was written.
 
     Attributes:
@@ -13,3 +13,6 @@ class ConfigInitResponse(FrozenObject):
 
     env_file: str
     vault_dir: str | None
+
+    def render(self) -> str:
+        return f"wrote {self.env_file}"

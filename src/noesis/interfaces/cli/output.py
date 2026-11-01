@@ -6,14 +6,14 @@ on stdout with `--json`, or a short text block on stderr otherwise.
 """
 
 import sys
-from collections.abc import Callable, Iterator
+from collections.abc import Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar, Token
 
 from noesis.exceptions import AppException
 from noesis.utils import FrozenObject
 
-from .responses import ErrorDetail, ErrorResponse, SuccessResponse
+from .responses import ErrorDetail, ErrorResponse, IRenderableResponse, SuccessResponse
 
 _JSON_MODE: ContextVar[bool] = ContextVar("noesis_json_mode", default=False)
 
@@ -56,17 +56,16 @@ def json_mode() -> bool:
     return _JSON_MODE.get()
 
 
-def emit[T: FrozenObject](result: T, formatter: Callable[[T], str]) -> None:
-    """Print a successful result as the JSON envelope or as formatted text.
+def emit(result: IRenderableResponse) -> None:
+    """Print a successful result as the JSON envelope or as its own `render()` text.
 
     Args:
-        result: The command's result model.
-        formatter: Renders the result for people.
+        result: The command's response; it serialises for machines and renders for people.
     """
     if json_mode():
         sys.stdout.write(_dump(SuccessResponse(result=result)))
     else:
-        sys.stdout.write(formatter(result).rstrip("\n") + "\n")
+        sys.stdout.write(result.render().rstrip("\n") + "\n")
 
 
 def emit_error(error: AppException) -> None:

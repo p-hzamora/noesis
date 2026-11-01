@@ -2,6 +2,8 @@
 
 from noesis.utils import FrozenObject
 
+from .i_renderable_response import IRenderableResponse
+
 
 class CaptureRunResponse(FrozenObject):
     """One journaled event of `noesis capture runs`.
@@ -21,7 +23,7 @@ class CaptureRunResponse(FrozenObject):
     result: dict[str, object] | None = None
 
 
-class CaptureRunListResponse(FrozenObject):
+class CaptureRunListResponse(IRenderableResponse):
     """`noesis capture runs`: the journal of one session, oldest first.
 
     Attributes:
@@ -31,3 +33,15 @@ class CaptureRunListResponse(FrozenObject):
 
     session_id: str
     runs: tuple[CaptureRunResponse, ...]
+
+    def render(self) -> str:
+        if not self.runs:
+            return f"session {self.session_id}: nothing journaled yet"
+        lines: list[str] = []
+        for run in self.runs:
+            lines.append(f"{run.at}  {run.outcome:<20} {run.detail}")
+            if run.reference:
+                lines.append(f"{'':21}brief: {run.reference}")
+            if run.result is not None:
+                lines.append(f"{'':21}result: {'ok' if run.result.get('ok') else 'failed'}")
+        return "\n".join(lines)

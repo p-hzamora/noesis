@@ -46,10 +46,7 @@ def list_guides(as_json: JsonOption = False) -> None:
         SkillGuideResponse(name=name, title=_title(item.read_text(encoding="utf-8")))
         for name, item in sorted(_guides().items())
     )
-    output.emit(
-        SkillGuideListResponse(guides=guides),
-        lambda r: "\n".join(f"{g.name}  {g.title}" for g in r.guides),
-    )
+    output.emit(SkillGuideListResponse(guides=guides))
 
 
 @skills_app.command("get")
@@ -68,7 +65,4 @@ def get_guide(
             next_steps=["Run `noesis skills list`."],
         )
     content: str = guides[name].read_text(encoding="utf-8")
-    output.emit(
-        SkillGuideResponse(name=name, title=_title(content), content=content),
-        lambda guide: guide.content,
-    )
+    output.emit(SkillGuideResponse(name=name, title=_title(content), content=content))

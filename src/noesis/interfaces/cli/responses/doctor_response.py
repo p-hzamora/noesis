@@ -2,6 +2,8 @@
 
 from noesis.utils import FrozenObject
 
+from .i_renderable_response import IRenderableResponse
+
 
 class DoctorCheckResponse(FrozenObject):
     """One environment check of `noesis doctor`.
@@ -19,7 +21,7 @@ class DoctorCheckResponse(FrozenObject):
     next_step: str | None = None
 
 
-class DoctorResponse(FrozenObject):
+class DoctorResponse(IRenderableResponse):
     """`noesis doctor`: all checks of one run.
 
     Attributes:
@@ -29,3 +31,10 @@ class DoctorResponse(FrozenObject):
 
     ok: bool
     checks: tuple[DoctorCheckResponse, ...]
+
+    def render(self) -> str:
+        return "\n".join(
+            f"{'ok ' if check.ok else 'FAIL'} {check.name}: {check.detail}"
+            + (f"\n     next: {check.next_step}" if check.next_step else "")
+            for check in self.checks
+        )

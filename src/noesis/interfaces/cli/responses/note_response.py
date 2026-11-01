@@ -3,6 +3,8 @@
 from noesis.shared_kernel.enums import SearchEngineEnum
 from noesis.utils import FrozenObject
 
+from .i_renderable_response import IRenderableResponse
+
 
 class NoteResponse(FrozenObject):
     """A note as listed by `noesis knowledge list|search`.
@@ -24,7 +26,7 @@ class NoteResponse(FrozenObject):
     snippet: str
 
 
-class NoteListResponse(FrozenObject):
+class NoteListResponse(IRenderableResponse):
     """`noesis knowledge list|search`: notes, best match first for searches.
 
     Attributes:
@@ -32,6 +34,14 @@ class NoteListResponse(FrozenObject):
     """
 
     notes: tuple[NoteResponse, ...]
+
+    def render(self) -> str:
+        if not self.notes:
+            return "no notes"
+        return "\n".join(
+            f"{note.path}  [{note.origin} {note.kind or 'note'}]  {note.title}"
+            for note in self.notes
+        )
 
 
 class NoteSearchResponse(NoteListResponse):
@@ -44,6 +54,9 @@ class NoteSearchResponse(NoteListResponse):
 
     backend: SearchEngineEnum
 
+    def render(self) -> str:
+        return f"{super().render()}\nbackend: {self.backend}"
+
 
 class NoteSearchFallbackResponse(NoteSearchResponse):
     """`noesis knowledge search` when Obsidian could not answer and files were searched instead.
@@ -55,3 +68,6 @@ class NoteSearchFallbackResponse(NoteSearchResponse):
     """
 
     notice: str
+
+    def render(self) -> str:
+        return f"{super().render()}\nnotice: {self.notice}"

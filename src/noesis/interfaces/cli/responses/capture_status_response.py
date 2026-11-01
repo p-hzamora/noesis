@@ -1,9 +1,9 @@
 """`noesis capture on|off|status` output."""
 
-from noesis.utils import FrozenObject
+from .i_renderable_response import IRenderableResponse
 
 
-class CaptureStatusResponse(FrozenObject):
+class CaptureStatusResponse(IRenderableResponse):
     """`noesis capture on|off|status`: the state of one capture session.
 
     Attributes:
@@ -33,3 +33,20 @@ class CaptureStatusResponse(FrozenObject):
     env_file: str | None = None
     state_dir: str | None = None
     vault_dir: str | None = None
+
+    def render(self) -> str:
+        state: str = f"on ({self.mode})" if self.enabled else "off"
+        pending: str = (
+            f"{self.pending_commits} commit(s), {self.pending_files} file(s), "
+            f"{self.pending_lines} line(s)"
+            if self.pending_commits
+            else "none"
+        )
+        return (
+            f"session {self.session_id}: {state}\n"
+            f"pending: {pending}\n"
+            f"last hand-over: {self.last_handover_at or 'never'}\n"
+            f"env file: {self.env_file}\n"
+            f"state dir: {self.state_dir}\n"
+            f"vault: {self.vault_dir or 'not set'}"
+        )

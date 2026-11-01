@@ -46,36 +46,6 @@ def _status(context: typer.Context, dto: CaptureStatusDto) -> CaptureStatusRespo
     )
 
 
-def _format_status(status: CaptureStatusResponse) -> str:
-    state: str = f"on ({status.mode})" if status.enabled else "off"
-    pending: str = (
-        f"{status.pending_commits} commit(s), {status.pending_files} file(s), {status.pending_lines} line(s)"
-        if status.pending_commits
-        else "none"
-    )
-    return (
-        f"session {status.session_id}: {state}\n"
-        f"pending: {pending}\n"
-        f"last hand-over: {status.last_handover_at or 'never'}\n"
-        f"env file: {status.env_file}\n"
-        f"state dir: {status.state_dir}\n"
-        f"vault: {status.vault_dir or 'not set'}"
-    )
-
-
-def _format_runs(runs: CaptureRunListResponse) -> str:
-    if not runs.runs:
-        return f"session {runs.session_id}: nothing journaled yet"
-    lines: list[str] = []
-    for run in runs.runs:
-        lines.append(f"{run.at}  {run.outcome:<20} {run.detail}")
-        if run.reference:
-            lines.append(f"{'':21}brief: {run.reference}")
-        if run.result is not None:
-            lines.append(f"{'':21}result: {'ok' if run.result.get('ok') else 'failed'}")
-    return "\n".join(lines)
-
-
 @capture_app.command("on")
 def capture_on(
     context: typer.Context,
@@ -91,7 +61,7 @@ def capture_on(
     status: CaptureStatusResponse = _status(
         context, asyncio.run(_handlers(context).enable.handle(command))
     )
-    output.emit(status, _format_status)
+    output.emit(status)
 
 
 @capture_app.command("off")
@@ -103,7 +73,7 @@ def capture_off(
         context,
         asyncio.run(_handlers(context).disable.handle(DisableCaptureCommand(session_id=session))),
     )
-    output.emit(status, _format_status)
+    output.emit(status)
 
 
 @capture_app.command("status")
@@ -115,7 +85,7 @@ def capture_status(
         context,
         asyncio.run(_handlers(context).status.handle(GetCaptureStatusQuery(session_id=session))),
     )
-    output.emit(status, _format_status)
+    output.emit(status)
 
 
 @capture_app.command("runs")
@@ -132,4 +102,4 @@ def capture_runs(
     runs: CaptureRunListResponse = CaptureRunListResponse.model_validate(
         asyncio.run(_handlers(context).runs.handle(query))
     )
-    output.emit(runs, _format_runs)
+    output.emit(runs)

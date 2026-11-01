@@ -2,6 +2,8 @@
 
 from noesis.utils import FrozenObject
 
+from .i_renderable_response import IRenderableResponse
+
 
 class ParkedCurationResponse(FrozenObject):
     """One parked brief of `noesis knowledge parked`.
@@ -21,7 +23,7 @@ class ParkedCurationResponse(FrozenObject):
     error: str
 
 
-class ParkedCurationListResponse(FrozenObject):
+class ParkedCurationListResponse(IRenderableResponse):
     """`noesis knowledge parked`: every parked brief, oldest first.
 
     Attributes:
@@ -29,3 +31,11 @@ class ParkedCurationListResponse(FrozenObject):
     """
 
     parked: tuple[ParkedCurationResponse, ...]
+
+    def render(self) -> str:
+        if not self.parked:
+            return "nothing parked"
+        return "\n".join(
+            f"{item.ticket}  {item.repository}@{item.head[:8]}  {item.error}"
+            for item in self.parked
+        )

@@ -19,7 +19,7 @@ from noesis.bounded_context.capture.infrastructure.outbound.agent_hooks import H
 from noesis.interfaces.cli import output
 from noesis.interfaces.cli.bootstrap import AgentHooksHandlers, build_agent_hooks
 from noesis.interfaces.cli.options import JsonOption
-from noesis.interfaces.cli.responses import IntegrationResponse
+from noesis.interfaces.cli.responses import IntegrationResponse, IntegrationStatusResponse
 from noesis.interfaces.cli.state import cli_state
 
 DEV_VENV_MARKER: str = "/.venv/"
@@ -50,36 +50,6 @@ def _handlers(context: typer.Context, settings: Path | None) -> AgentHooksHandle
 
 def _result(change: AgentHookChangeDto, *, warning: str | None = None) -> IntegrationResponse:
     return IntegrationResponse.model_validate(change).model_copy(update={"warning": warning})
-
-
-def _format(result: IntegrationResponse) -> str:
-    lines: list[str] = []
-    if result.diff:
-        lines.append(result.diff.rstrip("\n"))
-    if not result.changed:
-        lines.append(f"{result.settings_file}: already up to date")
-    elif result.applied:
-        lines.append(
-            f"wrote {result.settings_file}"
-            + (f" (backup: {result.backup})" if result.backup else "")
-        )
-        lines.append("Restart Claude Code sessions so they load the hooks.")
-    else:
-        lines.append("Preview only. Re-run with --yes to write this change.")
-    lines += [f"{event}: {', '.join(commands)}" for event, commands in result.installed.items()]
-    if result.warning:
-        lines.append(f"warning: {result.warning}")
-    return "\n".join(lines)
-
-
-def _format_status(result: IntegrationResponse) -> str:
-    missing: str = (
-        "installed" if not result.missing_events else "missing " + ", ".join(result.missing_events)
-    )
-    return "\n".join(
-        [f"{result.settings_file}: {missing}"]
-        + [f"{event}: {', '.join(commands)}" for event, commands in result.installed.items()]
-    )
 
 
 def hook_command(context: typer.Context) -> str:
@@ -115,7 +85,7 @@ def install(
         if DEV_VENV_MARKER in resolved
         else None
     )
-    output.emit(_result(change, warning=warning), _format)
+    output.emit(_result(change, warning=warning))
 
 
 @claude_code_app.command("uninstall")
@@ -129,7 +99,7 @@ def uninstall(
     change: AgentHookChangeDto = asyncio.run(
         _handlers(context, settings).uninstall.handle(UninstallAgentHooksCommand(apply=yes))
     )
-    output.emit(_result(change), _format)
+    output.emit(_result(change))
 
 
 @claude_code_app.command("status")
@@ -140,4 +110,4 @@ def status(
     hooks: AgentHooksDto = asyncio.run(
         _handlers(context, settings).status.handle(GetAgentHooksStatusQuery())
     )
-    output.emit(IntegrationResponse.model_validate(hooks), _format_status)
+    output.emit(IntegrationStatusResponse.model_validate(hooks))

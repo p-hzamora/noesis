@@ -1,12 +1,14 @@
 """`noesis integrate claude-code` output."""
 
+from abc import ABC
+
 from pydantic import Field
 
-from noesis.utils import FrozenObject
+from .i_renderable_response import IRenderableResponse
 
 
-class IntegrationResponse(FrozenObject):
-    """`noesis integrate claude-code install|uninstall|status`.
+class IntegrationBaseResponse(IRenderableResponse, ABC):
+    """Fields shared by every `noesis integrate claude-code` response.
 
     Attributes:
         settings_file: The settings file.
@@ -29,3 +31,38 @@ class IntegrationResponse(FrozenObject):
     installed: dict[str, list[str]]
     missing_events: list[str] = Field(default_factory=list)
     warning: str | None = None
+
+    def _installed_lines(self) -> list[str]:
+        return [f"{event}: {', '.join(commands)}" for event, commands in self.installed.items()]
+
+
+class IntegrationResponse(IntegrationBaseResponse):
+    """`noesis integrate claude-code install|uninstall`: what changed in the settings file."""
+
+    def render(self) -> str:
+        lines: list[str] = []
+        if self.diff:
+            lines.append(self.diff.rstrip("\n"))
+        if not self.changed:
+            lines.append(f"{self.settings_file}: already up to date")
+        elif self.applied:
+            lines.append(
+                f"wrote {self.settings_file}" + (f" (backup: {self.backup})" if self.backup else "")
+            )
+            lines.append("Restart Claude Code sessions so they load the hooks.")
+        else:
+            lines.append("Preview only. Re-run with --yes to write this change.")
+        lines += self._installed_lines()
+        if self.warning:
+            lines.append(f"warning: {self.warning}")
+        return "\n".join(lines)
+
+
+class IntegrationStatusResponse(IntegrationBaseResponse):
+    """`noesis integrate claude-code status`: which hooks are registered."""
+
+    def render(self) -> str:
+        missing: str = (
+            "installed" if not self.missing_events else "missing " + ", ".join(self.missing_events)
+        )
+        return "\n".join([f"{self.settings_file}: {missing}", *self._installed_lines()])

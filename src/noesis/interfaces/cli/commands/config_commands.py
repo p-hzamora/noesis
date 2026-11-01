@@ -36,22 +36,10 @@ def _view(environment: Environment) -> ConfigShowResponse:
     )
 
 
-def _format_view(view: ConfigShowResponse) -> str:
-    """Text rendering for `config show`."""
-    lines: list[str] = [
-        f"env file: {view.env_file} ({'found' if view.env_file_exists else 'missing'})"
-    ]
-    for concern, values in view.settings.items():
-        lines.append(f"[{concern}]")
-        if isinstance(values, dict):
-            lines += [f"  {key} = {value}" for key, value in values.items()]
-    return "\n".join(lines)
-
-
 @config_app.command("show")
 def show(context: typer.Context, as_json: JsonOption = False) -> None:
     """Print the effective settings and the file they were read from."""
-    output.emit(_view(cli_state(context).environment()), _format_view)
+    output.emit(_view(cli_state(context).environment()))
 
 
 @config_app.command("init")
@@ -74,6 +62,5 @@ def init(
         )
     write_env_file(target, vault_dir=vault_dir)
     output.emit(
-        ConfigInitResponse(env_file=str(target), vault_dir=str(vault_dir) if vault_dir else None),
-        lambda result: f"wrote {result.env_file}",
+        ConfigInitResponse(env_file=str(target), vault_dir=str(vault_dir) if vault_dir else None)
     )

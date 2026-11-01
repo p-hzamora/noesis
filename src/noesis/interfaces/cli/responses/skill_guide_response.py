@@ -1,9 +1,9 @@
 """`noesis skills` output."""
 
-from noesis.utils import FrozenObject
+from .i_renderable_response import IRenderableResponse
 
 
-class SkillGuideResponse(FrozenObject):
+class SkillGuideResponse(IRenderableResponse):
     """`noesis skills get`: one packaged guide (also an entry of the listing).
 
     Attributes:
@@ -16,8 +16,11 @@ class SkillGuideResponse(FrozenObject):
     title: str
     content: str = ""
 
+    def render(self) -> str:
+        return self.content
 
-class SkillGuideListResponse(FrozenObject):
+
+class SkillGuideListResponse(IRenderableResponse):
     """`noesis skills list`: every packaged guide.
 
     Attributes:
@@ -25,3 +28,6 @@ class SkillGuideListResponse(FrozenObject):
     """
 
     guides: tuple[SkillGuideResponse, ...]
+
+    def render(self) -> str:
+        return "\n".join(f"{guide.name}  {guide.title}" for guide in self.guides)
