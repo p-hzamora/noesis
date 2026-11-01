@@ -10,8 +10,8 @@ from noesis import __version__
 from noesis.exceptions import AppException, ExitCodeEnum
 from noesis.interfaces.cli import commands
 
+from . import output
 from .options import EnvFileOption
-from .output import emit_error, output_scope
 from .state import CliState
 
 PROGRAM: str = "noesis"
@@ -68,7 +68,7 @@ def run(argv: Sequence[str]) -> int:
     Returns:
         The exit code (see `ExitCodeEnum`).
     """
-    with output_scope():
+    with output.output_scope():
         try:
             result: object = app(args=list(argv), prog_name=PROGRAM, standalone_mode=False)
         except typer.Abort:
@@ -79,7 +79,7 @@ def run(argv: Sequence[str]) -> int:
                 show()
             return int(getattr(error, "exit_code", ExitCodeEnum.USAGE))
         except AppException as error:
-            emit_error(error)
+            output.emit_error(error)
             return error.exit_code
         return result if isinstance(result, int) else ExitCodeEnum.OK
 

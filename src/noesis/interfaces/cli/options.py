@@ -5,12 +5,12 @@ from typing import Annotated
 
 import typer
 
-from .output import remember_json_mode
+from . import output
 
 JsonOption = Annotated[
     bool,
     typer.Option(
-        "--json", help="Print a JSON envelope instead of text.", callback=remember_json_mode
+        "--json", help="Print a JSON envelope instead of text.", callback=output.remember_json_mode
     ),
 ]
 EnvFileOption = Annotated[

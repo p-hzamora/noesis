@@ -16,9 +16,9 @@ from noesis.bounded_context.capture.application.handlers.commands import (
 )
 from noesis.bounded_context.capture.application.handlers.queries import GetAgentHooksStatusQuery
 from noesis.bounded_context.capture.infrastructure.outbound.agent_hooks import HOOK_SUBCOMMAND
+from noesis.interfaces.cli import output
 from noesis.interfaces.cli.bootstrap import AgentHooksHandlers, build_agent_hooks
 from noesis.interfaces.cli.options import JsonOption
-from noesis.interfaces.cli.output import emit
 from noesis.interfaces.cli.responses import IntegrationResponse
 from noesis.interfaces.cli.state import cli_state
 
@@ -115,7 +115,7 @@ def install(
         if DEV_VENV_MARKER in resolved
         else None
     )
-    emit(_result(change, warning=warning), _format)
+    output.emit(_result(change, warning=warning), _format)
 
 
 @claude_code_app.command("uninstall")
@@ -129,7 +129,7 @@ def uninstall(
     change: AgentHookChangeDto = asyncio.run(
         _handlers(context, settings).uninstall.handle(UninstallAgentHooksCommand(apply=yes))
     )
-    emit(_result(change), _format)
+    output.emit(_result(change), _format)
 
 
 @claude_code_app.command("status")
@@ -140,4 +140,4 @@ def status(
     hooks: AgentHooksDto = asyncio.run(
         _handlers(context, settings).status.handle(GetAgentHooksStatusQuery())
     )
-    emit(IntegrationResponse.model_validate(hooks), _format_status)
+    output.emit(IntegrationResponse.model_validate(hooks), _format_status)

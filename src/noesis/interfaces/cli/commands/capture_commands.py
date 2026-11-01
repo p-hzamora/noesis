@@ -17,9 +17,9 @@ from noesis.bounded_context.capture.application.handlers.queries import (
 )
 from noesis.bounded_context.capture.domain.value_objects import CaptureModeEnum
 from noesis.core import Environment
+from noesis.interfaces.cli import output
 from noesis.interfaces.cli.bootstrap import CaptureHandlers, build_capture
 from noesis.interfaces.cli.options import JsonOption, SessionOption
-from noesis.interfaces.cli.output import emit
 from noesis.interfaces.cli.responses import CaptureRunListResponse, CaptureStatusResponse
 from noesis.interfaces.cli.state import cli_state
 
@@ -91,7 +91,7 @@ def capture_on(
     status: CaptureStatusResponse = _status(
         context, asyncio.run(_handlers(context).enable.handle(command))
     )
-    emit(status, _format_status)
+    output.emit(status, _format_status)
 
 
 @capture_app.command("off")
@@ -103,7 +103,7 @@ def capture_off(
         context,
         asyncio.run(_handlers(context).disable.handle(DisableCaptureCommand(session_id=session))),
     )
-    emit(status, _format_status)
+    output.emit(status, _format_status)
 
 
 @capture_app.command("status")
@@ -115,7 +115,7 @@ def capture_status(
         context,
         asyncio.run(_handlers(context).status.handle(GetCaptureStatusQuery(session_id=session))),
     )
-    emit(status, _format_status)
+    output.emit(status, _format_status)
 
 
 @capture_app.command("runs")
@@ -132,4 +132,4 @@ def capture_runs(
     runs: CaptureRunListResponse = CaptureRunListResponse.model_validate(
         asyncio.run(_handlers(context).runs.handle(query))
     )
-    emit(runs, _format_runs)
+    output.emit(runs, _format_runs)

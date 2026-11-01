@@ -12,8 +12,8 @@ from noesis.core import (
 from noesis.exceptions import (
     ConfigFileExistsError,
 )
+from noesis.interfaces.cli import output
 from noesis.interfaces.cli.options import JsonOption
-from noesis.interfaces.cli.output import emit
 from noesis.interfaces.cli.responses import ConfigInitResponse, ConfigShowResponse
 from noesis.interfaces.cli.state import cli_state
 
@@ -51,7 +51,7 @@ def _format_view(view: ConfigShowResponse) -> str:
 @config_app.command("show")
 def show(context: typer.Context, as_json: JsonOption = False) -> None:
     """Print the effective settings and the file they were read from."""
-    emit(_view(cli_state(context).environment()), _format_view)
+    output.emit(_view(cli_state(context).environment()), _format_view)
 
 
 @config_app.command("init")
@@ -73,7 +73,7 @@ def init(
             next_steps=["Edit the file directly, or re-run with --force to replace it."],
         )
     write_env_file(target, vault_dir=vault_dir)
-    emit(
+    output.emit(
         ConfigInitResponse(env_file=str(target), vault_dir=str(vault_dir) if vault_dir else None),
         lambda result: f"wrote {result.env_file}",
     )

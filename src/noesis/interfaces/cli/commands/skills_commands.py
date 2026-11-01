@@ -9,8 +9,8 @@ import typer
 from noesis.exceptions import (
     SkillGuideNotFoundError,
 )
+from noesis.interfaces.cli import output
 from noesis.interfaces.cli.options import JsonOption
-from noesis.interfaces.cli.output import emit
 from noesis.interfaces.cli.responses import SkillGuideListResponse, SkillGuideResponse
 from noesis.shared_kernel.domain import (
     JsonValue,
@@ -46,7 +46,7 @@ def list_guides(as_json: JsonOption = False) -> None:
         SkillGuideResponse(name=name, title=_title(item.read_text(encoding="utf-8")))
         for name, item in sorted(_guides().items())
     )
-    emit(
+    output.emit(
         SkillGuideListResponse(guides=guides),
         lambda r: "\n".join(f"{g.name}  {g.title}" for g in r.guides),
     )
@@ -68,7 +68,7 @@ def get_guide(
             next_steps=["Run `noesis skills list`."],
         )
     content: str = guides[name].read_text(encoding="utf-8")
-    emit(
+    output.emit(
         SkillGuideResponse(name=name, title=_title(content), content=content),
         lambda guide: guide.content,
     )

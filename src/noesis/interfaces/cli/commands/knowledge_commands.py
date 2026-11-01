@@ -21,9 +21,9 @@ from noesis.bounded_context.knowledge.domain.value_objects import NoteArea, Note
 from noesis.exceptions import (
     InvalidWorkBriefError,
 )
+from noesis.interfaces.cli import output
 from noesis.interfaces.cli.bootstrap import KnowledgeHandlers, build_knowledge
 from noesis.interfaces.cli.options import JsonOption
-from noesis.interfaces.cli.output import emit
 from noesis.interfaces.cli.responses import (
     CurationResponse,
     NoteListResponse,
@@ -125,7 +125,7 @@ def curate(
         asyncio.run(handlers.curate.handle(command))
     )
     _warn(handlers)
-    emit(result, _format_result)
+    output.emit(result, _format_result)
 
 
 @knowledge_app.command("retry")
@@ -138,7 +138,7 @@ def retry(
     result: CurationResponse = CurationResponse.model_validate(
         asyncio.run(_handlers(context).retry.handle(RetryParkedCurationCommand(ticket=ticket)))
     )
-    emit(result, _format_result)
+    output.emit(result, _format_result)
 
 
 @knowledge_app.command("parked")
@@ -147,7 +147,7 @@ def parked(context: typer.Context, as_json: JsonOption = False) -> None:
     result: ParkedCurationListResponse = ParkedCurationListResponse.model_validate(
         asyncio.run(_handlers(context).list_parked.handle(ListParkedCurationsQuery()))
     )
-    emit(result, _format_parked)
+    output.emit(result, _format_parked)
 
 
 @knowledge_app.command("search")
@@ -166,10 +166,10 @@ def search(
         asyncio.run(handlers.search.handle(query))
     )
     if not handlers.notices:
-        emit(found, _format_search)
+        output.emit(found, _format_search)
         return
     notice: str = handlers.notices[0]
-    emit(
+    output.emit(
         NoteSearchFallbackResponse(notes=found.notes, backend=found.backend, notice=notice),
         lambda result: f"{_format_search(result)}\nnotice: {result.notice}",
     )
@@ -190,4 +190,4 @@ def list_notes(
     result: NoteListResponse = NoteListResponse.model_validate(
         asyncio.run(_handlers(context).list_notes.handle(query))
     )
-    emit(result, _format_notes)
+    output.emit(result, _format_notes)
