@@ -11,6 +11,7 @@ from noesis.bounded_context.knowledge.application.mappers import WorkBriefMapper
 from noesis.bounded_context.knowledge.domain.value_objects import CurationActionEnum, NoteKindEnum
 from noesis.bounded_context.knowledge.infrastructure.outbound.curation import (
     ClaudeCliCuratorAdapter,
+    default_system_prompt,
 )
 from noesis.exceptions import (
     CuratorFailedError,
@@ -21,6 +22,8 @@ from noesis.shared_kernel.domain import (
 
 pytestmark = pytest.mark.integration
 
+SYSTEM_PROMPT: str = "You are a test curator."
+
 
 def _adapter(claude: Path, *, model: str = "", timeout: float = 10) -> ClaudeCliCuratorAdapter:
     return ClaudeCliCuratorAdapter(
@@ -28,6 +31,7 @@ def _adapter(claude: Path, *, model: str = "", timeout: float = 10) -> ClaudeCli
         model=model,
         max_budget_usd=0.25,
         timeout_seconds=timeout,
+        system_prompt=SYSTEM_PROMPT,
         environment={"PATH": "/usr/bin:/bin"},
     )
 
@@ -73,6 +77,7 @@ async def test_the_run_is_isolated_and_receives_the_brief_on_stdin(tmp_path: Pat
     assert argv[argv.index("--tools") + 1] == ""
     assert argv[argv.index("--setting-sources") + 1] == ""
     assert argv[argv.index("--model") + 1] == "haiku"
+    assert argv[argv.index("--system-prompt") + 1] == SYSTEM_PROMPT
     assert json.loads(argv[argv.index("--json-schema") + 1])["required"] == ["decisions"]
     stdin: str = (tmp_path / "stdin.txt").read_text()
     assert '"repository": "demo"' in stdin
@@ -126,3 +131,9 @@ async def test_missing_executable_timeout_and_crash_raise_curator_failed(tmp_pat
     crashing: Path = write_fake_claude(tmp_path, raw="", exit_code=3)
     with pytest.raises(CuratorFailedError, match="exited with 3"):
         await _adapter(crashing).curate(WorkBriefMapper.to_domain(a_brief()), [])
+
+
+def test_the_packaged_system_prompt_ships_with_the_adapter() -> None:
+    prompt: str = default_system_prompt()
+
+    assert prompt.startswith("You are the curator of a personal engineering knowledge base.")

@@ -78,5 +78,6 @@ def test_the_env_example_template_documents_every_setting() -> None:
         "NOESIS_CAPTURE_TRACE",
         "NOESIS_CURATOR_MODEL",
         "NOESIS_CURATOR_RETRY_SECONDS",
+        "NOESIS_CURATOR_SYSTEM_PROMPT_FILE",
     ):
         assert variable in template

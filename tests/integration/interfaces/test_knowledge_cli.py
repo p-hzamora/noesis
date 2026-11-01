@@ -74,6 +74,50 @@ def test_curate_writes_auto_notes_then_search_and_list_find_them(
     assert "[auto decision]  Use a TTL cache" in capsys.readouterr().out
 
 
+def test_curate_sends_the_configured_system_prompt_file(
+    vault: Path,
+    brief_file: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    prompt_file: Path = tmp_path / "curator_system.md"
+    prompt_file.write_text("Keep only architecture decisions.", encoding="utf-8")
+    monkeypatch.setenv("NOESIS_CURATOR_SYSTEM_PROMPT_FILE", str(prompt_file))
+    _use_claude(tmp_path, monkeypatch, envelope=success_envelope([]))
+
+    assert run(["knowledge", "curate", "--brief-file", str(brief_file), "--json"]) == 0
+
+    argv: list[str] = (tmp_path / "bin/argv.txt").read_text().split("\n")
+    assert argv[argv.index("--system-prompt") + 1] == "Keep only architecture decisions."
+
+
+@pytest.mark.parametrize("content", [None, "  \n"], ids=["missing", "empty"])
+def test_an_unusable_system_prompt_file_is_a_configuration_error(
+    content: str | None,
+    vault: Path,
+    brief_file: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    prompt_file: Path = tmp_path / "curator_system.md"
+    if content is not None:
+        prompt_file.write_text(content, encoding="utf-8")
+    monkeypatch.setenv("NOESIS_CURATOR_SYSTEM_PROMPT_FILE", str(prompt_file))
+    _use_claude(tmp_path, monkeypatch, envelope=success_envelope([]))
+
+    assert run(["knowledge", "curate", "--brief-file", str(brief_file), "--json"]) == 1
+
+    error: JsonObject = _out(capsys)["error"]  # type: ignore[assignment]
+    assert error["code"] == "CORE_005_CURATOR_PROMPT_UNREADABLE"
+    assert error["metadata"] == {
+        "setting": "NOESIS_CURATOR_SYSTEM_PROMPT_FILE",
+        "path": str(prompt_file),
+    }
+    assert not (tmp_path / "bin/stdin.txt").exists()
+
+
 def test_failed_curation_is_parked_listed_and_retried(
     vault: Path,
     brief_file: Path,
