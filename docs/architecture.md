@@ -1,7 +1,8 @@
 # Architecture
 
 noesis follows tactical DDD with a strict hexagonal (ports and adapters) layout, in the
-context-first topology described in ADR-0001.
+context-first topology described in ADR-0001. For what each command does step by step, see
+[workflows/](workflows/README.md).
 
 ```text
 src/noesis/
