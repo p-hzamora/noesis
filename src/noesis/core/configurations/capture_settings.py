@@ -3,7 +3,7 @@
 from pydantic import Field
 from pydantic_settings import SettingsConfigDict
 
-from noesis.core.configurations.base_settings import AppBaseSettings
+from .base_settings import AppBaseSettings
 
 
 class CaptureSettings(AppBaseSettings):

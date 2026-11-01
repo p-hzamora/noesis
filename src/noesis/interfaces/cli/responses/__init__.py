@@ -10,30 +10,18 @@ Envelope, on stdout with `--json`:
     failure: `ErrorResponse`   -> `{"ok": false, "error": {...}}`
 """
 
-from noesis.interfaces.cli.responses.capture_run_response import (
-    CaptureRunListResponse,
-    CaptureRunResponse,
-)
-from noesis.interfaces.cli.responses.capture_status_response import CaptureStatusResponse
-from noesis.interfaces.cli.responses.config_init_response import ConfigInitResponse
-from noesis.interfaces.cli.responses.config_show_response import ConfigShowResponse
-from noesis.interfaces.cli.responses.curation_response import (
-    CurationResponse,
-    SkippedCandidateResponse,
-)
-from noesis.interfaces.cli.responses.doctor_response import DoctorCheckResponse, DoctorResponse
-from noesis.interfaces.cli.responses.error_response import ErrorDetail, ErrorResponse
-from noesis.interfaces.cli.responses.integration_response import IntegrationResponse
-from noesis.interfaces.cli.responses.note_response import NoteListResponse, NoteResponse
-from noesis.interfaces.cli.responses.parked_curation_response import (
-    ParkedCurationListResponse,
-    ParkedCurationResponse,
-)
-from noesis.interfaces.cli.responses.skill_guide_response import (
-    SkillGuideListResponse,
-    SkillGuideResponse,
-)
-from noesis.interfaces.cli.responses.success_response import SuccessResponse
+from .capture_run_response import CaptureRunListResponse, CaptureRunResponse
+from .capture_status_response import CaptureStatusResponse
+from .config_init_response import ConfigInitResponse
+from .config_show_response import ConfigShowResponse
+from .curation_response import CurationResponse, SkippedCandidateResponse
+from .doctor_response import DoctorCheckResponse, DoctorResponse
+from .error_response import ErrorDetail, ErrorResponse
+from .integration_response import IntegrationResponse
+from .note_response import NoteListResponse, NoteResponse
+from .parked_curation_response import ParkedCurationListResponse, ParkedCurationResponse
+from .skill_guide_response import SkillGuideListResponse, SkillGuideResponse
+from .success_response import SuccessResponse
 
 __all__ = [
     "CaptureRunListResponse",

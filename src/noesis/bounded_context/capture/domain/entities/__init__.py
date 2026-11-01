@@ -1,6 +1,6 @@
 """Capture aggregates."""
 
-from noesis.bounded_context.capture.domain.entities.capture_session import (
+from .capture_session import (
     MAX_FAILED_HANDOVERS,
     CaptureSession,
     CommitRecorded,

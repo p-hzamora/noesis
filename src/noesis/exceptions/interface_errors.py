@@ -1,6 +1,6 @@
 """Errors raised by delivery adapters for invalid input."""
 
-from noesis.exceptions.base import InterfaceException
+from .base import InterfaceException
 
 
 class InvalidWorkBriefError(InterfaceException):

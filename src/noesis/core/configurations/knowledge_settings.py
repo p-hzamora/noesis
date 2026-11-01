@@ -5,7 +5,7 @@ from pathlib import Path
 from pydantic import field_validator
 from pydantic_settings import SettingsConfigDict
 
-from noesis.core.configurations.base_settings import AppBaseSettings
+from .base_settings import AppBaseSettings
 
 
 class KnowledgeSettings(AppBaseSettings):

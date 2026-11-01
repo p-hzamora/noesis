@@ -1,10 +1,6 @@
 """Retry a parked curation once, in the foreground."""
 
 from noesis.bounded_context.knowledge.application.dtos import CurationResultDto
-from noesis.bounded_context.knowledge.application.handlers.commands.curate_work_brief_handler import (
-    CurateWorkBriefCommand,
-    CurateWorkBriefHandler,
-)
 from noesis.bounded_context.knowledge.application.ports.queue import IParkedCurationQueue
 from noesis.exceptions import (
     CurationFailedError,
@@ -13,6 +9,8 @@ from noesis.exceptions import (
 from noesis.shared_kernel.application.handlers import IHandler
 from noesis.shared_kernel.contracts import WorkBriefContract
 from noesis.utils import FrozenObject
+
+from .curate_work_brief_handler import CurateWorkBriefCommand, CurateWorkBriefHandler
 
 
 class RetryParkedCurationCommand(FrozenObject):

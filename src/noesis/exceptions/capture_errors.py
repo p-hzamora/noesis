@@ -1,6 +1,6 @@
 """Errors of the Capture context."""
 
-from noesis.exceptions.base import ApplicationException, DomainException, InfrastructureException
+from .base import ApplicationException, DomainException, InfrastructureException
 
 
 class InvalidSessionIdError(DomainException):

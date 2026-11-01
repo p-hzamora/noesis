@@ -2,10 +2,11 @@
 
 from enum import StrEnum
 
-from noesis.bounded_context.knowledge.domain.value_objects.note_kind_enum import NoteKindEnum
-from noesis.bounded_context.knowledge.domain.value_objects.note_section import NoteSection
-from noesis.bounded_context.knowledge.domain.value_objects.note_slug import NoteSlug
 from noesis.shared_kernel.domain.value_objects import ValueObject
+
+from .note_kind_enum import NoteKindEnum
+from .note_section import NoteSection
+from .note_slug import NoteSlug
 
 
 class CurationActionEnum(StrEnum):

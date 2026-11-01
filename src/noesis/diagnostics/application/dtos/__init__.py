@@ -1,8 +1,5 @@
 """Diagnostics DTOs."""
 
-from noesis.diagnostics.application.dtos.diagnostic_report_dto import (
-    DiagnosticCheckDto,
-    DiagnosticReportDto,
-)
+from .diagnostic_report_dto import DiagnosticCheckDto, DiagnosticReportDto
 
 __all__ = ["DiagnosticCheckDto", "DiagnosticReportDto"]

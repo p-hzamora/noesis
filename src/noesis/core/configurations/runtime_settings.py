@@ -6,8 +6,8 @@ from pathlib import Path
 from pydantic import Field, field_validator
 from pydantic_settings import SettingsConfigDict
 
-from noesis.core.configurations.base_settings import AppBaseSettings
-from noesis.core.configurations.paths import default_state_dir
+from .base_settings import AppBaseSettings
+from .paths import default_state_dir
 
 
 class LogLevelEnum(StrEnum):

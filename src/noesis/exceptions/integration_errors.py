@@ -1,6 +1,6 @@
 """Errors raised while integrating noesis with an agent."""
 
-from noesis.exceptions.base import InfrastructureException, InterfaceException
+from .base import InfrastructureException, InterfaceException
 
 
 class AgentSettingsInvalidError(InfrastructureException):

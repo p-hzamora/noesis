@@ -5,9 +5,8 @@ from typing import Self
 
 from noesis.bounded_context.knowledge.application.ports.uow import IKnowledgeUnitOfWork
 from noesis.bounded_context.knowledge.domain.repositories import INoteRepository
-from noesis.bounded_context.knowledge.infrastructure.outbound.storage.filesystem_note_repository_adapter import (
-    FilesystemNoteRepositoryAdapter,
-)
+
+from .filesystem_note_repository_adapter import FilesystemNoteRepositoryAdapter
 
 
 class FilesystemKnowledgeUnitOfWorkAdapter(IKnowledgeUnitOfWork):

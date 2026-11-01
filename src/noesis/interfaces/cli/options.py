@@ -5,7 +5,7 @@ from typing import Annotated
 
 import typer
 
-from noesis.interfaces.cli.output import remember_json_mode
+from .output import remember_json_mode
 
 JsonOption = Annotated[
     bool,

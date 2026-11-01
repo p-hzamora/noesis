@@ -7,13 +7,12 @@ from typing import Self
 from noesis.bounded_context.capture.application.ports.uow import ICaptureUnitOfWork
 from noesis.bounded_context.capture.domain.repositories import ICaptureSessionRepository
 from noesis.bounded_context.capture.domain.value_objects import SessionId
-from noesis.bounded_context.capture.infrastructure.outbound.persistence.json_file_capture_session_repository_adapter import (
-    JsonFileCaptureSessionRepositoryAdapter,
-)
 from noesis.exceptions import (
     CaptureStateError,
 )
 from noesis.shared_kernel.infrastructure.outbound.persistence import FileLock
+
+from .json_file_capture_session_repository_adapter import JsonFileCaptureSessionRepositoryAdapter
 
 
 class JsonFileCaptureUnitOfWorkAdapter(ICaptureUnitOfWork):

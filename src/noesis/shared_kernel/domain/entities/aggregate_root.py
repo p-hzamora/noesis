@@ -3,10 +3,11 @@
 from dataclasses import dataclass, field
 from typing import Any
 
-from noesis.shared_kernel.domain.entities.base import Entity
 from noesis.shared_kernel.domain.events import (
     DomainEvent,
 )
+
+from .base import Entity
 
 
 @dataclass(slots=True, kw_only=True)

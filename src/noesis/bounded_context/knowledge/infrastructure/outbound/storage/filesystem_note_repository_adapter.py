@@ -5,11 +5,12 @@ from pathlib import Path
 from noesis.bounded_context.knowledge.domain.entities import Note
 from noesis.bounded_context.knowledge.domain.repositories import INoteRepository
 from noesis.bounded_context.knowledge.domain.value_objects import NoteLocation
-from noesis.bounded_context.knowledge.infrastructure.outbound.storage.mappers import NoteMapper
 from noesis.exceptions import (
     NoteStorageError,
 )
 from noesis.shared_kernel.infrastructure.outbound.persistence import write_text_atomic
+
+from .mappers import NoteMapper
 
 
 class FilesystemNoteRepositoryAdapter(INoteRepository):

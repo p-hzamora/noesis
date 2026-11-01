@@ -1,6 +1,6 @@
 """Application-wide exception hierarchy and exit codes."""
 
-from noesis.exceptions.base import (
+from .base import (
     AppException,
     ApplicationException,
     CoreException,
@@ -8,26 +8,17 @@ from noesis.exceptions.base import (
     InfrastructureException,
     InterfaceException,
 )
-from noesis.exceptions.capture_errors import (
-    CaptureNotEnabledError,
-    CaptureStateError,
-    InvalidSessionIdError,
-)
-from noesis.exceptions.core_errors import (
+from .capture_errors import CaptureNotEnabledError, CaptureStateError, InvalidSessionIdError
+from .core_errors import (
     ConfigFileExistsError,
     ConfigTemplateMissingError,
     InvalidConfigurationError,
     VaultNotConfiguredError,
 )
-from noesis.exceptions.exit_code_enum import ExitCodeEnum
-from noesis.exceptions.integration_errors import (
-    AgentSettingsInvalidError,
-    SkillGuideNotFoundError,
-)
-from noesis.exceptions.interface_errors import (
-    InvalidWorkBriefError,
-)
-from noesis.exceptions.knowledge_errors import (
+from .exit_code_enum import ExitCodeEnum
+from .integration_errors import AgentSettingsInvalidError, SkillGuideNotFoundError
+from .interface_errors import InvalidWorkBriefError
+from .knowledge_errors import (
     CurationFailedError,
     CuratorFailedError,
     InvalidNoteAreaError,

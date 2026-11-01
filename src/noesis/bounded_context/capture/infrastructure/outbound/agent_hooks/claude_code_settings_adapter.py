@@ -8,12 +8,6 @@ from pathlib import Path
 
 from noesis.bounded_context.capture.application.dtos import AgentHookPlanDto, AgentHooksDto
 from noesis.bounded_context.capture.application.ports.agent_hooks import IAgentHookRegistry
-from noesis.bounded_context.capture.infrastructure.outbound.agent_hooks.claude_code_hook_settings import (
-    HOOK_SPECS,
-    installed_commands,
-    with_noesis,
-    without_noesis,
-)
 from noesis.exceptions import (
     AgentSettingsInvalidError,
 )
@@ -21,6 +15,8 @@ from noesis.shared_kernel.domain import (
     JsonObject,
 )
 from noesis.shared_kernel.infrastructure.outbound.persistence import write_text_atomic
+
+from .claude_code_hook_settings import HOOK_SPECS, installed_commands, with_noesis, without_noesis
 
 BACKUP_SUFFIX: str = ".noesis-backup-"
 

@@ -4,9 +4,10 @@ from pathlib import Path
 
 from noesis.bounded_context.capture.application.dtos import PublicationDto
 from noesis.bounded_context.capture.application.ports.publishing import IWorkBriefPublisher
-from noesis.bounded_context.capture.infrastructure.outbound.publishing.brief_files import BriefFiles
 from noesis.shared_kernel.application.ports.clock import IClock
 from noesis.shared_kernel.contracts import WorkBriefContract
+
+from .brief_files import BriefFiles
 
 
 class DryRunWorkBriefPublisherAdapter(IWorkBriefPublisher):

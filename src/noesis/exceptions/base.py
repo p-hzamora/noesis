@@ -9,10 +9,11 @@ import re
 from collections.abc import Sequence
 from typing import ClassVar
 
-from noesis.exceptions.exit_code_enum import ExitCodeEnum
 from noesis.shared_kernel.domain import (
     JsonValue,
 )
+
+from .exit_code_enum import ExitCodeEnum
 
 
 class AppException(Exception):  # noqa: N818 - house style: bases end in Exception, concrete errors in Error

@@ -7,9 +7,6 @@ from pydantic import ValidationError
 from noesis.bounded_context.capture.domain.entities import CaptureSession
 from noesis.bounded_context.capture.domain.repositories import ICaptureSessionRepository
 from noesis.bounded_context.capture.domain.value_objects import SessionId
-from noesis.bounded_context.capture.infrastructure.outbound.persistence.mappers import (
-    CaptureSessionMapper,
-)
 from noesis.exceptions import (
     CaptureStateError,
 )
@@ -20,6 +17,8 @@ from noesis.shared_kernel.infrastructure.outbound.persistence import (
     read_json_object,
     write_json_atomic,
 )
+
+from .mappers import CaptureSessionMapper
 
 
 class JsonFileCaptureSessionRepositoryAdapter(ICaptureSessionRepository):

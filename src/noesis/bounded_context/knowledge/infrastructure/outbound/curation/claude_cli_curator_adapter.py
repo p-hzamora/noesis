@@ -16,14 +16,12 @@ from pydantic import ValidationError
 from noesis.bounded_context.knowledge.application.dtos import NoteSummaryDto
 from noesis.bounded_context.knowledge.application.ports.curation import ICurator
 from noesis.bounded_context.knowledge.domain.value_objects import CurationDecision
-from noesis.bounded_context.knowledge.infrastructure.outbound.curation.curator_response_schema import (
-    RESPONSE_JSON_SCHEMA,
-    CuratorResponseModel,
-)
 from noesis.exceptions import (
     CuratorFailedError,
 )
 from noesis.shared_kernel.contracts import WorkBriefContract
+
+from .curator_response_schema import RESPONSE_JSON_SCHEMA, CuratorResponseModel
 
 SYSTEM_PROMPT_RESOURCE: str = "curator_system.md"
 RECURSION_GUARD: Mapping[str, str] = {"NOESIS_HOOK": "1"}

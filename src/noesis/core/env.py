@@ -11,7 +11,14 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
-from noesis.core.configurations import (
+from noesis.exceptions import (
+    InvalidConfigurationError,
+)
+from noesis.shared_kernel.domain import (
+    JsonValue,
+)
+
+from .configurations import (
     AppBaseSettings,
     CaptureSettings,
     ClaudeCodeSettings,
@@ -20,12 +27,6 @@ from noesis.core.configurations import (
     RuntimeSettings,
     default_env_file,
     default_state_dir,
-)
-from noesis.exceptions import (
-    InvalidConfigurationError,
-)
-from noesis.shared_kernel.domain import (
-    JsonValue,
 )
 
 

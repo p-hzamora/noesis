@@ -3,14 +3,15 @@
 from pathlib import PurePosixPath
 from typing import Self
 
-from noesis.bounded_context.knowledge.domain.value_objects.note_area import AUTO_FOLDER, NoteArea
-from noesis.bounded_context.knowledge.domain.value_objects.note_kind_enum import NoteKindEnum
-from noesis.bounded_context.knowledge.domain.value_objects.note_origin_enum import NoteOriginEnum
-from noesis.bounded_context.knowledge.domain.value_objects.note_slug import NoteSlug
 from noesis.exceptions import (
     InvalidNoteLocationError,
 )
 from noesis.shared_kernel.domain.value_objects import ValueObject
+
+from .note_area import AUTO_FOLDER, NoteArea
+from .note_kind_enum import NoteKindEnum
+from .note_origin_enum import NoteOriginEnum
+from .note_slug import NoteSlug
 
 NOTE_SUFFIX: str = ".md"
 

@@ -1,7 +1,8 @@
 """There is pending work at all."""
 
-from noesis.bounded_context.capture.domain.specifications.flush_candidate import FlushCandidate
 from noesis.shared_kernel.domain.specifications import Specification
+
+from .flush_candidate import FlushCandidate
 
 
 class PendingWorkSpecification(Specification[FlushCandidate]):

@@ -1,10 +1,6 @@
 """Errors of the Knowledge context."""
 
-from noesis.exceptions.base import (
-    ApplicationException,
-    DomainException,
-    InfrastructureException,
-)
+from .base import ApplicationException, DomainException, InfrastructureException
 
 
 class InvalidNoteSlugError(DomainException):

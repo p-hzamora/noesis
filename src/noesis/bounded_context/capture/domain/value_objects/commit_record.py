@@ -1,7 +1,8 @@
 """One finished commit waiting to be handed over."""
 
-from noesis.bounded_context.capture.domain.value_objects.diff_size import DiffSize
 from noesis.shared_kernel.domain.value_objects import ValueObject
+
+from .diff_size import DiffSize
 
 
 class CommitRecord(ValueObject):

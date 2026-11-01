@@ -1,8 +1,9 @@
 """The pending work is big enough to be worth a curator run."""
 
-from noesis.bounded_context.capture.domain.specifications.flush_candidate import FlushCandidate
 from noesis.bounded_context.capture.domain.value_objects import DiffSize
 from noesis.shared_kernel.domain.specifications import Specification
+
+from .flush_candidate import FlushCandidate
 
 
 class SignificantChangeSpecification(Specification[FlushCandidate]):

@@ -11,8 +11,9 @@ from contextlib import contextmanager
 from contextvars import ContextVar, Token
 
 from noesis.exceptions import AppException
-from noesis.interfaces.cli.responses import ErrorDetail, ErrorResponse, SuccessResponse
 from noesis.utils import FrozenObject
+
+from .responses import ErrorDetail, ErrorResponse, SuccessResponse
 
 _JSON_MODE: ContextVar[bool] = ContextVar("noesis_json_mode", default=False)
 

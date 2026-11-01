@@ -1,6 +1,6 @@
 """Errors raised while loading configuration."""
 
-from noesis.exceptions.base import CoreException
+from .base import CoreException
 
 
 class InvalidConfigurationError(CoreException):

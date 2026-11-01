@@ -2,10 +2,9 @@
 
 import abc
 
-from noesis.bounded_context.capture.application.ports.publishing.i_work_brief_publisher import (
-    IWorkBriefPublisher,
-)
 from noesis.bounded_context.capture.domain.value_objects import CaptureModeEnum
+
+from .i_work_brief_publisher import IWorkBriefPublisher
 
 
 class IWorkBriefPublisherFactory(abc.ABC):

@@ -1,9 +1,9 @@
 """Capture value objects."""
 
-from noesis.bounded_context.capture.domain.value_objects.capture_mode_enum import CaptureModeEnum
-from noesis.bounded_context.capture.domain.value_objects.commit_record import CommitRecord
-from noesis.bounded_context.capture.domain.value_objects.diff_size import DiffSize
-from noesis.bounded_context.capture.domain.value_objects.session_id import SessionId
-from noesis.bounded_context.capture.domain.value_objects.transcript_cursor import TranscriptCursor
+from .capture_mode_enum import CaptureModeEnum
+from .commit_record import CommitRecord
+from .diff_size import DiffSize
+from .session_id import SessionId
+from .transcript_cursor import TranscriptCursor
 
 __all__ = ["CaptureModeEnum", "CommitRecord", "DiffSize", "SessionId", "TranscriptCursor"]

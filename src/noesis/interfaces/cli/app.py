@@ -9,9 +9,10 @@ import typer
 from noesis import __version__
 from noesis.exceptions import AppException, ExitCodeEnum
 from noesis.interfaces.cli import commands
-from noesis.interfaces.cli.options import EnvFileOption
-from noesis.interfaces.cli.output import emit_error, output_scope
-from noesis.interfaces.cli.state import CliState
+
+from .options import EnvFileOption
+from .output import emit_error, output_scope
+from .state import CliState
 
 PROGRAM: str = "noesis"
 EPILOG: str = (

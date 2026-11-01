@@ -12,11 +12,9 @@ from noesis.bounded_context.knowledge.domain.value_objects import (
     NoteLocation,
     NoteOriginEnum,
 )
-from noesis.bounded_context.knowledge.infrastructure.outbound.storage.mappers import (
-    NoteMapper,
-    ParsedMarkdown,
-)
 from noesis.exceptions import DomainException
+
+from .mappers import NoteMapper, ParsedMarkdown
 
 TOKEN_PATTERN: re.Pattern[str] = re.compile(r"[a-z0-9]{3,}")
 TITLE_WEIGHT: int = 3

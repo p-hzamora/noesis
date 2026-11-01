@@ -4,10 +4,9 @@ from noesis.bounded_context.capture.application.handlers.commands import (
     FlushCaptureCommand,
     RecordCommitCommand,
 )
-from noesis.bounded_context.capture.infrastructure.inbound.claude_code.hook_payload import (
-    ClaudeCodeHookPayload,
-)
 from noesis.utils import is_git_commit
+
+from .hook_payload import ClaudeCodeHookPayload
 
 type CaptureCommand = RecordCommitCommand | FlushCaptureCommand
 

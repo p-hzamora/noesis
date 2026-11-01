@@ -1,7 +1,8 @@
 """Result of listing or searching notes."""
 
-from noesis.bounded_context.knowledge.application.dtos.note_summary_dto import NoteSummaryDto
 from noesis.shared_kernel.application.dtos import BaseDto
+
+from .note_summary_dto import NoteSummaryDto
 
 
 class NoteListDto(BaseDto):
