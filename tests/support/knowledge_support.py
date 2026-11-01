@@ -22,6 +22,7 @@ from noesis.bounded_context.knowledge.domain.value_objects import (
     NoteOriginEnum,
     NoteSection,
     NoteSlug,
+    WorkBrief,
 )
 from noesis.exceptions import (
     CuratorFailedError,
@@ -112,11 +113,13 @@ class ScriptedCurator(ICurator):
         self._script: list[tuple[CurationDecision, ...] | str] = list(script)
         self.calls: int = 0
         self.related_seen: list[Sequence[NoteSummaryDto]] = []
+        self.briefs_seen: list[WorkBrief] = []
 
     async def curate(
-        self, brief: WorkBriefContract, related: Sequence[NoteSummaryDto]
+        self, brief: WorkBrief, related: Sequence[NoteSummaryDto]
     ) -> tuple[CurationDecision, ...]:
         self.calls += 1
+        self.briefs_seen.append(brief)
         self.related_seen.append(related)
         step: tuple[CurationDecision, ...] | str = self._script.pop(0)
         if isinstance(step, str):

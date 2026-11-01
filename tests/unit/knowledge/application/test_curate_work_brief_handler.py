@@ -21,6 +21,7 @@ from noesis.bounded_context.knowledge.application.handlers.commands import (
     RetryParkedCurationCommand,
     RetryParkedCurationHandler,
 )
+from noesis.bounded_context.knowledge.application.mappers import WorkBriefMapper
 from noesis.bounded_context.knowledge.domain.services import AutoCurationPolicy
 from noesis.bounded_context.knowledge.domain.value_objects import CurationActionEnum, NoteOriginEnum
 from noesis.exceptions import (
@@ -106,6 +107,7 @@ async def test_related_notes_are_searched_with_goal_and_commit_subjects_and_show
 
     assert world.read_repository.queries == ["make login faster feat: add TTL cache"]
     assert world.curator.related_seen == [related]
+    assert world.curator.briefs_seen == [WorkBriefMapper.to_domain(a_brief())]
 
 
 async def test_existing_auto_notes_are_updated_and_manual_ones_protected() -> None:
