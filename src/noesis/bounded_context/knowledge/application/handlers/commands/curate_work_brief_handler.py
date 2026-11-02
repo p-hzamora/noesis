@@ -16,7 +16,7 @@ from noesis.bounded_context.knowledge.application.ports.queue import IParkedCura
 from noesis.bounded_context.knowledge.application.ports.read_repositories import INoteReadRepository
 from noesis.bounded_context.knowledge.application.ports.uow import IKnowledgeUnitOfWork
 from noesis.bounded_context.knowledge.domain.entities import Note
-from noesis.bounded_context.knowledge.domain.services import (
+from noesis.bounded_context.knowledge.domain.policies import (
     AutoCurationPolicy,
     CurationOutcome,
     CurationOutcomeEnum,

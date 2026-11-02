@@ -1,4 +1,4 @@
-"""Knowledge domain services."""
+"""Knowledge domain policies."""
 
 from .auto_curation_policy import AutoCurationPolicy, CurationOutcome, CurationOutcomeEnum
 

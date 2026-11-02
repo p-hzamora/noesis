@@ -4,7 +4,7 @@ import pytest
 from tests.support.knowledge_support import NOW, a_decision, a_note
 
 from noesis.bounded_context.knowledge.domain.entities import Note
-from noesis.bounded_context.knowledge.domain.services import (
+from noesis.bounded_context.knowledge.domain.policies import (
     AutoCurationPolicy,
     CurationOutcome,
     CurationOutcomeEnum,

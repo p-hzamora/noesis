@@ -16,7 +16,7 @@ from noesis.bounded_context.knowledge.application.handlers.queries import (
 from noesis.bounded_context.knowledge.application.ports.curation import ICurator
 from noesis.bounded_context.knowledge.application.ports.read_repositories import INoteReadRepository
 from noesis.bounded_context.knowledge.application.ports.uow import IKnowledgeUnitOfWork
-from noesis.bounded_context.knowledge.domain.services import AutoCurationPolicy
+from noesis.bounded_context.knowledge.domain.policies import AutoCurationPolicy
 from noesis.bounded_context.knowledge.infrastructure.outbound.curation import (
     ClaudeCliCuratorAdapter,
     default_system_prompt,

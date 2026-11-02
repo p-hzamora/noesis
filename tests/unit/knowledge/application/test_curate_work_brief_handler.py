@@ -22,7 +22,7 @@ from noesis.bounded_context.knowledge.application.handlers.commands import (
     RetryParkedCurationHandler,
 )
 from noesis.bounded_context.knowledge.application.mappers import WorkBriefMapper
-from noesis.bounded_context.knowledge.domain.services import AutoCurationPolicy
+from noesis.bounded_context.knowledge.domain.policies import AutoCurationPolicy
 from noesis.bounded_context.knowledge.domain.value_objects import CurationActionEnum, NoteOriginEnum
 from noesis.exceptions import (
     CurationFailedError,
