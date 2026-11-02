@@ -38,6 +38,9 @@ network). With `obsidian-mcp`:
   Obsidian's score, and reads each of the best `--limit` hits with `vault_read` to build the
   same `NoteSummaryDto` as the filesystem adapter. Notes outside the noesis layout (e.g.
   `learning/<topic>/`) are found too, with `kind: null` and `origin: manual`.
+- The `--json` result of `search` always carries `backend` (`filesystem` or `obsidian-mcp`): the
+  repository that actually produced the notes, so it reads `filesystem` after a fallback even
+  with `obsidian-mcp` configured. Text mode prints a trailing `backend: ...` line.
 - `list` always reads files: one MCP round trip per note would be chattier than a scan, and
   files give a complete, ordered listing even when Obsidian is closed.
 - Unreachable server, rejected token, timeout or an unreadable answer (all `ObsidianMcpError`):
