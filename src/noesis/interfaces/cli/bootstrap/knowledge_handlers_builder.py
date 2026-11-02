@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass
 from pathlib import Path
+from typing import assert_never
 
 from noesis.bounded_context.knowledge.application.handlers.commands import (
     CurateWorkBriefHandler,
@@ -132,21 +133,24 @@ def build_read_repository(
     """
     files: FilesystemNoteReadRepositoryAdapter = FilesystemNoteReadRepositoryAdapter(vault, mapper)
     settings = environment.knowledge
-    if settings.search_backend is not SearchBackendEnum.OBSIDIAN_MCP:
-        return files
-    token: str | None = (
-        settings.obsidian_mcp_token.get_secret_value() if settings.obsidian_mcp_token else None
-    )
-    client: ObsidianMcpClient = ObsidianMcpClient(
-        settings.obsidian_mcp_url,
-        token=token,
-        timeout_seconds=settings.obsidian_mcp_timeout_seconds,
-    )
-    return FallbackNoteReadRepositoryAdapter(
-        ObsidianMcpNoteReadRepositoryAdapter(client, mapper, listing=files),
-        files,
-        on_fallback=lambda _error: notices.append(MCP_FALLBACK_NOTICE),
-    )
+    backend: SearchBackendEnum = settings.search_backend
+    match backend:
+        case SearchBackendEnum.FILESYSTEM:
+            return files
+        case SearchBackendEnum.OBSIDIAN_MCP:
+            token = settings.obsidian_mcp_token
+            client: ObsidianMcpClient = ObsidianMcpClient(
+                settings.obsidian_mcp_url,
+                token=token.get_secret_value() if token else None,
+                timeout_seconds=settings.obsidian_mcp_timeout_seconds,
+            )
+            return FallbackNoteReadRepositoryAdapter(
+                ObsidianMcpNoteReadRepositoryAdapter(client, mapper, listing=files),
+                files,
+                on_fallback=lambda _error: notices.append(MCP_FALLBACK_NOTICE),
+            )
+        case _ as unhandled:
+            assert_never(unhandled)
 
 
 def build_knowledge(
