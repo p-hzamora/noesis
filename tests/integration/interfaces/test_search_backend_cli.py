@@ -81,6 +81,9 @@ def test_search_goes_through_the_mcp_in_the_same_envelope_and_shape(
     assert server.calls[0][1] == {"query": "anything at all"}
     assert via_mcp["ok"] is True
     assert set(via_mcp) == set(filesystem) == {"ok", "result"}  # no notice key
+    assert set(via_mcp["result"]) == set(filesystem["result"]) == {"notes", "backend"}  # type: ignore[arg-type]
+    assert filesystem["result"]["backend"] == "filesystem"  # type: ignore[index]
+    assert via_mcp["result"]["backend"] == "obsidian-mcp"  # type: ignore[index]
     assert via_mcp["result"]["notes"][0] == next(  # type: ignore[index]
         note
         for note in filesystem["result"]["notes"]  # type: ignore[index]
@@ -111,11 +114,13 @@ def test_with_obsidian_closed_search_falls_back_to_files_and_exits_zero(
     envelope: JsonObject = _json(capsys)
     assert _paths(envelope) == ["repos/demo/auto/decisions/use-ttl-cache.md"]
     assert envelope["result"]["notice"] == FALLBACK_NOTICE  # type: ignore[index]
+    assert envelope["result"]["backend"] == "filesystem"  # files answered, not the MCP  # type: ignore[index]
 
     assert run(["knowledge", "search", "ttl cache", "--repo", "demo"]) == 0
     text: str = capsys.readouterr().out
     assert "repos/demo/auto/decisions/use-ttl-cache.md" in text
     assert text.count(FALLBACK_NOTICE) == 1
+    assert "backend: filesystem" in text
 
 
 def test_default_settings_never_call_the_mcp(

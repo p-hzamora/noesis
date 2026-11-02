@@ -117,8 +117,8 @@ async def test_read_repository_lists_filters_and_ranks_notes(
     auto_only = await reader.list_notes(
         area=NoteArea.for_repository("demo"), origin=NoteOriginEnum.AUTO
     )
-    found = await reader.search("token clock", area=None, limit=5)
-    nothing = await reader.search("a an", area=None, limit=5)
+    found = (await reader.search("token clock", area=None, limit=5)).notes
+    nothing = (await reader.search("a an", area=None, limit=5)).notes
     elsewhere = await reader.list_notes(area=NoteArea.for_repository("other"), origin=None)
 
     assert [note.path for note in everything] == [
@@ -128,7 +128,7 @@ async def test_read_repository_lists_filters_and_ranks_notes(
     assert [note.origin for note in auto_only] == ["auto"]
     assert found[0].path == "repos/demo/gotchas/clock-skew.md"
     assert found[0].snippet == "Tokens rejected right after login."
-    assert (nothing, elsewhere) == ([], [])
+    assert (nothing, elsewhere) == ((), [])
 
 
 def test_frontmatter_errors_are_tolerated(mapper: NoteMapper) -> None:

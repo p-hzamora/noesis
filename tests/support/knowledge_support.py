@@ -5,7 +5,11 @@ from datetime import UTC, datetime
 from types import TracebackType
 from typing import Self
 
-from noesis.bounded_context.knowledge.application.dtos import NoteSummaryDto, ParkedCurationDto
+from noesis.bounded_context.knowledge.application.dtos import (
+    NoteSearchResultDto,
+    NoteSummaryDto,
+    ParkedCurationDto,
+)
 from noesis.bounded_context.knowledge.application.ports.curation import ICurator
 from noesis.bounded_context.knowledge.application.ports.queue import IParkedCurationQueue
 from noesis.bounded_context.knowledge.application.ports.read_repositories import INoteReadRepository
@@ -29,6 +33,7 @@ from noesis.exceptions import (
 )
 from noesis.shared_kernel.application.ports.clock import IClock
 from noesis.shared_kernel.contracts import CommitRefContract, WorkBriefContract
+from noesis.shared_kernel.enums import SearchEngineEnum
 
 NOW: datetime = datetime(2026, 10, 30, 12, 0, tzinfo=UTC)
 
@@ -96,9 +101,11 @@ class InMemoryNoteReadRepository(INoteReadRepository):
         self.notes: list[NoteSummaryDto] = list(notes)
         self.queries: list[str] = []
 
-    async def search(self, text: str, *, area: NoteArea | None, limit: int) -> list[NoteSummaryDto]:
+    async def search(self, text: str, *, area: NoteArea | None, limit: int) -> NoteSearchResultDto:
         self.queries.append(text)
-        return self.notes[:limit]
+        return NoteSearchResultDto(
+            notes=tuple(self.notes[:limit]), backend=SearchEngineEnum.FILESYSTEM
+        )
 
     async def list_notes(
         self, *, area: NoteArea | None, origin: NoteOriginEnum | None

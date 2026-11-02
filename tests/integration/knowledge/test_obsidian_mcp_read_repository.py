@@ -62,13 +62,13 @@ def _adapters(
 async def test_search_maps_hits_to_the_same_dto_as_the_filesystem_adapter(vault: Path) -> None:
     with fake_obsidian_mcp(vault) as server:
         mcp_repo, files = _adapters(vault, server.url)
-        found: list[NoteSummaryDto] = await mcp_repo.search(
-            "ttl cache", area=NoteArea(value="repos/demo"), limit=5
-        )
+        found: list[NoteSummaryDto] = (
+            await mcp_repo.search("ttl cache", area=NoteArea(value="repos/demo"), limit=5)
+        ).notes
 
-    expected: list[NoteSummaryDto] = await files.search(
-        "ttl cache", area=NoteArea(value="repos/demo"), limit=5
-    )
+    expected: list[NoteSummaryDto] = (
+        await files.search("ttl cache", area=NoteArea(value="repos/demo"), limit=5)
+    ).notes
     assert found == expected
     assert [note.path for note in found] == ["repos/demo/auto/decisions/use-ttl-cache.md"]
     assert (found[0].kind, found[0].origin, found[0].updated) == ("decision", "auto", "2026-10-02")
@@ -78,10 +78,12 @@ async def test_search_maps_hits_to_the_same_dto_as_the_filesystem_adapter(vault:
 async def test_area_restricts_hits_to_that_folder(vault: Path) -> None:
     with fake_obsidian_mcp(vault) as server:
         mcp_repo, _ = _adapters(vault, server.url)
-        everywhere: list[NoteSummaryDto] = await mcp_repo.search("ttl", area=None, limit=10)
-        only_other: list[NoteSummaryDto] = await mcp_repo.search(
-            "ttl", area=NoteArea(value="repos/other"), limit=10
-        )
+        everywhere: tuple[NoteSummaryDto, ...] = (
+            await mcp_repo.search("ttl", area=None, limit=10)
+        ).notes
+        only_other: list[NoteSummaryDto] = (
+            await mcp_repo.search("ttl", area=NoteArea(value="repos/other"), limit=10)
+        ).notes
 
     assert {note.path for note in everywhere} >= {
         "repos/demo/auto/decisions/use-ttl-cache.md",
@@ -93,7 +95,9 @@ async def test_area_restricts_hits_to_that_folder(vault: Path) -> None:
 async def test_notes_outside_the_noesis_layout_are_found_without_a_kind(vault: Path) -> None:
     with fake_obsidian_mcp(vault) as server:
         mcp_repo, _ = _adapters(vault, server.url)
-        found: list[NoteSummaryDto] = await mcp_repo.search("trick", area=None, limit=10)
+        found: tuple[NoteSummaryDto, ...] = (
+            await mcp_repo.search("trick", area=None, limit=10)
+        ).notes
 
     assert [(note.path, note.kind, note.origin, note.title) for note in found] == [
         ("os/linux/ttl-trick.md", None, "manual", "Linux know-how")
@@ -109,7 +113,9 @@ async def test_hits_are_ranked_by_score_and_cut_at_the_limit(vault: Path) -> Non
     ]
     with fake_obsidian_mcp(vault, canned=canned) as server:
         mcp_repo, _ = _adapters(vault, server.url)
-        found: list[NoteSummaryDto] = await mcp_repo.search("anything", area=None, limit=2)
+        found: tuple[NoteSummaryDto, ...] = (
+            await mcp_repo.search("anything", area=None, limit=2)
+        ).notes
 
     assert [note.path for note in found] == [
         "repos/demo/auto/decisions/use-ttl-cache.md",
@@ -129,7 +135,7 @@ async def test_listing_stays_on_the_filesystem(vault: Path) -> None:
 async def test_the_token_is_sent_and_a_wrong_one_is_rejected_without_leaking(vault: Path) -> None:
     with fake_obsidian_mcp(vault, token="s3cret") as server:
         good, _ = _adapters(vault, server.url, token="s3cret")
-        assert await good.search("ttl", area=None, limit=1)
+        assert (await good.search("ttl", area=None, limit=1)).notes
         assert set(server.authorizations) == {"Bearer s3cret"}
 
         bad, _ = _adapters(vault, server.url, token="wrong-token")
@@ -154,10 +160,10 @@ async def test_fallback_searches_files_and_notifies_once(vault: Path) -> None:
         mcp_repo, files, on_fallback=notified.append
     )
 
-    first: list[NoteSummaryDto] = await repo.search("ttl cache", area=None, limit=5)
-    second: list[NoteSummaryDto] = await repo.search("ttl cache", area=None, limit=5)
+    first: tuple[NoteSummaryDto, ...] = (await repo.search("ttl cache", area=None, limit=5)).notes
+    second: tuple[NoteSummaryDto, ...] = (await repo.search("ttl cache", area=None, limit=5)).notes
 
-    assert first == second == await files.search("ttl cache", area=None, limit=5)
+    assert first == second == (await files.search("ttl cache", area=None, limit=5)).notes
     assert first
     assert len(notified) == 1
 
@@ -165,7 +171,9 @@ async def test_fallback_searches_files_and_notifies_once(vault: Path) -> None:
 async def test_a_second_text_block_with_a_truncation_note_is_ignored(vault: Path) -> None:
     with fake_obsidian_mcp(vault, truncation_note=True) as server:
         mcp_repo, _ = _adapters(vault, server.url)
-        found: list[NoteSummaryDto] = await mcp_repo.search("ttl cache", area=None, limit=5)
+        found: tuple[NoteSummaryDto, ...] = (
+            await mcp_repo.search("ttl cache", area=None, limit=5)
+        ).notes
 
     assert found
 
