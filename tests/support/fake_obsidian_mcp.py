@@ -70,7 +70,7 @@ class FakeObsidianMcp:
         ]
 
     def _build(self) -> ASGIApp:
-        mcp: FastMCP = FastMCP("obsidian", stateless_http=True, json_response=True)
+        mcp = FastMCP("obsidian", stateless_http=True, json_response=True)
 
         @mcp.tool()
         def search_simple(query: str) -> str | list[TextContent]:
@@ -158,7 +158,7 @@ def fake_obsidian_mcp(
     garbage: bool = False,
 ) -> Iterator[FakeObsidianMcp]:
     """Run a fake server for the duration of the block."""
-    fake: FakeObsidianMcp = FakeObsidianMcp(
+    fake = FakeObsidianMcp(
         vault, token=token, canned=canned, truncation_note=truncation_note, garbage=garbage
     )
     fake.start()

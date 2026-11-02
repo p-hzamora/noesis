@@ -53,9 +53,9 @@ def vault(tmp_path: Path) -> Path:
 def _adapters(
     vault: Path, url: str, token: str | None = None
 ) -> tuple[ObsidianMcpNoteReadRepositoryAdapter, FilesystemNoteReadRepositoryAdapter]:
-    mapper: NoteMapper = NoteMapper()
-    files: FilesystemNoteReadRepositoryAdapter = FilesystemNoteReadRepositoryAdapter(vault, mapper)
-    client: ObsidianMcpClient = ObsidianMcpClient(url, token=token, timeout_seconds=5)
+    mapper = NoteMapper()
+    files = FilesystemNoteReadRepositoryAdapter(vault, mapper)
+    client = ObsidianMcpClient(url, token=token, timeout_seconds=5)
     return ObsidianMcpNoteReadRepositoryAdapter(client, mapper, listing=files), files
 
 
@@ -156,9 +156,7 @@ async def test_an_unreachable_server_raises_obsidian_mcp_error(vault: Path) -> N
 async def test_fallback_searches_files_and_notifies_once(vault: Path) -> None:
     mcp_repo, files = _adapters(vault, f"http://127.0.0.1:{free_port()}/mcp/")
     notified: list[ObsidianMcpError] = []
-    repo: FallbackNoteReadRepositoryAdapter = FallbackNoteReadRepositoryAdapter(
-        mcp_repo, files, on_fallback=notified.append
-    )
+    repo = FallbackNoteReadRepositoryAdapter(mcp_repo, files, on_fallback=notified.append)
 
     first: tuple[NoteSummaryDto, ...] = (await repo.search("ttl cache", area=None, limit=5)).notes
     second: tuple[NoteSummaryDto, ...] = (await repo.search("ttl cache", area=None, limit=5)).notes

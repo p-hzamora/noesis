@@ -127,7 +127,7 @@ class ObsidianMcpClient:
             ):
                 async with asyncio.timeout(self._timeout_seconds):
                     await session.initialize()
-                body: ObsidianMcpSession = ObsidianMcpSession(session, self._timeout_seconds)
+                body = ObsidianMcpSession(session, self._timeout_seconds)
                 yield body
         except ObsidianMcpError:
             raise

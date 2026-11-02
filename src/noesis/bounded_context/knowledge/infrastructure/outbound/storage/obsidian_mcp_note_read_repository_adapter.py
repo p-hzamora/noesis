@@ -108,7 +108,7 @@ class ObsidianMcpNoteReadRepositoryAdapter(INoteReadRepository):
         parsed: ParsedMarkdown = self._mapper.parse(content)
         updated: object = parsed.frontmatter.get("updated") or parsed.frontmatter.get("date")
         try:
-            location: NoteLocation | None = NoteLocation.parse(path)
+            location = NoteLocation.parse(path)
         except DomainException:
             location = None
         stem: str = path.rsplit("/", 1)[-1].removesuffix(NOTE_SUFFIX)
