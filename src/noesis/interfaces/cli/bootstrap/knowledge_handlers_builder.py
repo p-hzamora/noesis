@@ -32,8 +32,9 @@ from noesis.bounded_context.knowledge.infrastructure.outbound.storage import (
     ObsidianMcpNoteReadRepositoryAdapter,
 )
 from noesis.bounded_context.knowledge.infrastructure.outbound.storage.mappers import NoteMapper
-from noesis.core import Environment, SearchBackendEnum
+from noesis.core import Environment
 from noesis.exceptions import CuratorPromptUnreadableError, VaultNotConfiguredError
+from noesis.shared_kernel.enums import SearchEngineEnum
 from noesis.shared_kernel.infrastructure.outbound.clock import SystemClockAdapter
 from noesis.shared_kernel.infrastructure.outbound.mcp import ObsidianMcpClient
 
@@ -133,11 +134,11 @@ def build_read_repository(
     """
     files: FilesystemNoteReadRepositoryAdapter = FilesystemNoteReadRepositoryAdapter(vault, mapper)
     settings = environment.knowledge
-    backend: SearchBackendEnum = settings.search_backend
+    backend: SearchEngineEnum = settings.search_backend
     match backend:
-        case SearchBackendEnum.FILESYSTEM:
+        case SearchEngineEnum.FILESYSTEM:
             return files
-        case SearchBackendEnum.OBSIDIAN_MCP:
+        case SearchEngineEnum.OBSIDIAN_MCP:
             token = settings.obsidian_mcp_token
             client: ObsidianMcpClient = ObsidianMcpClient(
                 settings.obsidian_mcp_url,

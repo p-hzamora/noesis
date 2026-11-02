@@ -4,7 +4,7 @@ from pathlib import Path
 
 from noesis.bounded_context.capture.application.dtos import AgentHooksDto
 from noesis.bounded_context.capture.application.handlers.queries import GetAgentHooksStatusQuery
-from noesis.core import ClaudeCodeSettings, Environment, SearchBackendEnum
+from noesis.core import ClaudeCodeSettings, Environment
 from noesis.diagnostics.application.dtos import DiagnosticReportDto
 from noesis.diagnostics.application.handlers.queries import (
     RunDiagnosticsHandler,
@@ -15,6 +15,7 @@ from noesis.diagnostics.infrastructure.outbound.probes import (
     SystemEnvironmentProbeAdapter,
 )
 from noesis.exceptions import AgentSettingsInvalidError
+from noesis.shared_kernel.enums import SearchEngineEnum
 from noesis.shared_kernel.infrastructure.outbound.mcp import ObsidianMcpClient
 
 from .agent_hooks_handlers_builder import build_agent_hooks
@@ -42,7 +43,7 @@ def build_diagnostics(environment: Environment | None = None) -> RunDiagnosticsH
 
 def uses_obsidian_mcp(environment: Environment) -> bool:
     """Whether notes are searched through Obsidian's MCP server."""
-    return environment.knowledge.search_backend is SearchBackendEnum.OBSIDIAN_MCP
+    return environment.knowledge.search_backend is SearchEngineEnum.OBSIDIAN_MCP
 
 
 async def run_diagnostics(

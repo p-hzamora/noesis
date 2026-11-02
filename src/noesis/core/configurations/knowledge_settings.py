@@ -1,21 +1,15 @@
 """Settings for where notes are stored and how they are searched."""
 
-from enum import StrEnum
 from pathlib import Path
 
 from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import SettingsConfigDict
 
+from noesis.shared_kernel.enums import SearchEngineEnum
+
 from .base_settings import AppBaseSettings
 
 DEFAULT_OBSIDIAN_MCP_URL: str = "http://127.0.0.1:27123/mcp/"
-
-
-class SearchBackendEnum(StrEnum):
-    """Where `knowledge search` (and the curator's related-notes lookup) reads from."""
-
-    FILESYSTEM = "filesystem"
-    OBSIDIAN_MCP = "obsidian-mcp"
 
 
 class KnowledgeSettings(AppBaseSettings):
@@ -37,7 +31,7 @@ class KnowledgeSettings(AppBaseSettings):
     model_config = SettingsConfigDict(env_prefix="NOESIS_")
 
     vault_dir: Path | None = None
-    search_backend: SearchBackendEnum = SearchBackendEnum.FILESYSTEM
+    search_backend: SearchEngineEnum = SearchEngineEnum.FILESYSTEM
     obsidian_mcp_url: str = DEFAULT_OBSIDIAN_MCP_URL
     obsidian_mcp_token: SecretStr | None = None
     obsidian_mcp_timeout_seconds: float = Field(default=5.0, gt=0)

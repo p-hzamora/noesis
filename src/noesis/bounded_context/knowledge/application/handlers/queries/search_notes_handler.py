@@ -2,7 +2,7 @@
 
 from pydantic import Field
 
-from noesis.bounded_context.knowledge.application.dtos import NoteListDto
+from noesis.bounded_context.knowledge.application.dtos import NoteSearchResultDto
 from noesis.bounded_context.knowledge.application.ports.read_repositories import INoteReadRepository
 from noesis.bounded_context.knowledge.domain.value_objects import NoteArea
 from noesis.shared_kernel.application.handlers import IHandler
@@ -23,17 +23,13 @@ class SearchNotesQuery(FrozenObject):
     limit: int = Field(default=10, ge=1, le=100)
 
 
-class SearchNotesHandler(IHandler[SearchNotesQuery, NoteListDto]):
+class SearchNotesHandler(IHandler[SearchNotesQuery, NoteSearchResultDto]):
     """Free-text search over the vault."""
 
     def __init__(self, *, read_repository: INoteReadRepository) -> None:
         self._read_repository: INoteReadRepository = read_repository
 
-    async def handle(self, action: SearchNotesQuery) -> NoteListDto:
-        """Notes matching the query, best match first."""
+    async def handle(self, action: SearchNotesQuery) -> NoteSearchResultDto:
+        """Notes matching the query, best match first, and the backend that found them."""
         area: NoteArea | None = NoteArea(value=action.area) if action.area else None
-        return NoteListDto(
-            notes=tuple(
-                await self._read_repository.search(action.text, area=area, limit=action.limit)
-            )
-        )
+        return await self._read_repository.search(action.text, area=area, limit=action.limit)

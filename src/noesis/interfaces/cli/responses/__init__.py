@@ -18,7 +18,12 @@ from .curation_response import CurationResponse, SkippedCandidateResponse
 from .doctor_response import DoctorCheckResponse, DoctorResponse
 from .error_response import ErrorDetail, ErrorResponse
 from .integration_response import IntegrationResponse
-from .note_response import NoteListResponse, NoteResponse, NoteSearchFallbackResponse
+from .note_response import (
+    NoteListResponse,
+    NoteResponse,
+    NoteSearchFallbackResponse,
+    NoteSearchResponse,
+)
 from .parked_curation_response import ParkedCurationListResponse, ParkedCurationResponse
 from .skill_guide_response import SkillGuideListResponse, SkillGuideResponse
 from .success_response import SuccessResponse
@@ -37,6 +42,7 @@ __all__ = [
     "IntegrationResponse",
     "NoteListResponse",
     "NoteSearchFallbackResponse",
+    "NoteSearchResponse",
     "NoteResponse",
     "ParkedCurationListResponse",
     "ParkedCurationResponse",

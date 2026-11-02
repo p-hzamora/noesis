@@ -1,5 +1,6 @@
 """`noesis knowledge list|search` output."""
 
+from noesis.shared_kernel.enums import SearchEngineEnum
 from noesis.utils import FrozenObject
 
 
@@ -33,10 +34,21 @@ class NoteListResponse(FrozenObject):
     notes: tuple[NoteResponse, ...]
 
 
-class NoteSearchFallbackResponse(NoteListResponse):
+class NoteSearchResponse(NoteListResponse):
+    """`noesis knowledge search`: notes plus the backend that actually answered.
+
+    Attributes:
+        backend: The implemented backend that produced `notes`, which is
+            `filesystem` after a fallback even when `obsidian-mcp` is configured.
+    """
+
+    backend: SearchEngineEnum
+
+
+class NoteSearchFallbackResponse(NoteSearchResponse):
     """`noesis knowledge search` when Obsidian could not answer and files were searched instead.
 
-    Only this variant carries `notice`; a normal search keeps the plain `NoteListResponse` shape.
+    Only this variant carries `notice`.
 
     Attributes:
         notice: Why the results come from files.

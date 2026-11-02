@@ -6,6 +6,7 @@ from datetime import datetime
 
 from noesis.bounded_context.knowledge.application.dtos import (
     CurationResultDto,
+    NoteSearchResultDto,
     NoteSummaryDto,
     SkippedCandidateDto,
 )
@@ -86,9 +87,10 @@ class CurateWorkBriefHandler(IHandler[CurateWorkBriefCommand, CurationResultDto]
             CurationFailedError: Every curator attempt failed (the brief is parked when asked).
         """
         brief: WorkBrief = WorkBriefMapper.to_domain(action.brief)
-        related: list[NoteSummaryDto] = await self._read_repository.search(
+        found: NoteSearchResultDto = await self._read_repository.search(
             brief.search_text(), area=brief.area, limit=RELATED_NOTES_LIMIT
         )
+        related: list[NoteSummaryDto] = list(found.notes)
         decisions: tuple[CurationDecision, ...] = await self._curate(action, brief, related)
         outcomes: list[CurationOutcome] = await self._store(brief, decisions)
         return CurationResultDto(

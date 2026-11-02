@@ -5,7 +5,7 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
 
-from noesis.bounded_context.knowledge.application.dtos import NoteSummaryDto
+from noesis.bounded_context.knowledge.application.dtos import NoteSearchResultDto, NoteSummaryDto
 from noesis.bounded_context.knowledge.application.ports.read_repositories import INoteReadRepository
 from noesis.bounded_context.knowledge.domain.value_objects import (
     NoteArea,
@@ -13,6 +13,7 @@ from noesis.bounded_context.knowledge.domain.value_objects import (
     NoteOriginEnum,
 )
 from noesis.exceptions import DomainException
+from noesis.shared_kernel.enums import SearchEngineEnum
 
 from .mappers import NoteMapper, ParsedMarkdown
 
@@ -60,11 +61,11 @@ class FilesystemNoteReadRepositoryAdapter(INoteReadRepository):
                 text=text.lower(),
             )
 
-    async def search(self, text: str, *, area: NoteArea | None, limit: int) -> list[NoteSummaryDto]:
+    async def search(self, text: str, *, area: NoteArea | None, limit: int) -> NoteSearchResultDto:
         """Notes ranked by how often the query's words occur (title words count triple)."""
         tokens: set[str] = set(TOKEN_PATTERN.findall(text.lower()))
         if not tokens:
-            return []
+            return self._result([])
         scored: list[tuple[int, str, NoteSummaryDto]] = []
         for note in self._notes(area):
             title: str = note.summary.title.lower()
@@ -73,7 +74,11 @@ class FilesystemNoteReadRepositoryAdapter(INoteReadRepository):
             )
             if score:
                 scored.append((-score, note.summary.path, note.summary))
-        return [summary for _, _, summary in sorted(scored)[:limit]]
+        return self._result([summary for _, _, summary in sorted(scored)[:limit]])
+
+    @staticmethod
+    def _result(notes: list[NoteSummaryDto]) -> NoteSearchResultDto:
+        return NoteSearchResultDto(notes=tuple(notes), backend=SearchEngineEnum.FILESYSTEM)
 
     async def list_notes(
         self, *, area: NoteArea | None, origin: NoteOriginEnum | None

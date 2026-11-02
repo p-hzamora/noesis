@@ -2,7 +2,7 @@
 
 import abc
 
-from noesis.bounded_context.knowledge.application.dtos import NoteSummaryDto
+from noesis.bounded_context.knowledge.application.dtos import NoteSearchResultDto, NoteSummaryDto
 from noesis.bounded_context.knowledge.domain.value_objects import NoteArea, NoteOriginEnum
 
 
@@ -10,8 +10,8 @@ class INoteReadRepository(abc.ABC):
     """Queries over stored notes."""
 
     @abc.abstractmethod
-    async def search(self, text: str, *, area: NoteArea | None, limit: int) -> list[NoteSummaryDto]:
-        """Notes matching `text`, best match first.
+    async def search(self, text: str, *, area: NoteArea | None, limit: int) -> NoteSearchResultDto:
+        """Notes matching `text`, best match first, tagged with the backend that answered.
 
         Args:
             text: Free-text query.

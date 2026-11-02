@@ -25,7 +25,6 @@ from .configurations import (
     CuratorSettings,
     KnowledgeSettings,
     RuntimeSettings,
-    SearchBackendEnum,
     default_env_file,
     default_state_dir,
 )
@@ -108,7 +107,6 @@ def _load[S: AppBaseSettings](
 __all__ = [
     "ClaudeCodeSettings",
     "Environment",
-    "SearchBackendEnum",
     "default_env_file",
     "default_state_dir",
     "load_claude_code_settings",

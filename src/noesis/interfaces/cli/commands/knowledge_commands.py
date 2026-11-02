@@ -28,6 +28,7 @@ from noesis.interfaces.cli.responses import (
     CurationResponse,
     NoteListResponse,
     NoteSearchFallbackResponse,
+    NoteSearchResponse,
     ParkedCurationListResponse,
 )
 from noesis.interfaces.cli.state import cli_state
@@ -87,6 +88,10 @@ def _format_notes(result: NoteListResponse) -> str:
     return "\n".join(
         f"{note.path}  [{note.origin} {note.kind or 'note'}]  {note.title}" for note in result.notes
     )
+
+
+def _format_search(result: NoteSearchResponse) -> str:
+    return f"{_format_notes(result)}\nbackend: {result.backend}"
 
 
 def _format_parked(result: ParkedCurationListResponse) -> str:
@@ -157,16 +162,16 @@ def search(
     """Find notes by free text, best match first."""
     query: SearchNotesQuery = SearchNotesQuery(text=text, area=_area(area, repo), limit=limit)
     handlers: KnowledgeHandlers = _handlers(context)
-    found: NoteListResponse = NoteListResponse.model_validate(
+    found: NoteSearchResponse = NoteSearchResponse.model_validate(
         asyncio.run(handlers.search.handle(query))
     )
     if not handlers.notices:
-        emit(found, _format_notes)
+        emit(found, _format_search)
         return
     notice: str = handlers.notices[0]
     emit(
-        NoteSearchFallbackResponse(notes=found.notes, notice=notice),
-        lambda result: f"{_format_notes(result)}\nnotice: {result.notice}",
+        NoteSearchFallbackResponse(notes=found.notes, backend=found.backend, notice=notice),
+        lambda result: f"{_format_search(result)}\nnotice: {result.notice}",
     )
 
 

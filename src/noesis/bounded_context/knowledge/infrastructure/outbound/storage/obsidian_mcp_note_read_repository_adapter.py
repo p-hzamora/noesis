@@ -13,7 +13,7 @@ Tools used (names and shapes of the `obsidian` MCP server):
 
 from typing import Final
 
-from noesis.bounded_context.knowledge.application.dtos import NoteSummaryDto
+from noesis.bounded_context.knowledge.application.dtos import NoteSearchResultDto, NoteSummaryDto
 from noesis.bounded_context.knowledge.application.ports.read_repositories import INoteReadRepository
 from noesis.bounded_context.knowledge.domain.value_objects import (
     NoteArea,
@@ -22,6 +22,7 @@ from noesis.bounded_context.knowledge.domain.value_objects import (
 )
 from noesis.exceptions import DomainException, ObsidianMcpError
 from noesis.shared_kernel.domain import JsonValue
+from noesis.shared_kernel.enums import SearchEngineEnum
 from noesis.shared_kernel.infrastructure.outbound.mcp import ObsidianMcpClient, ObsidianMcpSession
 
 from .mappers import NoteMapper, ParsedMarkdown
@@ -67,7 +68,7 @@ class ObsidianMcpNoteReadRepositoryAdapter(INoteReadRepository):
         self._mapper: NoteMapper = mapper
         self._listing: INoteReadRepository = listing
 
-    async def search(self, text: str, *, area: NoteArea | None, limit: int) -> list[NoteSummaryDto]:
+    async def search(self, text: str, *, area: NoteArea | None, limit: int) -> NoteSearchResultDto:
         """Obsidian's best matches, restricted to `area`'s folder when given.
 
         Hits outside the noesis layout are kept (kind None, origin manual), because Obsidian
@@ -77,7 +78,7 @@ class ObsidianMcpNoteReadRepositoryAdapter(INoteReadRepository):
             ObsidianMcpError: Obsidian is unreachable or answered something unusable.
         """
         if not text.strip():
-            return []
+            return self._result([])
         async with self._client.session() as session:
             answer: JsonValue = await session.call("search_simple", {"query": text})
             ranked: list[tuple[float, str]] = []
@@ -87,7 +88,11 @@ class ObsidianMcpNoteReadRepositoryAdapter(INoteReadRepository):
                     continue
                 ranked.append((_hit_score(hit), path))
             ranked.sort(key=lambda item: -item[0])  # stable: equal scores keep Obsidian's order
-            return [await self._summary(session, path) for _, path in ranked[:limit]]
+            return self._result([await self._summary(session, path) for _, path in ranked[:limit]])
+
+    @staticmethod
+    def _result(notes: list[NoteSummaryDto]) -> NoteSearchResultDto:
+        return NoteSearchResultDto(notes=tuple(notes), backend=SearchEngineEnum.OBSIDIAN_MCP)
 
     async def list_notes(
         self, *, area: NoteArea | None, origin: NoteOriginEnum | None

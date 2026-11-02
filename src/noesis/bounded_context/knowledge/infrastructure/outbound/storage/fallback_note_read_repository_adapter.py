@@ -2,7 +2,7 @@
 
 from collections.abc import Callable
 
-from noesis.bounded_context.knowledge.application.dtos import NoteSummaryDto
+from noesis.bounded_context.knowledge.application.dtos import NoteSearchResultDto, NoteSummaryDto
 from noesis.bounded_context.knowledge.application.ports.read_repositories import INoteReadRepository
 from noesis.bounded_context.knowledge.domain.value_objects import NoteArea, NoteOriginEnum
 from noesis.exceptions import ObsidianMcpError
@@ -27,8 +27,11 @@ class FallbackNoteReadRepositoryAdapter(INoteReadRepository):
         self._on_fallback: Callable[[ObsidianMcpError], None] = on_fallback
         self._degraded: bool = False
 
-    async def search(self, text: str, *, area: NoteArea | None, limit: int) -> list[NoteSummaryDto]:
-        """Preferred results, or the fallback's (and one notification) when it is unavailable."""
+    async def search(self, text: str, *, area: NoteArea | None, limit: int) -> NoteSearchResultDto:
+        """Preferred results, or the fallback's (and one notification) when it is unavailable.
+
+        The result's `backend` names whichever repository really answered.
+        """
         if not self._degraded:
             try:
                 return await self._preferred.search(text, area=area, limit=limit)
