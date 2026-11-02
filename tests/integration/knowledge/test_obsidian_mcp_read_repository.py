@@ -160,3 +160,18 @@ async def test_fallback_searches_files_and_notifies_once(vault: Path) -> None:
     assert first == second == await files.search("ttl cache", area=None, limit=5)
     assert first
     assert len(notified) == 1
+
+
+async def test_a_second_text_block_with_a_truncation_note_is_ignored(vault: Path) -> None:
+    with fake_obsidian_mcp(vault, truncation_note=True) as server:
+        mcp_repo, _ = _adapters(vault, server.url)
+        found: list[NoteSummaryDto] = await mcp_repo.search("ttl cache", area=None, limit=5)
+
+    assert found
+
+
+async def test_an_unusable_answer_is_reported_as_such_not_as_unreachable(vault: Path) -> None:
+    with fake_obsidian_mcp(vault, garbage=True) as server:
+        mcp_repo, _ = _adapters(vault, server.url)
+        with pytest.raises(ObsidianMcpError, match="not JSON"):
+            await mcp_repo.search("ttl", area=None, limit=1)

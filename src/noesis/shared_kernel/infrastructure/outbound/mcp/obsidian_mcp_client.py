@@ -23,6 +23,16 @@ from noesis.shared_kernel.domain import JsonValue
 DEFAULT_TIMEOUT_SECONDS: float = 5.0
 
 
+def _first_of(group: BaseExceptionGroup[BaseException]) -> ObsidianMcpError | None:
+    """The first `ObsidianMcpError` inside a (possibly nested) exception group."""
+    for member in group.exceptions:
+        if isinstance(member, ObsidianMcpError):
+            return member
+        if isinstance(member, BaseExceptionGroup) and (found := _first_of(member)):
+            return found
+    return None
+
+
 class ObsidianMcpSession:
     """One initialised MCP session; `call` runs a tool and returns its decoded JSON answer."""
 
@@ -51,9 +61,12 @@ class ObsidianMcpSession:
                 f"Obsidian MCP tool `{tool}` timed out after {self._timeout_seconds:g}s.",
                 {"tool": tool},
             ) from error
-        text: str = "".join(
+        blocks: list[str] = [
             block.text for block in result.content if isinstance(block, TextContent)
-        )
+        ]
+        text: str = (
+            blocks[0] if blocks else ""
+        )  # later blocks are notes such as "N results left out"
         if result.isError:
             raise ObsidianMcpError(
                 f"Obsidian MCP tool `{tool}` failed: {text[:200] or 'no detail'}", {"tool": tool}
@@ -119,6 +132,9 @@ class ObsidianMcpClient:
         except ObsidianMcpError:
             raise
         except BaseExceptionGroup as group:
+            ours: ObsidianMcpError | None = _first_of(group)
+            if ours is not None:  # raised by the body, wrapped by the SDK's task group
+                raise ours from None
             raise self._unavailable(group) from group
         except (OSError, TimeoutError, httpx.HTTPError, RuntimeError) as error:
             raise self._unavailable(error) from error

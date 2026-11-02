@@ -16,6 +16,7 @@ from typing import Any
 
 import uvicorn
 from mcp.server.fastmcp import FastMCP
+from mcp.types import TextContent
 from starlette.responses import PlainTextResponse
 from starlette.types import ASGIApp, Receive, Scope, Send
 
@@ -41,7 +42,11 @@ class FakeObsidianMcp:
         *,
         token: str | None = None,
         canned: list[tuple[str, float]] | None = None,
+        truncation_note: bool = False,
+        garbage: bool = False,
     ) -> None:
+        self.truncation_note: bool = truncation_note  # like the real server's second text block
+        self.garbage: bool = garbage
         self.vault: Path = vault
         self.token: str | None = token
         self.canned: list[tuple[str, float]] | None = canned
@@ -55,17 +60,28 @@ class FakeObsidianMcp:
     def url(self) -> str:
         return f"http://127.0.0.1:{self.port}/mcp/"
 
+    def _maybe_note(self, hits: list[dict[str, Any]]) -> str | list[TextContent]:
+        body: str = json.dumps(hits)
+        if not self.truncation_note:
+            return body
+        return [
+            TextContent(type="text", text=body),
+            TextContent(type="text", text="3 more files not shown."),
+        ]
+
     def _build(self) -> ASGIApp:
         mcp: FastMCP = FastMCP("obsidian", stateless_http=True, json_response=True)
 
         @mcp.tool()
-        def search_simple(query: str) -> str:
+        def search_simple(query: str) -> str | list[TextContent]:
             self.calls.append(("search_simple", {"query": query}))
+            if self.garbage:
+                return "not json at all"
             if self.canned is not None:
                 hits = [
                     {"filename": path, "score": score, "matches": []} for path, score in self.canned
                 ]
-                return json.dumps(hits)
+                return self._maybe_note(hits)
             words: list[str] = query.lower().split()
             hits = []
             for path in sorted(self.vault.rglob("*.md")):
@@ -79,7 +95,7 @@ class FakeObsidianMcp:
                             "matches": [],
                         }
                     )
-            return json.dumps(hits)
+            return self._maybe_note(hits)
 
         @mcp.tool()
         def vault_read(path: str) -> str:
@@ -134,10 +150,17 @@ class FakeObsidianMcp:
 
 @contextmanager
 def fake_obsidian_mcp(
-    vault: Path, *, token: str | None = None, canned: list[tuple[str, float]] | None = None
+    vault: Path,
+    *,
+    token: str | None = None,
+    canned: list[tuple[str, float]] | None = None,
+    truncation_note: bool = False,
+    garbage: bool = False,
 ) -> Iterator[FakeObsidianMcp]:
     """Run a fake server for the duration of the block."""
-    fake: FakeObsidianMcp = FakeObsidianMcp(vault, token=token, canned=canned)
+    fake: FakeObsidianMcp = FakeObsidianMcp(
+        vault, token=token, canned=canned, truncation_note=truncation_note, garbage=garbage
+    )
     fake.start()
     try:
         yield fake
