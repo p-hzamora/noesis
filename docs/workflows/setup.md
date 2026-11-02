@@ -17,7 +17,7 @@ flowchart LR
     show["config show"] --> env[load_environment] --> cs[ConfigShowResponse]
     init["config init [--vault-dir D] [--force]"] --> tpl["packaged env.example"] --> envfile[("~/.config/noesis/.env")]
 
-    sl["skills list"] --> guides[("package data:<br/>interfaces/cli/skill_guides/*.md")]
+    sl["skills list"] --> guides[("files:<br/>skill_guides/*.md (repo root)")]
     sg["skills get NAME"] --> guides
 ```
 

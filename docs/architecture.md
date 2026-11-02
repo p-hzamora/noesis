@@ -18,7 +18,6 @@ src/noesis/
     infrastructure/  SystemEnvironmentProbeAdapter
   interfaces/cli/  Typer CLI: the composition root (`bootstrap/`, one `<context>_handlers_builder.py`
                    per context) and the only delivery adapter
-    skill_guides/    Markdown guides served by `noesis skills get` (documents the CLI surface)
 ```
 
 Rules (enforced by import-linter, see `pyproject.toml`):
@@ -111,5 +110,5 @@ noesis integrate claude-code install|uninstall|status
 | Settings location | `core/configurations/claude_code_settings.py` | `ClaudeCodeSettings.config_dir` (`CLAUDE_CONFIG_DIR`, default `~/.claude`); `settings_file` is `<config_dir>/settings.json`. Bounded contexts cannot import `noesis.core`, so `bootstrap.build_agent_hooks` injects the resolved path; `--settings` overrides it. |
 | `noesis doctor` | `commands/doctor_commands.py`, `noesis/diagnostics/` | `bootstrap.run_diagnostics` builds a `RunDiagnosticsQuery` of primitives (env file, vault dir, state dir, curator binary, installed hook events from `GetAgentHooksStatusQuery`); `RunDiagnosticsHandler` applies the rules through `IEnvironmentProbe`; `format_report` renders the text. An unreadable agent settings file becomes a failed `claude_code_hooks` check. |
 | `noesis config init` | `commands/config_commands.py`, `core/env_template.py` | `write_env_file` renders the template and writes the file; the command decides whether overwriting is allowed. |
-| `noesis skills get` | `commands/skills_commands.py`, `skill_guides/*.md` | Version-matched agent guide packaged with the CLI. |
+| `noesis skills get` | `commands/skills_commands.py`, `skill_guides/*.md` (repository root) | Version-matched agent guide packaged with the CLI. |
 | Skill stub | `skills/noesis/SKILL.md` | Installed with `npx skills add`; only resolves the CLI and loads the guide, so it never goes stale. |

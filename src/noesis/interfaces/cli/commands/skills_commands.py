@@ -2,6 +2,7 @@
 
 from importlib.resources import files
 from importlib.resources.abc import Traversable
+from pathlib import Path
 from typing import Annotated
 
 import typer
@@ -16,7 +17,10 @@ from noesis.shared_kernel.domain import (
     JsonValue,
 )
 
-GUIDES_PACKAGE: str = "noesis.interfaces.cli.skill_guides"
+GUIDES_FOLDER: str = "skill_guides"
+GUIDES_ROOT: Path = (
+    Path(__file__).resolve().parents[5] / GUIDES_FOLDER
+)  # commands/cli/interfaces/noesis/src/<root>
 GUIDE_SUFFIX: str = ".md"
 
 skills_app: typer.Typer = typer.Typer(
@@ -26,9 +30,12 @@ skills_app: typer.Typer = typer.Typer(
 
 
 def _guides() -> dict[str, Traversable]:
+    """The guides of the installed package (hatch `force-include`), else those of the source tree."""
+    packaged: Traversable = files("noesis").joinpath(GUIDES_FOLDER)
+    folder: Traversable | Path = packaged if packaged.is_dir() else GUIDES_ROOT
     return {
         item.name.removesuffix(GUIDE_SUFFIX): item
-        for item in files(GUIDES_PACKAGE).iterdir()
+        for item in folder.iterdir()
         if item.name.endswith(GUIDE_SUFFIX)
     }
 

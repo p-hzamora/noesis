@@ -38,6 +38,7 @@ packages = ["src/noesis"]
 
 [tool.hatch.build.targets.wheel.force-include]
 ".env.example" = "noesis/core/env.example"  # `noesis config init` reads it after installation
+"skill_guides" = "noesis/skill_guides"  # `noesis skills get` serves them after installation
 
 [tool.ruff]
 line-length = 100

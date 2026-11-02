@@ -60,6 +60,7 @@ A review found delivery-adjacent logic inside `interfaces/cli`. It moved as foll
   its application layer.
 - **`config init` writes through core.** The env-file rendering and write moved to
   `core/env_template.py`.
-- **`skill_guides/` stays in `interfaces/cli`.** They document the CLI surface (commands,
-  flags, JSON envelopes) and are served by a CLI command; they change with the CLI, not with
-  Capture or Knowledge, so a context would be the wrong owner.
+- **`skill_guides/` lives at the repository root.** They are Markdown served by `noesis skills
+  get`; they document the CLI surface but hold no code, so they sit beside `skills/` and
+  `.env.example`. Wheels carry a copy inside the package (hatch `force-include`); a source
+  checkout reads the root folder.
