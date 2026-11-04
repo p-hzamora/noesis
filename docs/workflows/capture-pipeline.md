@@ -30,7 +30,7 @@ sequenceDiagram
     Cur->>Vault: search related notes
     Cur->>LLM: system prompt + brief + related notes
     LLM-->>Cur: decisions (create / update / skip)
-    Cur->>Vault: write auto notes (each file atomically; or via MCP, see the Writer backend)
+    Cur->>Vault: write auto notes via filesystem or MCP
     Cur->>State: .result.json (read by `noesis capture runs`)
 ```
 
