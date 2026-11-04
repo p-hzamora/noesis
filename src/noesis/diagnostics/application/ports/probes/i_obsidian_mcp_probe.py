@@ -1,10 +1,10 @@
-"""Question that diagnostics asks Obsidian's MCP server."""
+"""Questions that diagnostics asks Obsidian's MCP server."""
 
 import abc
 
 
 class IObsidianMcpProbe(abc.ABC):
-    """Read-only view of the vault that Obsidian serves."""
+    """Probes of Obsidian's MCP server: what vault it serves and whether it accepts a write."""
 
     @abc.abstractmethod
     async def list_root(self) -> tuple[str, ...]:
@@ -12,5 +12,14 @@ class IObsidianMcpProbe(abc.ABC):
 
         Raises:
             ObsidianMcpError: The MCP server does not answer.
+        """
+        ...
+
+    @abc.abstractmethod
+    async def write_probe(self) -> None:
+        """Write the fixed hidden probe file `.noesis/doctor-probe.md` (idempotent).
+
+        Raises:
+            ObsidianMcpError: The server is unreachable or refuses the write.
         """
         ...

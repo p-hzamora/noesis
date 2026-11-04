@@ -15,35 +15,33 @@ from noesis.diagnostics.infrastructure.outbound.probes import (
     SystemEnvironmentProbeAdapter,
 )
 from noesis.exceptions import AgentSettingsInvalidError
-from noesis.shared_kernel.enums import SearchEngineEnum
-from noesis.shared_kernel.infrastructure.outbound.mcp import ObsidianMcpClient
+from noesis.shared_kernel.enums import SearchEngineEnum, WriterBackendEnum
 
 from .agent_hooks_handlers_builder import build_agent_hooks
+from .knowledge_handlers_builder import needs_vault
+from .obsidian_mcp_client_builder import build_obsidian_mcp_client
 
 
 def build_diagnostics(environment: Environment | None = None) -> RunDiagnosticsHandler:
     """Wire the diagnostics handler with the probes of the real system.
 
-    The Obsidian MCP probe is wired only when `NOESIS_SEARCH_BACKEND=obsidian-mcp`, so the
-    default configuration never makes an MCP call.
+    The Obsidian MCP probe is wired only when `NOESIS_SEARCH_BACKEND=obsidian-mcp` or
+    `NOESIS_WRITER_BACKEND=mcp`, so the default configuration never makes an MCP call.
     """
     obsidian: ObsidianMcpProbeAdapter | None = None
-    if environment is not None and uses_obsidian_mcp(environment):
-        settings = environment.knowledge
-        token = settings.obsidian_mcp_token
-        obsidian = ObsidianMcpProbeAdapter(
-            ObsidianMcpClient(
-                settings.obsidian_mcp_url,
-                token=token.get_secret_value() if token else None,
-                timeout_seconds=settings.obsidian_mcp_timeout_seconds,
-            )
-        )
+    if environment is not None and (uses_obsidian_mcp(environment) or uses_mcp_writer(environment)):
+        obsidian = ObsidianMcpProbeAdapter(build_obsidian_mcp_client(environment))
     return RunDiagnosticsHandler(probe=SystemEnvironmentProbeAdapter(), obsidian=obsidian)
 
 
 def uses_obsidian_mcp(environment: Environment) -> bool:
     """Whether notes are searched through Obsidian's MCP server."""
     return environment.knowledge.search_backend is SearchEngineEnum.OBSIDIAN_MCP
+
+
+def uses_mcp_writer(environment: Environment) -> bool:
+    """Whether notes are written through Obsidian's MCP server."""
+    return environment.knowledge.writer_backend is WriterBackendEnum.MCP
 
 
 async def run_diagnostics(
@@ -81,5 +79,9 @@ async def run_diagnostics(
         obsidian_mcp_url=environment.knowledge.obsidian_mcp_url
         if uses_obsidian_mcp(environment)
         else None,
+        writer_mcp_url=environment.knowledge.obsidian_mcp_url
+        if uses_mcp_writer(environment)
+        else None,
+        vault_required=needs_vault(environment),
     )
     return await build_diagnostics(environment).handle(query)

@@ -22,6 +22,10 @@ class RunDiagnosticsQuery(FrozenObject):
             could not be read.
         obsidian_mcp_url: Obsidian MCP endpoint to probe, or None when notes are searched
             on the filesystem (then no MCP call is made).
+        writer_mcp_url: Obsidian MCP endpoint the notes are written to, or None when the
+            writer is the filesystem (then no MCP call is made).
+        vault_required: Whether something still uses local files; when False an unset vault
+            is not a failure.
     """
 
     env_file: Path
@@ -31,6 +35,8 @@ class RunDiagnosticsQuery(FrozenObject):
     hooks_settings_file: Path
     installed_hook_events: tuple[str, ...] | None
     obsidian_mcp_url: str | None = None
+    writer_mcp_url: str | None = None
+    vault_required: bool = True
 
 
 class RunDiagnosticsHandler(IHandler[RunDiagnosticsQuery, DiagnosticReportDto]):
@@ -46,13 +52,14 @@ class RunDiagnosticsHandler(IHandler[RunDiagnosticsQuery, DiagnosticReportDto]):
         """The report; `ok` is False when any check failed."""
         checks: tuple[DiagnosticCheckDto, ...] = (
             self._check_config_file(action.env_file),
-            self._check_vault(action.vault_dir),
+            self._check_vault(action.vault_dir, required=action.vault_required),
             self._check_state_dir(action.state_dir),
             self._check_executable("git", "git", "needed to read commits"),
             self._check_executable(
                 "curator", action.curator_binary, "the Claude Code CLI runs the curator"
             ),
             self._check_agent_hooks(action.hooks_settings_file, action.installed_hook_events),
+            await self._check_writer(action),
             await self._check_search_backend(action),
         )
         return DiagnosticReportDto(ok=all(check.ok for check in checks), checks=checks)
@@ -61,7 +68,11 @@ class RunDiagnosticsHandler(IHandler[RunDiagnosticsQuery, DiagnosticReportDto]):
         state: str = "found" if self._probe.is_file(env_file) else "not created, defaults in use"
         return DiagnosticCheckDto(name="config_file", ok=True, detail=f"{env_file} ({state})")
 
-    def _check_vault(self, vault: Path | None) -> DiagnosticCheckDto:
+    def _check_vault(self, vault: Path | None, *, required: bool) -> DiagnosticCheckDto:
+        if vault is None and not required:
+            return DiagnosticCheckDto(
+                name="vault", ok=True, detail="not set (no local files are used)"
+            )
         if vault is None:
             return DiagnosticCheckDto(
                 name="vault",
@@ -128,6 +139,42 @@ class RunDiagnosticsHandler(IHandler[RunDiagnosticsQuery, DiagnosticReportDto]):
             ok=True,
             detail="not installed (capture from Claude Code is off)",
             next_step="Run `noesis integrate claude-code install` to enable capture.",
+        )
+
+    async def _check_writer(self, action: RunDiagnosticsQuery) -> DiagnosticCheckDto:
+        """Whether the configured writer can store notes: the MCP accepts a hidden probe write."""
+        if action.writer_mcp_url is None:
+            return DiagnosticCheckDto(
+                name="writer",
+                ok=True,
+                detail=(
+                    f"filesystem (files under {action.vault_dir}; see the vault check)"
+                    if action.vault_dir
+                    else "filesystem (NOESIS_VAULT_DIR is not set; see the vault check)"
+                ),
+            )
+        url: str = action.writer_mcp_url
+        if self._obsidian is None:
+            return DiagnosticCheckDto(
+                name="writer",
+                ok=False,
+                detail=f"obsidian-mcp writer at {url} has no probe wired",
+                next_step="Report this: the diagnostics were built without an Obsidian MCP probe.",
+            )
+        try:
+            await self._obsidian.write_probe()
+        except ObsidianMcpError as error:
+            return DiagnosticCheckDto(
+                name="writer",
+                ok=False,
+                detail=f"obsidian-mcp writer at {url} failed: {error.message}",
+                next_step=(
+                    "Start Obsidian with its MCP server, or check NOESIS_OBSIDIAN_MCP_URL, "
+                    "NOESIS_OBSIDIAN_MCP_TOKEN and write permission."
+                ),
+            )
+        return DiagnosticCheckDto(
+            name="writer", ok=True, detail=f"obsidian-mcp at {url} accepted a write"
         )
 
     async def _check_search_backend(self, action: RunDiagnosticsQuery) -> DiagnosticCheckDto:
