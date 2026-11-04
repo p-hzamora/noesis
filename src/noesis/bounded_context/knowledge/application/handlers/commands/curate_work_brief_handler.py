@@ -31,6 +31,7 @@ from noesis.bounded_context.knowledge.domain.value_objects import (
 from noesis.exceptions import (
     CurationFailedError,
     CuratorFailedError,
+    NoteStorageError,
 )
 from noesis.shared_kernel.application.handlers import IHandler
 from noesis.shared_kernel.application.ports.clock import IClock
@@ -84,7 +85,9 @@ class CurateWorkBriefHandler(IHandler[CurateWorkBriefCommand, CurationResultDto]
         """Curate the brief and store what is admitted.
 
         Raises:
-            CurationFailedError: Every curator attempt failed (the brief is parked when asked).
+            CurationFailedError: Every curator attempt failed, or the notes could not be stored
+                (the brief is parked when asked).
+            NoteStorageError: The notes could not be stored and parking is off.
         """
         brief: WorkBrief = WorkBriefMapper.to_domain(action.brief)
         found: NoteSearchResultDto = await self._read_repository.search(
@@ -92,7 +95,22 @@ class CurateWorkBriefHandler(IHandler[CurateWorkBriefCommand, CurationResultDto]
         )
         related: list[NoteSummaryDto] = list(found.notes)
         decisions: tuple[CurationDecision, ...] = await self._curate(action, brief, related)
-        outcomes: list[CurationOutcome] = await self._store(brief, decisions)
+        try:
+            outcomes: list[CurationOutcome] = await self._store(brief, decisions)
+        except NoteStorageError as error:
+            if not action.park_on_failure:
+                raise
+            ticket: str = await self._queue.park(
+                action.brief, error=error.message, now=self._clock.now()
+            )
+            raise CurationFailedError(
+                f"Storing the notes failed: {error.message}",
+                {**error.metadata, "repository": action.brief.repository, "ticket": ticket},
+                next_steps=[
+                    *error.next_steps,
+                    f"Fix the cause, then run `noesis knowledge retry {ticket}`.",
+                ],
+            ) from error
         return CurationResultDto(
             repository=brief.repository,
             created=_paths(outcomes, CurationOutcomeEnum.CREATED),

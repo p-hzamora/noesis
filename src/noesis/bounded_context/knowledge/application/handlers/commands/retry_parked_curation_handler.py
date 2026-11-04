@@ -4,6 +4,7 @@ from noesis.bounded_context.knowledge.application.dtos import CurationResultDto
 from noesis.bounded_context.knowledge.application.ports.queue import IParkedCurationQueue
 from noesis.exceptions import (
     CurationFailedError,
+    NoteStorageError,
     ParkedCurationNotFoundError,
 )
 from noesis.shared_kernel.application.handlers import IHandler
@@ -35,7 +36,7 @@ class RetryParkedCurationHandler(IHandler[RetryParkedCurationCommand, CurationRe
 
         Raises:
             ParkedCurationNotFoundError: No parked brief has this ticket.
-            CurationFailedError: The attempt failed.
+            CurationFailedError: The attempt failed (the curator, or the storage of the notes).
         """
         brief: WorkBriefContract | None = await self._queue.get(action.ticket)
         if brief is None:
@@ -48,7 +49,7 @@ class RetryParkedCurationHandler(IHandler[RetryParkedCurationCommand, CurationRe
             result: CurationResultDto = await self._curate.handle(
                 CurateWorkBriefCommand(brief=brief, max_attempts=1, park_on_failure=False)
             )
-        except CurationFailedError as error:
+        except (CurationFailedError, NoteStorageError) as error:
             raise CurationFailedError(
                 error.message,
                 {**error.metadata, "ticket": action.ticket},

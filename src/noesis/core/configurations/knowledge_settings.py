@@ -5,7 +5,7 @@ from pathlib import Path
 from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import SettingsConfigDict
 
-from noesis.shared_kernel.enums import SearchEngineEnum
+from noesis.shared_kernel.enums import SearchEngineEnum, WriterBackendEnum
 
 from .base_settings import AppBaseSettings
 
@@ -21,7 +21,12 @@ class KnowledgeSettings(AppBaseSettings):
         search_backend: `filesystem` scans the Markdown files (default); `obsidian-mcp` asks
             Obsidian's MCP server and falls back to files when it is unreachable
             (`NOESIS_SEARCH_BACKEND`).
-        obsidian_mcp_url: Obsidian MCP endpoint (`NOESIS_OBSIDIAN_MCP_URL`).
+        writer_backend: `filesystem` writes the notes as files under `vault_dir` (default; point
+            it at an NFS mount to write there); `mcp` stores them through Obsidian's MCP server,
+            using the `obsidian_mcp_*` settings (`NOESIS_WRITER_BACKEND`). Reads follow
+            `search_backend`, independent of the writer.
+        obsidian_mcp_url: Obsidian MCP endpoint, for search and for the `mcp` writer
+            (`NOESIS_OBSIDIAN_MCP_URL`).
         obsidian_mcp_token: Token the MCP server requires, if any (`NOESIS_OBSIDIAN_MCP_TOKEN`);
             a secret: masked in `config show`, never logged.
         obsidian_mcp_timeout_seconds: Connect and per-call time limit; a closed Obsidian must
@@ -31,6 +36,7 @@ class KnowledgeSettings(AppBaseSettings):
     model_config = SettingsConfigDict(env_prefix="NOESIS_")
 
     vault_dir: Path | None = None
+    writer_backend: WriterBackendEnum = WriterBackendEnum.FILESYSTEM
     search_backend: SearchEngineEnum = SearchEngineEnum.FILESYSTEM
     obsidian_mcp_url: str = DEFAULT_OBSIDIAN_MCP_URL
     obsidian_mcp_token: SecretStr | None = None

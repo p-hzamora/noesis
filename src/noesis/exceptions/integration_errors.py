@@ -19,3 +19,7 @@ class ObsidianMcpError(InfrastructureException):
     """The Obsidian MCP server is unreachable, rejected the call, or answered something unusable."""
 
     __error_code__ = "INTEGRATION_102_OBSIDIAN_MCP_FAILED"
+
+
+class ObsidianMcpToolError(ObsidianMcpError):
+    """The Obsidian MCP server was reached but the tool refused the call (`isError`)."""

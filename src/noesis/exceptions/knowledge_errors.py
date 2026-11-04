@@ -40,7 +40,7 @@ class NoteStorageError(InfrastructureException):
 
 
 class CurationFailedError(ApplicationException):
-    """Curation kept failing; the brief was parked for a manual retry."""
+    """Curation or storage kept failing; the brief was parked for a manual retry."""
 
     __error_code__ = "KNOWLEDGE_201_CURATION_FAILED"
 

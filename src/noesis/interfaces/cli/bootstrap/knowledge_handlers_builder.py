@@ -1,5 +1,6 @@
 """Wires the Knowledge context's handlers."""
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import assert_never
@@ -29,14 +30,18 @@ from noesis.bounded_context.knowledge.infrastructure.outbound.storage import (
     FilesystemKnowledgeUnitOfWorkAdapter,
     FilesystemNoteReadRepositoryAdapter,
     FilesystemNoteRepositoryAdapter,
+    McpKnowledgeUnitOfWorkAdapter,
+    McpNoteRepositoryAdapter,
     ObsidianMcpNoteReadRepositoryAdapter,
+    UnavailableNoteReadRepositoryAdapter,
 )
 from noesis.bounded_context.knowledge.infrastructure.outbound.storage.mappers import NoteMapper
 from noesis.core import Environment
 from noesis.exceptions import CuratorPromptUnreadableError, VaultNotConfiguredError
-from noesis.shared_kernel.enums import SearchEngineEnum
+from noesis.shared_kernel.enums import SearchEngineEnum, WriterBackendEnum
 from noesis.shared_kernel.infrastructure.outbound.clock import SystemClockAdapter
-from noesis.shared_kernel.infrastructure.outbound.mcp import ObsidianMcpClient
+
+from .obsidian_mcp_client_builder import build_obsidian_mcp_client
 
 PARKED_FOLDER: tuple[str, ...] = ("knowledge", "parked")
 MCP_FALLBACK_NOTICE: str = "Obsidian MCP unreachable, searched files instead"
@@ -64,6 +69,14 @@ class KnowledgeHandlers:
     notices: list[str]
 
 
+def _vault_not_configured() -> VaultNotConfiguredError:
+    return VaultNotConfiguredError(
+        "No vault folder is configured.",
+        {"setting": "NOESIS_VAULT_DIR"},
+        next_steps=["Run `noesis config init --vault-dir <folder>` or set NOESIS_VAULT_DIR."],
+    )
+
+
 def require_vault(environment: Environment) -> Path:
     """The configured vault folder.
 
@@ -72,12 +85,17 @@ def require_vault(environment: Environment) -> Path:
     """
     vault: Path | None = environment.knowledge.vault_dir
     if vault is None:
-        raise VaultNotConfiguredError(
-            "No vault folder is configured.",
-            {"setting": "NOESIS_VAULT_DIR"},
-            next_steps=["Run `noesis config init --vault-dir <folder>` or set NOESIS_VAULT_DIR."],
-        )
+        raise _vault_not_configured()
     return vault
+
+
+def needs_vault(environment: Environment) -> bool:
+    """Whether something still uses local files: the filesystem writer or filesystem search."""
+    settings = environment.knowledge
+    return (
+        settings.writer_backend is WriterBackendEnum.FILESYSTEM
+        or settings.search_backend is SearchEngineEnum.FILESYSTEM
+    )
 
 
 def curator_system_prompt(environment: Environment) -> str:
@@ -123,33 +141,65 @@ def build_curator(environment: Environment) -> ICurator:
 
 
 def build_read_repository(
-    environment: Environment, vault: Path, mapper: NoteMapper, notices: list[str]
+    environment: Environment, vault: Path | None, mapper: NoteMapper, notices: list[str]
 ) -> INoteReadRepository:
-    """The note read repository for `NOESIS_SEARCH_BACKEND`.
+    """The note read repository for `NOESIS_SEARCH_BACKEND`, independent of the writer.
 
     `filesystem` (default) never touches the network. `obsidian-mcp` searches through Obsidian
     and degrades to the filesystem, appending one notice to `notices`, when it is unreachable.
-    The same repository serves `knowledge search`, `knowledge list` and the curator's
-    related-notes lookup, so curation never fails because Obsidian is closed.
+    Without a vault (`vault` is None: writer `mcp` and search `obsidian-mcp`) there is nothing
+    to fall back to: a search failure is raised and `knowledge list` fails with
+    `VaultNotConfiguredError`. The same repository serves `knowledge search`, `knowledge list`
+    and the curator's related-notes lookup.
+
+    Raises:
+        VaultNotConfiguredError: Search is `filesystem` and `vault` is None.
     """
-    files: FilesystemNoteReadRepositoryAdapter = FilesystemNoteReadRepositoryAdapter(vault, mapper)
-    settings = environment.knowledge
-    backend: SearchEngineEnum = settings.search_backend
+    backend: SearchEngineEnum = environment.knowledge.search_backend
     match backend:
         case SearchEngineEnum.FILESYSTEM:
-            return files
+            if vault is None:
+                raise _vault_not_configured()
+            return FilesystemNoteReadRepositoryAdapter(vault, mapper)
         case SearchEngineEnum.OBSIDIAN_MCP:
-            token = settings.obsidian_mcp_token
-            client: ObsidianMcpClient = ObsidianMcpClient(
-                settings.obsidian_mcp_url,
-                token=token.get_secret_value() if token else None,
-                timeout_seconds=settings.obsidian_mcp_timeout_seconds,
-            )
+            client = build_obsidian_mcp_client(environment)
+            if vault is None:
+                return ObsidianMcpNoteReadRepositoryAdapter(
+                    client,
+                    mapper,
+                    listing=UnavailableNoteReadRepositoryAdapter(_vault_not_configured),
+                )
+            files = FilesystemNoteReadRepositoryAdapter(vault, mapper)
             return FallbackNoteReadRepositoryAdapter(
                 ObsidianMcpNoteReadRepositoryAdapter(client, mapper, listing=files),
                 files,
                 on_fallback=lambda _error: notices.append(MCP_FALLBACK_NOTICE),
             )
+        case _ as unhandled:
+            assert_never(unhandled)
+
+
+def build_unit_of_work_factory(
+    environment: Environment, mapper: NoteMapper
+) -> Callable[[], IKnowledgeUnitOfWork]:
+    """The factory of units of work for `NOESIS_WRITER_BACKEND`.
+
+    `filesystem` writes files under the vault (so it needs one, checked now, before the
+    curator spends budget); `mcp` writes through Obsidian's MCP server.
+
+    Raises:
+        VaultNotConfiguredError: The writer is `filesystem` and no vault is configured.
+    """
+    backend: WriterBackendEnum = environment.knowledge.writer_backend
+    match backend:
+        case WriterBackendEnum.FILESYSTEM:
+            vault: Path = require_vault(environment)
+            return lambda: FilesystemKnowledgeUnitOfWorkAdapter(
+                FilesystemNoteRepositoryAdapter(vault, mapper)
+            )
+        case WriterBackendEnum.MCP:
+            client = build_obsidian_mcp_client(environment)
+            return lambda: McpKnowledgeUnitOfWorkAdapter(McpNoteRepositoryAdapter(client, mapper))
         case _ as unhandled:
             assert_never(unhandled)
 
@@ -166,7 +216,7 @@ def build_knowledge(
     Returns:
         The wired handlers.
     """
-    vault: Path = require_vault(environment)
+    vault: Path | None = require_vault(environment) if needs_vault(environment) else None
     mapper = NoteMapper()
     notices: list[str] = []
     read_repository = build_read_repository(environment, vault, mapper, notices)
@@ -174,11 +224,8 @@ def build_knowledge(
         environment.runtime.state_dir.joinpath(*PARKED_FOLDER)
     )
 
-    def unit_of_work() -> IKnowledgeUnitOfWork:
-        return FilesystemKnowledgeUnitOfWorkAdapter(FilesystemNoteRepositoryAdapter(vault, mapper))
-
     curate = CurateWorkBriefHandler(
-        uow_factory=unit_of_work,
+        uow_factory=build_unit_of_work_factory(environment, mapper),
         read_repository=read_repository,
         curator=curator or build_curator(environment),
         queue=queue,

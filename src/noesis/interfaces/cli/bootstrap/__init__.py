@@ -19,9 +19,12 @@ from .knowledge_handlers_builder import (
     KnowledgeHandlers,
     build_curator,
     build_knowledge,
+    build_unit_of_work_factory,
     curator_system_prompt,
+    needs_vault,
     require_vault,
 )
+from .obsidian_mcp_client_builder import build_obsidian_mcp_client
 
 __all__ = [
     "AgentHooksHandlers",
@@ -35,8 +38,11 @@ __all__ = [
     "build_curator",
     "build_diagnostics",
     "build_knowledge",
+    "build_obsidian_mcp_client",
+    "build_unit_of_work_factory",
     "curator_command",
     "curator_system_prompt",
+    "needs_vault",
     "require_vault",
     "run_diagnostics",
 ]

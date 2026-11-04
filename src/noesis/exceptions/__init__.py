@@ -20,6 +20,7 @@ from .exit_code_enum import ExitCodeEnum
 from .integration_errors import (
     AgentSettingsInvalidError,
     ObsidianMcpError,
+    ObsidianMcpToolError,
     SkillGuideNotFoundError,
 )
 from .interface_errors import InvalidWorkBriefError
@@ -59,6 +60,7 @@ __all__ = [
     "ManualNoteProtectedError",
     "NoteStorageError",
     "ObsidianMcpError",
+    "ObsidianMcpToolError",
     "ParkedCurationNotFoundError",
     "SkillGuideNotFoundError",
     "VaultNotConfiguredError",

@@ -17,7 +17,7 @@ from mcp import ClientSession
 from mcp.client.streamable_http import streamable_http_client
 from mcp.types import CallToolResult, TextContent
 
-from noesis.exceptions import ObsidianMcpError
+from noesis.exceptions import ObsidianMcpError, ObsidianMcpToolError
 from noesis.shared_kernel.domain import JsonValue
 
 DEFAULT_TIMEOUT_SECONDS: float = 5.0
@@ -34,24 +34,18 @@ def _first_of(group: BaseExceptionGroup[BaseException]) -> ObsidianMcpError | No
 
 
 class ObsidianMcpSession:
-    """One initialised MCP session; `call` runs a tool and returns its decoded JSON answer."""
+    """One initialised MCP session; `call` returns a tool's decoded JSON, `call_text` its raw text."""
 
     def __init__(self, session: ClientSession, timeout_seconds: float) -> None:
         self._session: ClientSession = session
         self._timeout_seconds: float = timeout_seconds
 
-    async def call(self, tool: str, arguments: dict[str, Any] | None = None) -> JsonValue:
-        """Call `tool` and decode the JSON text it answers with.
-
-        Args:
-            tool: MCP tool name, e.g. `search_simple`.
-            arguments: Tool arguments.
-
-        Returns:
-            The decoded JSON value (the tool's text content).
+    async def _run(self, tool: str, arguments: dict[str, Any] | None) -> str:
+        """Call `tool` and return the text of its first content block.
 
         Raises:
-            ObsidianMcpError: The call timed out, failed, or answered something unreadable.
+            ObsidianMcpToolError: The tool answered with an error.
+            ObsidianMcpError: The call timed out.
         """
         try:
             async with asyncio.timeout(self._timeout_seconds):
@@ -68,9 +62,26 @@ class ObsidianMcpSession:
             blocks[0] if blocks else ""
         )  # later blocks are notes such as "N results left out"
         if result.isError:
-            raise ObsidianMcpError(
+            raise ObsidianMcpToolError(
                 f"Obsidian MCP tool `{tool}` failed: {text[:200] or 'no detail'}", {"tool": tool}
             )
+        return text
+
+    async def call(self, tool: str, arguments: dict[str, Any] | None = None) -> JsonValue:
+        """Call `tool` and decode the JSON text it answers with.
+
+        Args:
+            tool: MCP tool name, e.g. `search_simple`.
+            arguments: Tool arguments.
+
+        Returns:
+            The decoded JSON value (the tool's text content).
+
+        Raises:
+            ObsidianMcpToolError: The tool answered with an error.
+            ObsidianMcpError: The call timed out, or answered something that is not JSON.
+        """
+        text: str = await self._run(tool, arguments)
         try:
             decoded: JsonValue = json.loads(text)
         except json.JSONDecodeError as error:
@@ -78,6 +89,22 @@ class ObsidianMcpSession:
                 f"Obsidian MCP tool `{tool}` answered something that is not JSON.", {"tool": tool}
             ) from error
         return decoded
+
+    async def call_text(self, tool: str, arguments: dict[str, Any] | None = None) -> str:
+        """Call `tool` and return its text answer undecoded (e.g. `vault_write` answers text).
+
+        Args:
+            tool: MCP tool name, e.g. `vault_write`.
+            arguments: Tool arguments.
+
+        Returns:
+            The tool's first text content block.
+
+        Raises:
+            ObsidianMcpToolError: The tool answered with an error.
+            ObsidianMcpError: The call timed out.
+        """
+        return await self._run(tool, arguments)
 
 
 class ObsidianMcpClient:
