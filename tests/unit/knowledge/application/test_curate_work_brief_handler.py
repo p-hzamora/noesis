@@ -26,6 +26,7 @@ from noesis.bounded_context.knowledge.domain.policies import AutoCurationPolicy
 from noesis.bounded_context.knowledge.domain.value_objects import CurationActionEnum, NoteOriginEnum
 from noesis.exceptions import (
     CurationFailedError,
+    NoteStorageError,
     ParkedCurationNotFoundError,
 )
 
@@ -42,12 +43,13 @@ class _World:
         self.curator = curator
         self.sleeps: list[float] = []
         self.units: list[InMemoryKnowledgeUnitOfWork] = []
+        self.commit_errors: list[NoteStorageError] = []
 
         async def sleep(seconds: float) -> None:
             self.sleeps.append(seconds)
 
         def unit_of_work() -> InMemoryKnowledgeUnitOfWork:
-            self.units.append(InMemoryKnowledgeUnitOfWork(self.repository))
+            self.units.append(InMemoryKnowledgeUnitOfWork(self.repository, self.commit_errors))
             return self.units[-1]
 
         self.handler = CurateWorkBriefHandler(
@@ -185,3 +187,78 @@ async def test_retrying_an_unknown_ticket_fails_clearly() -> None:
         await RetryParkedCurationHandler(queue=world.queue, curate=world.handler).handle(
             RetryParkedCurationCommand(ticket="nope")
         )
+
+
+def _storage_error() -> NoteStorageError:
+    return NoteStorageError(
+        "Wrote 1 of 2 note(s) through the Obsidian MCP before it failed: disk full",
+        {
+            "backend": "mcp",
+            "written": ["repos/demo/auto/decisions/a.md"],
+            "not_written": ["repos/demo/auto/decisions/b.md"],
+        },
+        next_steps=["Check NOESIS_OBSIDIAN_MCP_URL (`noesis doctor`)."],
+    )
+
+
+@pytest.mark.parametrize("failing_step", ["lookup", "commit"])
+async def test_storage_failure_parks_the_brief_and_keeps_the_error_details(
+    failing_step: str,
+) -> None:
+    world = _World(ScriptedCurator((a_decision(),)))
+    if failing_step == "lookup":
+        world.repository.get_errors.append(_storage_error())
+    else:
+        world.commit_errors.append(_storage_error())
+
+    with pytest.raises(CurationFailedError) as raised:
+        await world.handler.handle(_command())
+
+    error: CurationFailedError = raised.value
+    assert error.error_code == "KNOWLEDGE_201_CURATION_FAILED"
+    assert error.message.startswith("Storing the notes failed: Wrote 1 of 2 note(s)")
+    assert error.metadata == {
+        "backend": "mcp",
+        "written": ["repos/demo/auto/decisions/a.md"],
+        "not_written": ["repos/demo/auto/decisions/b.md"],
+        "repository": "demo",
+        "ticket": "ticket-1",
+    }
+    assert error.next_steps == (
+        "Check NOESIS_OBSIDIAN_MCP_URL (`noesis doctor`).",
+        "Fix the cause, then run `noesis knowledge retry ticket-1`.",
+    )
+    assert world.queue.parked["ticket-1"][0] == a_brief()
+    assert isinstance(error.__cause__, NoteStorageError)
+    assert world.repository.stored == {}
+
+
+async def test_storage_failure_without_parking_propagates() -> None:
+    world = _World(ScriptedCurator((a_decision(),)))
+    world.commit_errors.append(_storage_error())
+
+    with pytest.raises(NoteStorageError) as raised:
+        await world.handler.handle(_command(park=False))
+
+    assert raised.value.error_code == "KNOWLEDGE_102_NOTE_STORAGE_FAILED"
+    assert world.queue.parked == {}
+
+
+async def test_retry_that_hits_a_storage_failure_keeps_the_ticket_then_succeeds() -> None:
+    world = _World(ScriptedCurator((a_decision(),), (a_decision(),), (a_decision(),)))
+    retry = RetryParkedCurationHandler(queue=world.queue, curate=world.handler)
+    world.commit_errors.extend([_storage_error(), _storage_error()])
+    with pytest.raises(CurationFailedError):
+        await world.handler.handle(_command())
+
+    with pytest.raises(CurationFailedError) as raised:
+        await retry.handle(RetryParkedCurationCommand(ticket="ticket-1"))
+
+    assert raised.value.metadata["ticket"] == "ticket-1"
+    assert raised.value.metadata["written"] == ["repos/demo/auto/decisions/a.md"]
+    assert raised.value.next_steps[-1].endswith("`noesis knowledge retry ticket-1` again.")
+    assert list(world.queue.parked) == ["ticket-1"]  # kept, and not parked a second time
+
+    result: CurationResultDto = await retry.handle(RetryParkedCurationCommand(ticket="ticket-1"))
+    assert len(result.created) == 1
+    assert world.queue.parked == {}

@@ -2,7 +2,9 @@
 
 Speaks the real MCP protocol through the official SDK's `FastMCP`, with the three tools
 noesis uses (`search_simple`, `vault_read`, `vault_list`), shaped like the `obsidian` server's
-answers. Records every tool call and every `Authorization` header.
+answers, plus `vault_write`, which writes into the folder and answers PLAIN TEXT (not JSON).
+A missing file or folder is a tool error (`isError`). Records every tool call and every
+`Authorization` header.
 """
 
 import json
@@ -44,7 +46,15 @@ class FakeObsidianMcp:
         canned: list[tuple[str, float]] | None = None,
         truncation_note: bool = False,
         garbage: bool = False,
+        fail_write_after: int | None = None,
+        reject_writes: bool = False,
+        read_without_content: bool = False,
+        port: int | None = None,
     ) -> None:
+        self.fail_write_after: int | None = fail_write_after  # the (N+1)-th write is a tool error
+        self.reject_writes: bool = reject_writes  # every write is a tool error
+        self.read_without_content: bool = read_without_content  # `vault_read` omits `content`
+        self.writes_done: int = 0
         self.truncation_note: bool = truncation_note  # like the real server's second text block
         self.garbage: bool = garbage
         self.vault: Path = vault
@@ -52,7 +62,7 @@ class FakeObsidianMcp:
         self.canned: list[tuple[str, float]] | None = canned
         self.calls: list[tuple[str, dict[str, Any]]] = []
         self.authorizations: list[str | None] = []
-        self.port: int = free_port()
+        self.port: int = port if port is not None else free_port()
         self._server: uvicorn.Server | None = None
         self._thread: threading.Thread | None = None
 
@@ -100,6 +110,8 @@ class FakeObsidianMcp:
         @mcp.tool()
         def vault_read(path: str) -> str:
             self.calls.append(("vault_read", {"path": path}))
+            if self.read_without_content:
+                return json.dumps({"path": path})
             return json.dumps(
                 {"path": path, "content": (self.vault / path).read_text(encoding="utf-8")}
             )
@@ -112,6 +124,19 @@ class FakeObsidianMcp:
                 entry.name + ("/" if entry.is_dir() else "") for entry in sorted(folder.iterdir())
             ]
             return json.dumps({"files": names})
+
+        @mcp.tool()
+        def vault_write(path: str, content: str) -> str:
+            self.calls.append(("vault_write", {"path": path, "content": content}))
+            if self.reject_writes:
+                raise PermissionError("the vault is read-only")
+            if self.fail_write_after is not None and self.writes_done >= self.fail_write_after:
+                raise OSError("disk full")
+            target: Path = self.vault / path
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(content, encoding="utf-8")
+            self.writes_done += 1
+            return f"Wrote {path}"  # plain text on purpose: the real server does not answer JSON
 
         app: ASGIApp = mcp.streamable_http_app()
 
@@ -156,10 +181,22 @@ def fake_obsidian_mcp(
     canned: list[tuple[str, float]] | None = None,
     truncation_note: bool = False,
     garbage: bool = False,
+    fail_write_after: int | None = None,
+    reject_writes: bool = False,
+    read_without_content: bool = False,
+    port: int | None = None,
 ) -> Iterator[FakeObsidianMcp]:
-    """Run a fake server for the duration of the block."""
+    """Run a fake server for the duration of the block (on `port`, to bring a server back)."""
     fake = FakeObsidianMcp(
-        vault, token=token, canned=canned, truncation_note=truncation_note, garbage=garbage
+        vault,
+        token=token,
+        canned=canned,
+        truncation_note=truncation_note,
+        garbage=garbage,
+        fail_write_after=fail_write_after,
+        reject_writes=reject_writes,
+        read_without_content=read_without_content,
+        port=port,
     )
     fake.start()
     try:

@@ -77,7 +77,7 @@ async def test_a_healthy_machine_passes_every_check() -> None:
     assert report.ok
     assert [check.name for check in report.checks] == [
         "config_file", "vault", "state_dir", "git", "curator", "claude_code_hooks",
-        "search_backend",
+        "writer", "search_backend",
     ]  # fmt: skip
     assert report.checks[0].detail == "/cfg/.env (found)"
     assert report.checks[2].detail == str(
@@ -120,9 +120,16 @@ async def test_installed_events_are_listed_sorted() -> None:
 
 
 class _Obsidian(IObsidianMcpProbe):
-    def __init__(self, root: tuple[str, ...] | None) -> None:
+    def __init__(self, root: tuple[str, ...] | None, *, accepts_writes: bool = True) -> None:
         self.root: tuple[str, ...] | None = root
+        self.accepts_writes: bool = accepts_writes
         self.calls: int = 0
+        self.writes: int = 0
+
+    async def write_probe(self) -> None:
+        self.writes += 1
+        if not self.accepts_writes:
+            raise ObsidianMcpError("Obsidian MCP tool `vault_write` failed: read-only vault.")
 
     async def list_root(self) -> tuple[str, ...]:
         self.calls += 1
@@ -185,3 +192,75 @@ async def test_without_a_vault_folder_the_comparison_is_skipped() -> None:
 
     assert ok
     assert "not compared" in detail
+
+
+async def _writer_check(
+    obsidian: _Obsidian | None, **changes: object
+) -> tuple[bool, str, str | None]:
+    report = await RunDiagnosticsHandler(probe=_healthy(), obsidian=obsidian).handle(
+        _query(**changes)
+    )
+    check = next(check for check in report.checks if check.name == "writer")
+    return check.ok, check.detail, check.next_step
+
+
+async def test_writer_check_on_the_filesystem_makes_no_mcp_call() -> None:
+    obsidian: _Obsidian = _Obsidian(("repos",))
+
+    ok, detail, _ = await _writer_check(obsidian)
+
+    assert ok
+    assert detail == f"filesystem (files under {VAULT}; see the vault check)"
+    assert (obsidian.calls, obsidian.writes) == (0, 0)
+
+
+async def test_writer_check_on_mcp_passes_when_the_server_accepts_a_write() -> None:
+    obsidian: _Obsidian = _Obsidian(("repos",))
+
+    ok, detail, _ = await _writer_check(obsidian, writer_mcp_url=MCP_URL)
+
+    assert ok
+    assert detail == f"obsidian-mcp at {MCP_URL} accepted a write"
+    assert obsidian.writes == 1
+
+
+async def test_writer_check_on_mcp_fails_when_the_write_is_refused() -> None:
+    obsidian: _Obsidian = _Obsidian(("repos",), accepts_writes=False)
+    probe: _Probe = _healthy()
+
+    report = await RunDiagnosticsHandler(probe=probe, obsidian=obsidian).handle(
+        _query(writer_mcp_url=MCP_URL)
+    )
+
+    check = next(check for check in report.checks if check.name == "writer")
+    assert not check.ok
+    assert "read-only vault" in check.detail
+    assert check.next_step is not None
+    assert "write permission" in check.next_step
+    assert not report.ok
+
+
+async def test_writer_check_on_the_filesystem_names_an_unset_vault() -> None:
+    ok, detail, _ = await _writer_check(None, vault_dir=None)
+
+    assert ok
+    assert "None" not in detail
+    assert "NOESIS_VAULT_DIR is not set" in detail
+
+
+async def test_writer_check_on_mcp_fails_when_no_probe_is_wired() -> None:
+    ok, detail, next_step = await _writer_check(None, writer_mcp_url=MCP_URL)
+
+    assert not ok
+    assert "no probe wired" in detail
+    assert next_step is not None
+
+
+async def test_an_unset_vault_does_not_fail_the_vault_check_when_no_vault_is_required() -> None:
+    report = await RunDiagnosticsHandler(probe=_healthy()).handle(
+        _query(vault_dir=None, vault_required=False)
+    )
+
+    vault = next(check for check in report.checks if check.name == "vault")
+    assert vault.ok
+    assert report.ok

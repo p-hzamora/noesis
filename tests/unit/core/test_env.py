@@ -72,6 +72,7 @@ def test_the_env_example_template_documents_every_setting() -> None:
 
     for variable in (
         "NOESIS_VAULT_DIR",
+        "NOESIS_WRITER_BACKEND",
         "NOESIS_STATE_DIR",
         "NOESIS_LOG_LEVEL",
         "NOESIS_CAPTURE_MIN_FILES",
@@ -110,3 +111,22 @@ def test_an_unknown_search_backend_is_rejected(tmp_path: Path) -> None:
         load_environment(env_file)
 
     assert "NOESIS_SEARCH_BACKEND" in str(raised.value.metadata["problems"])
+
+
+def test_writer_backend_defaults_to_the_filesystem_and_accepts_mcp(tmp_path: Path) -> None:
+    assert load_environment(tmp_path / "missing.env").knowledge.writer_backend.value == "filesystem"
+
+    env_file: Path = tmp_path / "noesis.env"
+    env_file.write_text("NOESIS_WRITER_BACKEND=mcp\n", encoding="utf-8")
+
+    assert load_environment(env_file).knowledge.writer_backend.value == "mcp"
+
+
+def test_an_unknown_writer_backend_is_rejected(tmp_path: Path) -> None:
+    env_file: Path = tmp_path / "noesis.env"
+    env_file.write_text("NOESIS_WRITER_BACKEND=bogus\n", encoding="utf-8")
+
+    with pytest.raises(InvalidConfigurationError) as raised:
+        load_environment(env_file)
+
+    assert "NOESIS_WRITER_BACKEND" in str(raised.value.metadata["problems"])

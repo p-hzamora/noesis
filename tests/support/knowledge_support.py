@@ -30,6 +30,7 @@ from noesis.bounded_context.knowledge.domain.value_objects import (
 )
 from noesis.exceptions import (
     CuratorFailedError,
+    NoteStorageError,
 )
 from noesis.shared_kernel.application.ports.clock import IClock
 from noesis.shared_kernel.contracts import CommitRefContract, WorkBriefContract
@@ -49,13 +50,19 @@ class FixedClock(IClock):
 
 
 class InMemoryNoteRepository(INoteRepository):
-    """Notes in a dict; `save` stages, the unit of work publishes on commit."""
+    """Notes in a dict; `save` stages, the unit of work publishes on commit.
+
+    `get_errors` scripts storage failures: each `get` pops and raises one while any remain.
+    """
 
     def __init__(self) -> None:
         self.stored: dict[str, Note] = {}
         self.staged: dict[str, Note] = {}
+        self.get_errors: list[NoteStorageError] = []
 
     async def get(self, location: NoteLocation) -> Note | None:
+        if self.get_errors:
+            raise self.get_errors.pop(0)
         path: str = location.relative_path
         return self.staged.get(path) or self.stored.get(path)
 
@@ -64,10 +71,21 @@ class InMemoryNoteRepository(INoteRepository):
 
 
 class InMemoryKnowledgeUnitOfWork(IKnowledgeUnitOfWork):
-    """Commits staged notes into `stored`; counts commits."""
+    """Commits staged notes into `stored`; counts commits.
 
-    def __init__(self, repository: InMemoryNoteRepository) -> None:
+    `commit_errors` scripts storage failures: each `commit` pops and raises one while any remain
+    (the stage is then dropped on exit, like a real writer that did not confirm).
+    """
+
+    def __init__(
+        self,
+        repository: InMemoryNoteRepository,
+        commit_errors: list[NoteStorageError] | None = None,
+    ) -> None:
         self._repository: InMemoryNoteRepository = repository
+        self.commit_errors: list[NoteStorageError] = (
+            commit_errors if commit_errors is not None else []
+        )
         self.commits: int = 0
 
     @property
@@ -86,6 +104,8 @@ class InMemoryKnowledgeUnitOfWork(IKnowledgeUnitOfWork):
         await self.rollback()
 
     async def commit(self) -> None:
+        if self.commit_errors:
+            raise self.commit_errors.pop(0)
         self._repository.stored.update(self._repository.staged)
         self._repository.staged.clear()
         self.commits += 1
