@@ -9,9 +9,9 @@ flowchart LR
     rd -->|installed hook events as plain values| hs[GetAgentHooksStatusHandler]
     rd --> dh[RunDiagnosticsHandler]
     dh --> probe[SystemEnvironmentProbeAdapter]
-    dh -.->|"only when NOESIS_SEARCH_BACKEND=obsidian-mcp"| mp[ObsidianMcpProbeAdapter]
-    mp -->|"vault_list root"| obs[("Obsidian MCP")]
-    probe --> checks["env file, vault dir, state dir,<br/>curator binary, Claude Code hooks,<br/>search backend"]
+    dh -.->|"only when search is obsidian-mcp or writer is mcp"| mp[ObsidianMcpProbeAdapter]
+    mp -->|"vault_list root; write .noesis/doctor-probe.md"| obs[("Obsidian MCP")]
+    probe --> checks["env file, vault dir, state dir,<br/>curator binary, Claude Code hooks,<br/>writer, search backend"]
     checks --> dr["DoctorResponse, exit 1 if any check fails"]
 
     show["config show"] --> env[load_environment] --> cs[ConfigShowResponse]
@@ -20,6 +20,12 @@ flowchart LR
     sl["skills list"] --> guides[("files:<br/>skill_guides/*.md (repo root)")]
     sg["skills get NAME"] --> guides
 ```
+
+The `writer` check (between `claude_code_hooks` and `search_backend`) is ok with no MCP call
+on the default `filesystem` writer; with `NOESIS_WRITER_BACKEND=mcp` it writes the hidden file
+`.noesis/doctor-probe.md` and fails (exit 1) when the server is unreachable or refuses the
+write. The `vault` check fails on an unset vault only when a vault is required (writer or
+search on `filesystem`).
 
 The `search_backend` check makes no MCP call on the default `filesystem` backend. With
 `obsidian-mcp` it lists the root of the vault Obsidian serves and compares the non-hidden

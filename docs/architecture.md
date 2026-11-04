@@ -43,7 +43,8 @@ WorkBriefContract ──► CurateWorkBriefHandler
                         ├─ ICurator.curate(brief, related)                       LLM judgment (retry once)
                         ├─ AutoCurationPolicy.apply(decision, existing notes)    domain rules
                         └─ IKnowledgeUnitOfWork: notes.save(...) + commit        all or nothing
-                      on repeated curator failure: IParkedCurationQueue.park -> `noesis knowledge retry`
+                      on repeated curator failure, or a storage failure (NoteStorageError):
+                        IParkedCurationQueue.park -> `noesis knowledge retry`
 ```
 
 | Piece | Where | Notes |
@@ -54,9 +55,37 @@ WorkBriefContract ──► CurateWorkBriefHandler
 | `AutoCurationPolicy` | `domain/policies/` | Manual note on the same topic wins (`covered by <path>`); create/update both upsert the auto note. |
 | `ClaudeCliCuratorAdapter` | `infrastructure/outbound/curation/` | `claude -p --output-format json --json-schema` with no tools, no settings, no saved session, a budget cap; prompt on stdin; reads `structured_output`. The system prompt holds the admission rule; the adapter receives it as text from the composition root (`build_curator`), which reads `NOESIS_CURATOR_SYSTEM_PROMPT_FILE` or falls back to the packaged `prompts/curator_system.md` (`default_system_prompt()`). |
 | `curator_response_schema.py` | same folder | Anti-corruption layer: pydantic schema sent to the CLI, translated into domain decisions; malformed entries become reported skips. |
-| Filesystem adapters | `infrastructure/outbound/storage/` | Markdown + YAML frontmatter under `NOESIS_VAULT_DIR`; writes are staged and committed atomically. Works for Obsidian vaults, plain folders and NFS. |
-| Obsidian MCP search | `infrastructure/outbound/storage/` | `ObsidianMcpNoteReadRepositoryAdapter` implements `INoteReadRepository` over the official `mcp` SDK (streamable HTTP, client in `shared_kernel/infrastructure/outbound/mcp/`); `FallbackNoteReadRepositoryAdapter` degrades to the filesystem adapter on `ObsidianMcpError`. Selected by `NOESIS_SEARCH_BACKEND` in `build_knowledge` (default `filesystem`: no MCP call). Read side only; the curate handler shares it (so related notes come from Obsidian too, with the same fallback); `list` and every write stay on files. See [knowledge workflow](workflows/knowledge.md#search-backend). |
-| Parked queue | `infrastructure/outbound/queue/` | One JSON file per failed brief under `$NOESIS_STATE_DIR/knowledge/parked/`. |
+| Filesystem adapters | `infrastructure/outbound/storage/` | Markdown + YAML frontmatter under `NOESIS_VAULT_DIR`; each file is written atomically, staged notes are written on commit (not all-or-nothing across files; a retry overwrites). Works for Obsidian vaults, plain folders and NFS (a mount). The default writer (`NOESIS_WRITER_BACKEND=filesystem`). |
+| MCP writer | `infrastructure/outbound/storage/` | `McpNoteRepositoryAdapter` + `McpKnowledgeUnitOfWorkAdapter` implement `INoteRepository` / `IKnowledgeUnitOfWork` over Obsidian's MCP server (`vault_read`, `vault_list`, `vault_write`) with the same `NoteMapper`, so the Markdown is byte-identical to the filesystem writer's. Stages on `save`, sends on `commit`. Selected by `NOESIS_WRITER_BACKEND=mcp` in `build_unit_of_work_factory`; reuses `NOESIS_OBSIDIAN_MCP_*`. See [Writer backend](#writer-backend). |
+| Obsidian MCP search | `infrastructure/outbound/storage/` | `ObsidianMcpNoteReadRepositoryAdapter` implements `INoteReadRepository` over the official `mcp` SDK (streamable HTTP, client in `shared_kernel/infrastructure/outbound/mcp/`); `FallbackNoteReadRepositoryAdapter` degrades to the filesystem adapter on `ObsidianMcpError`. Selected by `NOESIS_SEARCH_BACKEND` in `build_knowledge` (default `filesystem`: no MCP call). Read side only; the curate handler shares it (so related notes come from Obsidian too, with the same fallback); `list` always reads files, and writes follow `NOESIS_WRITER_BACKEND`, not the search backend. See [knowledge workflow](workflows/knowledge.md#search-backend). |
+| Parked queue | `infrastructure/outbound/queue/` | One JSON file per failed brief under `$NOESIS_STATE_DIR/knowledge/parked/`. A brief is parked when the curator keeps failing and when storing the notes fails (`NoteStorageError`); both surface as `KNOWLEDGE_201`. |
+
+### Writer backend
+
+`NOESIS_WRITER_BACKEND` (`filesystem` default, or `mcp`) chooses where curated notes are stored.
+Rules, recorded here and in ADR-0001 Amendment 2:
+
+- R1. The writer is chosen by a composition-root function (`build_unit_of_work_factory` in
+  `interfaces/cli/bootstrap/knowledge_handlers_builder.py`, `match` + `assert_never`) from
+  `NOESIS_WRITER_BACKEND`. There is no application-layer resolver.
+- R2. `uow.notes` reads from the backend it writes (the manual-wins lookup sees the same notes the
+  writer stores). Search, `list` and the curator's related notes follow `NOESIS_SEARCH_BACKEND`.
+- R3. The MCP writer opens one MCP session per operation (one `get`, one `commit`).
+  `ObsidianMcpToolError` (a subtype of `ObsidianMcpError`) separates "the tool said no" from
+  "unreachable".
+- R4. Only `NoteStorageError` leaves a writer. MCP `commit` renders and validates every note
+  first (nothing is sent if one fails), then sends them one at a time. It is not atomic across
+  notes and is convergent on retry; the error lists the `written` and `not_written` paths.
+- R5. A storage failure parks the brief and fails with `KNOWLEDGE_201`; `--no-park` keeps
+  `KNOWLEDGE_102`. `knowledge retry` keeps the ticket when storage fails again.
+- R6. A vault is required only where files are used (`needs_vault`: writer or search is
+  `filesystem`). `knowledge list` always needs it; without a vault there is no MCP-to-files
+  search fallback.
+- R7. Search and writer share `NOESIS_OBSIDIAN_MCP_*` and one client builder
+  (`build_obsidian_mcp_client`), the only place that unwraps the token.
+- R8. `NoteMapper` is the single note renderer/parser, in infrastructure
+  `storage/mappers/`; every writer and reader uses it.
+- R9. The `doctor` writer probe writes the fixed hidden file `.noesis/doctor-probe.md`.
 
 Tuning the curator: read the `skipped` list of `noesis knowledge curate --json`, copy
 `prompts/curator_system.md` to a file of your own, edit it, and point
@@ -108,7 +137,7 @@ noesis integrate claude-code install|uninstall|status
 | `noesis hook claude-code` | `interfaces/cli/commands/hook_commands.py` + Capture `infrastructure/inbound/claude_code/` | Inbound adapter. The CLI command keeps the process concerns: the `NOESIS_HOOK=1` guard (set for the curator's own run), reading stdin, exiting 0 always, the error log at `<state>/capture/hook-errors.log`, and dispatching to the handler. Payload model and router (the anti-corruption layer) live in Capture. |
 | `noesis integrate claude-code` | `commands/integrate_commands.py`, Capture `application/handlers/` and `infrastructure/outbound/agent_hooks/` | Adds, removes, or reports the three hooks in Claude Code's settings. Preview by default, `--yes` writes after a timestamped backup; foreign hooks are never touched. The CLI does no file I/O. `claude_code_hook_settings.py` holds `HOOK_SPECS` and the pure `with_noesis`/`without_noesis`/`installed_commands` functions. |
 | Settings location | `core/configurations/claude_code_settings.py` | `ClaudeCodeSettings.config_dir` (`CLAUDE_CONFIG_DIR`, default `~/.claude`); `settings_file` is `<config_dir>/settings.json`. Bounded contexts cannot import `noesis.core`, so `bootstrap.build_agent_hooks` injects the resolved path; `--settings` overrides it. |
-| `noesis doctor` | `commands/doctor_commands.py`, `noesis/diagnostics/` | `bootstrap.run_diagnostics` builds a `RunDiagnosticsQuery` of primitives (env file, vault dir, state dir, curator binary, installed hook events from `GetAgentHooksStatusQuery`); `RunDiagnosticsHandler` applies the rules through `IEnvironmentProbe`; `format_report` renders the text. An unreadable agent settings file becomes a failed `claude_code_hooks` check. |
+| `noesis doctor` | `commands/doctor_commands.py`, `noesis/diagnostics/` | `bootstrap.run_diagnostics` builds a `RunDiagnosticsQuery` of primitives (env file, vault dir, state dir, curator binary, installed hook events from `GetAgentHooksStatusQuery`, the MCP URLs to probe, and whether a vault is required); `RunDiagnosticsHandler` applies the rules through `IEnvironmentProbe`; `format_report` renders the text. An unreadable agent settings file becomes a failed `claude_code_hooks` check. The `writer` check sits between `claude_code_hooks` and `search_backend`: `filesystem` makes no MCP call; `mcp` writes `.noesis/doctor-probe.md` (`IObsidianMcpProbe.write_probe`). The `vault` check fails on an unset vault only when one is required. |
 | `noesis config init` | `commands/config_commands.py`, `core/env_template.py` | `write_env_file` renders the template and writes the file; the command decides whether overwriting is allowed. |
 | `noesis skills get` | `commands/skills_commands.py`, `skill_guides/*.md` (repository root) | Version-matched agent guide packaged with the CLI. |
 | Skill stub | `skills/noesis/SKILL.md` | Installed with `npx skills add`; only resolves the CLI and loads the guide, so it never goes stale. |

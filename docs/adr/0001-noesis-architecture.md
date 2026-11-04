@@ -64,3 +64,56 @@ A review found delivery-adjacent logic inside `interfaces/cli`. It moved as foll
   get`; they document the CLI surface but hold no code, so they sit beside `skills/` and
   `.env.example`. Wheels carry a copy inside the package (hatch `force-include`); a source
   checkout reads the root folder.
+
+## Amendment 2 (2026-11-03): pluggable writer backend
+
+`knowledge curate` always wrote notes as files, a storage failure lost the brief, and
+`NOESIS_VAULT_DIR` was mandatory even when nothing local was used. The writer behind
+`IKnowledgeUnitOfWork` is now selectable (issue #2). The domain, the application ports and the
+curator are unchanged.
+
+Decisions:
+
+- **D-006** `WriterBackendEnum` (`filesystem` default, `mcp`) lives in `shared_kernel/enums.py`,
+  next to `SearchEngineEnum`; `NOESIS_WRITER_BACKEND` is the only new setting.
+- **D-007** A composition-root function (`match` + `assert_never`) selects the unit of work; no
+  application resolver. One `build_obsidian_mcp_client` builds the client for search, writer and
+  doctor and is the only place that unwraps the token.
+- **D-008** The MCP writer opens one session per operation, because `session()` relabels
+  exceptions thrown into its body as "unreachable".
+- **D-009** `ObsidianMcpToolError` (subtype of `ObsidianMcpError`) and `call_text` on the
+  client: a tool refusal differs from a transport failure, and `vault_write` answers plain text.
+- **D-010** `get` treats a tool error plus an absent name in the parent `vault_list` as "no such
+  note"; a listed file that cannot be read is a storage error.
+- **D-011** MCP pre-validation is render + non-blank; path rules stay in the domain value objects.
+- **D-012** Only `NoteStorageError` is parked.
+- **D-013** `needs_vault` is the single owner of the vault requirement; a vault-less read
+  repository fails `list` lazily and has no MCP-to-files fallback.
+- **D-014** `doctor` gets a `writer` check; on `mcp` it writes the fixed hidden file
+  `.noesis/doctor-probe.md`.
+- **D-015** `NoteMapper` stays in infrastructure `storage/mappers/` (it imports `yaml`), shared
+  by every writer and reader.
+
+Rules (also in `docs/architecture.md`, "Writer backend"):
+
+- R1 The writer is chosen by a composition-root function from `NOESIS_WRITER_BACKEND`; no
+  application resolver.
+- R2 `uow.notes` reads from the backend it writes; search, list and related notes follow
+  `NOESIS_SEARCH_BACKEND`.
+- R3 The MCP writer uses one session per operation; `ObsidianMcpToolError` separates "tool said
+  no" from "unreachable".
+- R4 Only `NoteStorageError` leaves a writer; MCP commit = pre-validate, send sequentially, not
+  atomic, convergent on retry.
+- R5 A storage failure parks as `KNOWLEDGE_201`; `KNOWLEDGE_102` remains with `--no-park`; retry
+  keeps the ticket on failure.
+- R6 A vault is required only where files are used (`needs_vault`); `list` always needs it; no
+  MCP fallback without a vault.
+- R7 Search and writer share `NOESIS_OBSIDIAN_MCP_*` and one client builder that unwraps the
+  secret.
+- R8 `NoteMapper` is the single renderer, in infrastructure `storage/mappers/`.
+- R9 The doctor writer probe writes the fixed hidden file `.noesis/doctor-probe.md`.
+
+Behaviour change: a storage failure during `curate` now parks the brief and fails with
+`KNOWLEDGE_201` (ticket and `knowledge retry` next step), including on the default filesystem
+backend, where it used to fail with `KNOWLEDGE_102` and lose the brief. `--no-park` keeps
+`KNOWLEDGE_102`. NFS stays the filesystem backend pointed at a mount; no separate backend.

@@ -84,10 +84,24 @@ noesis [--env-file <path>] knowledge parked --json           # tickets of briefs
 noesis [--env-file <path>] knowledge retry <TICKET> --json   # retry one, in the foreground
 ```
 
+A brief is parked when the curator keeps failing and also when storing the notes fails (vault
+folder not writable, Obsidian's MCP unreachable): both are `KNOWLEDGE_201_CURATION_FAILED` with a
+`ticket` in `error.metadata`. Follow its `next_steps`: fix the cause, then `knowledge retry
+<TICKET>`. A storage failure may carry `written` and `not_written` paths (some notes were stored
+before it failed); retry overwrites them all, so do not write notes by hand.
+
+## Where notes are stored
+
+`NOESIS_WRITER_BACKEND` selects the writer: `filesystem` (default; files under
+`NOESIS_VAULT_DIR`, which can be an NFS mount) or `mcp` (through Obsidian's MCP server, using the
+`NOESIS_OBSIDIAN_MCP_*` settings). Search follows `NOESIS_SEARCH_BACKEND` independently. The
+vault folder is only required where files are used (not with writer `mcp` + search
+`obsidian-mcp`, except for `knowledge list`).
+
 ## Setup and diagnosis
 
 ```bash
-noesis [--env-file <path>] doctor --json                       # vault, state dir, git, curator CLI, hooks, search backend
+noesis [--env-file <path>] doctor --json                       # vault, state dir, git, curator CLI, hooks, writer, search backend
 noesis [--env-file <path>] config show --json                  # effective settings and their file
 noesis [--env-file <path>] config init --vault-dir <folder>    # create the env file (default ~/.config/noesis/.env)
 noesis integrate claude-code status --json             # hooks in the user settings file only
@@ -100,5 +114,5 @@ are not included. To inspect a project file, pass
 `integrate claude-code status --settings <repo>/.claude/settings.json`.
 
 Common error codes: `CORE_002_VAULT_NOT_CONFIGURED` (run `config init`),
-`CAPTURE_001_INVALID_SESSION_ID`, `KNOWLEDGE_201_CURATION_FAILED` (see `knowledge parked`),
+`CAPTURE_001_INVALID_SESSION_ID`, `KNOWLEDGE_201_CURATION_FAILED` (curation or storage failed; see `knowledge parked`),
 `INTEGRATION_101_AGENT_SETTINGS_INVALID` (the settings file is not valid JSON).

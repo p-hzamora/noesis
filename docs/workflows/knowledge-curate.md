@@ -10,11 +10,11 @@ sequenceDiagram
     participant Read as INoteReadRepository<br/>(filesystem keyword search, or Obsidian MCP<br/>with filesystem fallback)
     participant Cur as ICurator<br/>(ClaudeCliCuratorAdapter)
     participant Pol as AutoCurationPolicy (domain)
-    participant UoW as IKnowledgeUnitOfWork
+    participant UoW as IKnowledgeUnitOfWork<br/>(files, or Obsidian MCP: NOESIS_WRITER_BACKEND)
     participant Q as IParkedCurationQueue
 
     Cmd->>Cmd: load F as WorkBriefContract (else INVALID_WORK_BRIEF)
-    Cmd->>Boot: vault required, system prompt resolved
+    Cmd->>Boot: vault required only where files are used, system prompt resolved
     Cmd->>H: CurateWorkBriefCommand(brief, max_attempts=2, park=true)
     H->>Map: to_domain(contract)
     Map-->>H: WorkBrief (area, search_text, provenance)
@@ -29,13 +29,18 @@ sequenceDiagram
         H-->>Cmd: CurationFailedError (next step: knowledge retry ticket)
     else decisions
         loop each decision
-            H->>UoW: get existing auto note and manual note (always files)
+            H->>UoW: get existing auto note and manual note (from the writer's backend)
             H->>Pol: apply(decision, existing, commits, session)
             Pol-->>H: created / updated / skipped (manual note wins)
             H->>UoW: notes.save(note)
         end
-        H->>UoW: commit (all notes or none)
-        H-->>Cmd: CurationResultDto -> CurationResponse
+        H->>UoW: commit (MCP: validate all, send one by one, not atomic)
+        alt NoteStorageError (lookup or commit)
+            H->>Q: park(contract, error) -> ticket
+            H-->>Cmd: CurationFailedError KNOWLEDGE_201 (written / not_written, knowledge retry ticket)
+        else stored
+            H-->>Cmd: CurationResultDto -> CurationResponse
+        end
     end
 ```
 
