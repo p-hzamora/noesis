@@ -2,19 +2,30 @@
 # A disposable playground for noesis: its own vault, state, config and git repository.
 # Nothing here touches ~/.config/noesis, your real vault, or Claude Code's settings.
 #
-#   scripts/sandbox.sh init                 create .sandbox/ (idempotent)
+#   scripts/sandbox.sh init [--file PATH]   create the sandbox (idempotent); PATH = any new dir, git-initialized
 #   scripts/sandbox.sh hook [live|dry-run]  simulate a Claude Code session: commit + Stop hook
 #   scripts/sandbox.sh curate               run the real curator on docs/examples/work-brief.json
-#   scripts/sandbox.sh shell                print the env line to use noesis against the sandbox
-#   scripts/sandbox.sh clean                delete .sandbox/
+#   scripts/sandbox.sh shell [--file PATH]  print the env line to use noesis against the sandbox
+#   scripts/sandbox.sh clean [--file PATH]  delete the sandbox (only if it holds a noesis.env)
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SANDBOX="${SANDBOX:-$ROOT/.sandbox}"
+# --file PATH (any subcommand) points the sandbox at PATH instead of .sandbox/.
+if [ "${2:-}" = --file ]; then
+  P="${3:?--file needs a path}"
+  case "$P" in "~"|"~/"*) P="$HOME${P#\~}" ;; esac  # make's quoting stops the shell expanding ~
+  SANDBOX="$(realpath -m "$P")"
+fi
 ENV_FILE="$SANDBOX/noesis.env"
 noesis() { uv run --project "$ROOT" noesis --env-file "$ENV_FILE" "$@"; }
 
 init() {
+  # Refuse to take over a non-empty directory that is not already a sandbox.
+  if [ -d "$SANDBOX" ] && [ -n "$(ls -A "$SANDBOX")" ] && [ ! -f "$ENV_FILE" ]; then
+    echo "refusing: $SANDBOX is not empty and is not a sandbox (no noesis.env). Pick a new path." >&2
+    exit 1
+  fi
   mkdir -p "$SANDBOX/vault" "$SANDBOX/state"
   [ -f "$ENV_FILE" ] || cat > "$ENV_FILE" <<ENV
 NOESIS_VAULT_DIR=$SANDBOX/vault
@@ -25,7 +36,14 @@ NOESIS_CAPTURE_DEBOUNCE_SECONDS=0
 NOESIS_CURATOR_MODEL=haiku
 NOESIS_CURATOR_MAX_BUDGET_USD=0.2
 ENV
-  echo "sandbox: $SANDBOX (config: $ENV_FILE)"
+  if [ ! -d "$SANDBOX/.git" ]; then
+    git -C "$SANDBOX" init -q
+    printf 'vault/\nstate/\nnoesis.env\nrepo-*/\nrepo-*.jsonl\n' > "$SANDBOX/.gitignore"
+    printf '# noesis playground\n\nThrowaway repo for testing noesis by hand.\n' > "$SANDBOX/README.md"
+    git -C "$SANDBOX" add . && git -C "$SANDBOX" -c user.name=sandbox -c user.email=sandbox@example.com \
+      commit -qm "chore: init sandbox"
+  fi
+  echo "sandbox: $SANDBOX (config: $ENV_FILE, git: initialized)"
 }
 
 # One transcript line in Claude Code's JSONL format.
@@ -73,6 +91,11 @@ case "${1:-}" in
   hook) hook "${2:-dry-run}" ;;
   curate) init && noesis knowledge curate --brief-file "$ROOT/docs/examples/work-brief.json" ;;
   shell) init >/dev/null && echo "export NOESIS_ENV_FILE=$ENV_FILE" ;;
-  clean) rm -rf "$SANDBOX" && echo "removed $SANDBOX" ;;
+  clean)
+    if [ ! -f "$ENV_FILE" ]; then
+      echo "refusing: $SANDBOX has no noesis.env, so it is not a sandbox. Not deleting." >&2
+      exit 1
+    fi
+    rm -rf "$SANDBOX" && echo "removed $SANDBOX" ;;
   *) sed -n '2,10p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
 esac

@@ -50,8 +50,8 @@ uninstall: ## Remove the `noesis` command from your PATH
 	uv tool uninstall noesis
 
 ## --- playground (never touches your real config, vault, or Claude settings) --
-sandbox: ## Create .sandbox/ with its own vault, state and config
-	scripts/sandbox.sh init
+sandbox: ## Create the sandbox git repo (.sandbox/, or FILE=/new/path): make sandbox FILE=~/tmp/noesis-test
+	scripts/sandbox.sh init $(if $(FILE),--file "$(FILE)")
 
 sandbox-hook: ## Simulate a Claude Code commit + Stop hook: make sandbox-hook MODE=live|dry-run
 	scripts/sandbox.sh hook $(MODE)
@@ -59,8 +59,8 @@ sandbox-hook: ## Simulate a Claude Code commit + Stop hook: make sandbox-hook MO
 sandbox-curate: ## Run the real curator (haiku) on docs/examples/work-brief.json
 	scripts/sandbox.sh curate
 
-sandbox-env: ## Print the export line to point noesis at the sandbox
-	@scripts/sandbox.sh shell
+sandbox-env: ## Print the export line to point noesis at the sandbox (FILE=… as above)
+	@scripts/sandbox.sh shell $(if $(FILE),--file "$(FILE)")
 
-sandbox-clean: ## Delete .sandbox/
-	scripts/sandbox.sh clean
+sandbox-clean: ## Delete the sandbox (FILE=… as above; refuses non-sandbox dirs)
+	scripts/sandbox.sh clean $(if $(FILE),--file "$(FILE)")
