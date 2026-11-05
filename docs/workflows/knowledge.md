@@ -104,7 +104,7 @@ Without a vault there is no MCP-to-files search fallback: a search failure raise
 `INTEGRATION_102` unparked.
 
 **Doctor.** The `writer` check makes no MCP call on `filesystem` (writability is the `vault`
-check). On `mcp` it writes the hidden file `.noesis/doctor-probe.md` (same fixed content every
-run) and fails if the server is unreachable or refuses the write.
+check). On `mcp` it writes `noesis-doctor-probe.md` at the vault root, deletes it again, and fails if the
+server is unreachable or refuses the write or the delete.
 
 Back to [workflows](README.md).

@@ -2,7 +2,8 @@
 
 Speaks the real MCP protocol through the official SDK's `FastMCP`, with the three tools
 noesis uses (`search_simple`, `vault_read`, `vault_list`), shaped like the `obsidian` server's
-answers, plus `vault_write`, which writes into the folder and answers PLAIN TEXT (not JSON).
+answers, plus `vault_write`, which writes into the folder and answers PLAIN TEXT (not JSON), and
+`vault_delete`.
 A missing file or folder is a tool error (`isError`). Records every tool call and every
 `Authorization` header.
 """
@@ -137,6 +138,12 @@ class FakeObsidianMcp:
             target.write_text(content, encoding="utf-8")
             self.writes_done += 1
             return f"Wrote {path}"  # plain text on purpose: the real server does not answer JSON
+
+        @mcp.tool()
+        def vault_delete(path: str, permanent: bool = False) -> str:
+            self.calls.append(("vault_delete", {"path": path, "permanent": permanent}))
+            (self.vault / path).unlink()
+            return json.dumps({"message": "OK"})
 
         app: ASGIApp = mcp.streamable_http_app()
 

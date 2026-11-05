@@ -17,9 +17,9 @@ class IObsidianMcpProbe(abc.ABC):
 
     @abc.abstractmethod
     async def write_probe(self) -> None:
-        """Write the fixed hidden probe file `.noesis/doctor-probe.md` (idempotent).
+        """Write the probe file `noesis-doctor-probe.md` at the vault root, then delete it.
 
         Raises:
-            ObsidianMcpError: The server is unreachable or refuses the write.
+            ObsidianMcpError: The server is unreachable or refuses the write or the delete.
         """
         ...
