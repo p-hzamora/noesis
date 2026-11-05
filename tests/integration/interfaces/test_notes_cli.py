@@ -1,11 +1,11 @@
-"""`noesis knowledge` end to end, with a fake curator executable and a temporary vault."""
+"""`noesis notes` end to end, with a fake curator executable and a temporary vault."""
 
 import json
 from pathlib import Path
 
 import pytest
 from tests.support.fake_claude import TTL_DECISION, success_envelope, write_fake_claude
-from tests.support.knowledge_support import a_brief
+from tests.support.notes_support import a_brief
 
 from noesis.interfaces.cli import (
     run,
@@ -55,7 +55,7 @@ def test_curate_writes_auto_notes_then_search_and_list_find_them(
 ) -> None:
     _use_claude(tmp_path, monkeypatch, envelope=success_envelope([TTL_DECISION]))
 
-    assert run(["knowledge", "curate", "--brief-file", str(brief_file), "--json"]) == 0
+    assert run(["notes", "curate", "--brief-file", str(brief_file), "--json"]) == 0
     assert _out(capsys)["result"] == {
         "repository": "demo",
         "created": ["repos/demo/auto/decisions/use-ttl-cache.md"],
@@ -64,13 +64,13 @@ def test_curate_writes_auto_notes_then_search_and_list_find_them(
     }
     assert (vault / "repos/demo/auto/decisions/use-ttl-cache.md").is_file()
 
-    assert run(["knowledge", "search", "TTL cache", "--repo", "demo", "--json"]) == 0
+    assert run(["notes", "search", "TTL cache", "--repo", "demo", "--json"]) == 0
     assert [note["path"] for note in _out(capsys)["result"]["notes"]] == [  # type: ignore[index]
         "repos/demo/auto/decisions/use-ttl-cache.md"
     ]
-    assert run(["knowledge", "list", "--origin", "manual"]) == 0
+    assert run(["notes", "list", "--origin", "manual"]) == 0
     assert capsys.readouterr().out.strip() == "no notes"
-    assert run(["knowledge", "list"]) == 0
+    assert run(["notes", "list"]) == 0
     assert "[auto decision]  Use a TTL cache" in capsys.readouterr().out
 
 
@@ -86,7 +86,7 @@ def test_curate_sends_the_configured_system_prompt_file(
     monkeypatch.setenv("NOESIS_CURATOR_SYSTEM_PROMPT_FILE", str(prompt_file))
     _use_claude(tmp_path, monkeypatch, envelope=success_envelope([]))
 
-    assert run(["knowledge", "curate", "--brief-file", str(brief_file), "--json"]) == 0
+    assert run(["notes", "curate", "--brief-file", str(brief_file), "--json"]) == 0
 
     argv: list[str] = (tmp_path / "bin/argv.txt").read_text().split("\n")
     assert argv[argv.index("--system-prompt") + 1] == "Keep only architecture decisions."
@@ -107,7 +107,7 @@ def test_an_unusable_system_prompt_file_is_a_configuration_error(
     monkeypatch.setenv("NOESIS_CURATOR_SYSTEM_PROMPT_FILE", str(prompt_file))
     _use_claude(tmp_path, monkeypatch, envelope=success_envelope([]))
 
-    assert run(["knowledge", "curate", "--brief-file", str(brief_file), "--json"]) == 1
+    assert run(["notes", "curate", "--brief-file", str(brief_file), "--json"]) == 1
 
     error: JsonObject = _out(capsys)["error"]  # type: ignore[assignment]
     assert error["code"] == "CORE_005_CURATOR_PROMPT_UNREADABLE"
@@ -127,29 +127,29 @@ def test_failed_curation_is_parked_listed_and_retried(
 ) -> None:
     _use_claude(tmp_path, monkeypatch, raw="not json")
 
-    assert run(["knowledge", "curate", "--brief-file", str(brief_file)]) == 1
+    assert run(["notes", "curate", "--brief-file", str(brief_file)]) == 1
     err: str = capsys.readouterr().err
-    assert "KNOWLEDGE_201_CURATION_FAILED" in err
-    assert "noesis knowledge retry" in err
+    assert "NOTES_201_CURATION_FAILED" in err
+    assert "noesis notes retry" in err
 
-    assert run(["knowledge", "parked", "--json"]) == 0
+    assert run(["notes", "parked", "--json"]) == 0
     ticket: str = _out(capsys)["result"]["parked"][0]["ticket"]  # type: ignore[index]
 
     _use_claude(tmp_path, monkeypatch, envelope=success_envelope([TTL_DECISION]))
-    assert run(["knowledge", "retry", ticket]) == 0
+    assert run(["notes", "retry", ticket]) == 0
     assert "1 created" in capsys.readouterr().out
-    assert run(["knowledge", "parked"]) == 0
+    assert run(["notes", "parked"]) == 0
     assert capsys.readouterr().out.strip() == "nothing parked"
 
 
 def test_invalid_brief_and_missing_vault_are_reported(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    assert run(["knowledge", "list", "--json"]) == 1
+    assert run(["notes", "list", "--json"]) == 1
     assert _out(capsys)["error"]["code"] == "CORE_002_VAULT_NOT_CONFIGURED"  # type: ignore[index]
 
     monkeypatch.setenv("NOESIS_VAULT_DIR", str(tmp_path))
     bad: Path = tmp_path / "bad.json"
     bad.write_text('{"contract_version": 2}', encoding="utf-8")
-    assert run(["knowledge", "curate", "--brief-file", str(bad), "--json"]) == 2
+    assert run(["notes", "curate", "--brief-file", str(bad), "--json"]) == 2
     assert _out(capsys)["error"]["code"] == "INTERFACE_001_INVALID_WORK_BRIEF"  # type: ignore[index]

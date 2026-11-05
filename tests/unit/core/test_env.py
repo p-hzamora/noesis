@@ -24,7 +24,7 @@ def test_defaults_apply_when_no_file_and_no_variables(isolated_environment: Path
 
     assert environment.env_file == isolated_environment / ".config/noesis/.env"
     assert environment.runtime.state_dir == isolated_environment / ".local/state/noesis"
-    assert environment.knowledge.vault_dir is None
+    assert environment.notes.vault_dir is None
     assert (environment.capture.min_files, environment.capture.min_lines) == (2, 20)
     assert environment.curator.claude_bin == "claude"
 
@@ -35,7 +35,7 @@ def test_values_come_from_the_env_file_and_expand_the_home_folder(tmp_path: Path
 
     environment: Environment = load_environment(env_file)
 
-    assert environment.knowledge.vault_dir == Path.home() / "brain"
+    assert environment.notes.vault_dir == Path.home() / "brain"
     assert environment.capture.min_lines == 5
 
 
@@ -87,7 +87,7 @@ def test_the_env_example_template_documents_every_setting() -> None:
 def test_search_backend_defaults_to_the_filesystem_and_hides_the_token(
     tmp_path: Path, isolated_environment: Path
 ) -> None:
-    default = load_environment(tmp_path / "missing.env").knowledge
+    default = load_environment(tmp_path / "missing.env").notes
     assert default.search_backend.value == "filesystem"
     assert default.obsidian_mcp_url == "http://127.0.0.1:27123/mcp/"
     assert default.obsidian_mcp_token is None
@@ -96,7 +96,7 @@ def test_search_backend_defaults_to_the_filesystem_and_hides_the_token(
     env_file.write_text(
         "NOESIS_SEARCH_BACKEND=obsidian-mcp\nNOESIS_OBSIDIAN_MCP_TOKEN=abc123\n", encoding="utf-8"
     )
-    configured = load_environment(env_file).knowledge
+    configured = load_environment(env_file).notes
     assert configured.search_backend.value == "obsidian-mcp"
     assert configured.obsidian_mcp_token is not None
     assert configured.obsidian_mcp_token.get_secret_value() == "abc123"
@@ -114,12 +114,12 @@ def test_an_unknown_search_backend_is_rejected(tmp_path: Path) -> None:
 
 
 def test_writer_backend_defaults_to_the_filesystem_and_accepts_mcp(tmp_path: Path) -> None:
-    assert load_environment(tmp_path / "missing.env").knowledge.writer_backend.value == "filesystem"
+    assert load_environment(tmp_path / "missing.env").notes.writer_backend.value == "filesystem"
 
     env_file: Path = tmp_path / "noesis.env"
     env_file.write_text("NOESIS_WRITER_BACKEND=mcp\n", encoding="utf-8")
 
-    assert load_environment(env_file).knowledge.writer_backend.value == "mcp"
+    assert load_environment(env_file).notes.writer_backend.value == "mcp"
 
 
 def test_an_unknown_writer_backend_is_rejected(tmp_path: Path) -> None:

@@ -2,15 +2,15 @@
 
 import pytest
 from pydantic import ValidationError
-from tests.support.knowledge_support import (
+from tests.support.notes_support import (
     NOW,
     InMemoryNoteReadRepository,
     InMemoryParkedQueue,
     a_brief,
 )
 
-from noesis.bounded_context.knowledge.application.dtos import NoteSummaryDto
-from noesis.bounded_context.knowledge.application.handlers.queries import (
+from noesis.bounded_context.notes.application.dtos import NoteSummaryDto
+from noesis.bounded_context.notes.application.handlers.queries import (
     ListNotesHandler,
     ListNotesQuery,
     ListParkedCurationsHandler,
@@ -18,7 +18,7 @@ from noesis.bounded_context.knowledge.application.handlers.queries import (
     SearchNotesHandler,
     SearchNotesQuery,
 )
-from noesis.bounded_context.knowledge.domain.value_objects import NoteOriginEnum
+from noesis.bounded_context.notes.domain.value_objects import NoteOriginEnum
 
 pytestmark = pytest.mark.unit
 

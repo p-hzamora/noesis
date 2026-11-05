@@ -2,7 +2,7 @@
 
 import pytest
 
-from noesis.bounded_context.knowledge.domain.value_objects import (
+from noesis.bounded_context.notes.domain.value_objects import (
     NoteArea,
     NoteKindEnum,
     NoteLocation,

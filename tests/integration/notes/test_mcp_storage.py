@@ -5,17 +5,17 @@ from pathlib import Path
 import pytest
 import yaml
 from tests.support.fake_obsidian_mcp import FakeObsidianMcp, fake_obsidian_mcp, free_port
-from tests.support.knowledge_support import a_note
+from tests.support.notes_support import a_note
 
-from noesis.bounded_context.knowledge.domain.entities import Note
-from noesis.bounded_context.knowledge.domain.value_objects import NoteLocation
-from noesis.bounded_context.knowledge.infrastructure.outbound.storage import (
-    FilesystemKnowledgeUnitOfWorkAdapter,
+from noesis.bounded_context.notes.domain.entities import Note
+from noesis.bounded_context.notes.domain.value_objects import NoteLocation
+from noesis.bounded_context.notes.infrastructure.outbound.storage import (
     FilesystemNoteRepositoryAdapter,
-    McpKnowledgeUnitOfWorkAdapter,
+    FilesystemNotesUnitOfWorkAdapter,
     McpNoteRepositoryAdapter,
+    McpNotesUnitOfWorkAdapter,
 )
-from noesis.bounded_context.knowledge.infrastructure.outbound.storage.mappers import NoteMapper
+from noesis.bounded_context.notes.infrastructure.outbound.storage.mappers import NoteMapper
 from noesis.exceptions import NoteStorageError
 from noesis.shared_kernel.infrastructure.outbound.mcp import ObsidianMcpClient
 
@@ -31,11 +31,11 @@ def _notes() -> list[Note]:
 
 def _unit(
     url: str, mapper: NoteMapper | None = None
-) -> tuple[McpKnowledgeUnitOfWorkAdapter, McpNoteRepositoryAdapter]:
+) -> tuple[McpNotesUnitOfWorkAdapter, McpNoteRepositoryAdapter]:
     repository = McpNoteRepositoryAdapter(
         ObsidianMcpClient(url, timeout_seconds=2), mapper or NoteMapper()
     )
-    return McpKnowledgeUnitOfWorkAdapter(repository), repository
+    return McpNotesUnitOfWorkAdapter(repository), repository
 
 
 def _closed_url() -> str:
@@ -57,7 +57,7 @@ async def _commit(url: str, notes: list[Note], mapper: NoteMapper | None = None)
 async def test_commit_sends_the_same_markdown_the_filesystem_writer_stores(tmp_path: Path) -> None:
     mapper = NoteMapper()
     files: Path = tmp_path / "files"
-    unit = FilesystemKnowledgeUnitOfWorkAdapter(FilesystemNoteRepositoryAdapter(files, mapper))
+    unit = FilesystemNotesUnitOfWorkAdapter(FilesystemNoteRepositoryAdapter(files, mapper))
     async with unit as uow:
         for note in _notes():
             await uow.notes.save(note)
@@ -120,7 +120,7 @@ async def test_get_with_an_unreachable_server_raises_a_storage_error() -> None:
     with pytest.raises(NoteStorageError) as raised:
         await repository.get(NoteLocation.parse(FIRST))
 
-    assert raised.value.error_code == "KNOWLEDGE_102_NOTE_STORAGE_FAILED"
+    assert raised.value.error_code == "NOTES_102_NOTE_STORAGE_FAILED"
     assert raised.value.message.startswith(f"Cannot read {FIRST} through the Obsidian MCP:")
     assert raised.value.metadata == {"path": FIRST, "backend": "mcp"}
     assert any("NOESIS_OBSIDIAN_MCP_URL" in step for step in raised.value.next_steps)

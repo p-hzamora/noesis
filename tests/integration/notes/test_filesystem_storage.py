@@ -3,20 +3,20 @@
 from pathlib import Path
 
 import pytest
-from tests.support.knowledge_support import a_note
+from tests.support.notes_support import a_note
 
-from noesis.bounded_context.knowledge.domain.entities import Note
-from noesis.bounded_context.knowledge.domain.value_objects import (
+from noesis.bounded_context.notes.domain.entities import Note
+from noesis.bounded_context.notes.domain.value_objects import (
     NoteArea,
     NoteLocation,
     NoteOriginEnum,
 )
-from noesis.bounded_context.knowledge.infrastructure.outbound.storage import (
-    FilesystemKnowledgeUnitOfWorkAdapter,
+from noesis.bounded_context.notes.infrastructure.outbound.storage import (
     FilesystemNoteReadRepositoryAdapter,
     FilesystemNoteRepositoryAdapter,
+    FilesystemNotesUnitOfWorkAdapter,
 )
-from noesis.bounded_context.knowledge.infrastructure.outbound.storage.mappers import NoteMapper
+from noesis.bounded_context.notes.infrastructure.outbound.storage.mappers import NoteMapper
 
 pytestmark = pytest.mark.integration
 
@@ -45,7 +45,7 @@ async def test_committed_notes_are_written_as_markdown_and_read_back(
     note: Note = a_note()
     note.commits = ("8e6d3b5f",)
     note.session = "abcd1234"
-    unit = FilesystemKnowledgeUnitOfWorkAdapter(FilesystemNoteRepositoryAdapter(tmp_path, mapper))
+    unit = FilesystemNotesUnitOfWorkAdapter(FilesystemNoteRepositoryAdapter(tmp_path, mapper))
 
     async with unit as uow:
         await uow.notes.save(note)
@@ -70,7 +70,7 @@ async def test_committed_notes_are_written_as_markdown_and_read_back(
 
 
 async def test_leaving_without_commit_writes_nothing(tmp_path: Path, mapper: NoteMapper) -> None:
-    async with FilesystemKnowledgeUnitOfWorkAdapter(
+    async with FilesystemNotesUnitOfWorkAdapter(
         FilesystemNoteRepositoryAdapter(tmp_path, mapper)
     ) as uow:
         await uow.notes.save(a_note())
@@ -107,7 +107,7 @@ async def test_read_repository_lists_filters_and_ranks_notes(
     (tmp_path / ".obsidian").mkdir()
     (tmp_path / ".obsidian/decisions").mkdir()
     (tmp_path / ".obsidian/decisions/x.md").write_text("# hidden", encoding="utf-8")
-    unit = FilesystemKnowledgeUnitOfWorkAdapter(FilesystemNoteRepositoryAdapter(tmp_path, mapper))
+    unit = FilesystemNotesUnitOfWorkAdapter(FilesystemNoteRepositoryAdapter(tmp_path, mapper))
     async with unit as uow:
         await uow.notes.save(a_note())
         await uow.commit()

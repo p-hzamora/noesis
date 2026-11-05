@@ -3,9 +3,9 @@
 from pathlib import Path
 
 import pytest
-from tests.support.knowledge_support import NOW, a_brief
+from tests.support.notes_support import NOW, a_brief
 
-from noesis.bounded_context.knowledge.infrastructure.outbound.queue import (
+from noesis.bounded_context.notes.infrastructure.outbound.queue import (
     JsonFileParkedCurationQueueAdapter,
 )
 

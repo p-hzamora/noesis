@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 from tests.support.capture_support import START
-from tests.support.knowledge_support import FixedClock, a_brief
+from tests.support.notes_support import FixedClock, a_brief
 
 from noesis.bounded_context.capture.application.dtos import CaptureRunDto, TranscriptSnapshotDto
 from noesis.bounded_context.capture.domain.value_objects import CommitRecord, DiffSize, SessionId
@@ -155,7 +155,7 @@ async def test_live_publisher_detaches_the_curator_and_captures_its_output(
         await asyncio.sleep(0.02)
     result = json.loads(result_file.read_text())
     assert result["argv"] == [
-        "knowledge",
+        "notes",
         "curate",
         "--brief-file",
         publication.reference,

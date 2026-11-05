@@ -5,14 +5,14 @@ from pathlib import Path
 import pytest
 from tests.support.fake_obsidian_mcp import fake_obsidian_mcp, free_port
 
-from noesis.bounded_context.knowledge.application.dtos import NoteSummaryDto
-from noesis.bounded_context.knowledge.domain.value_objects import NoteArea
-from noesis.bounded_context.knowledge.infrastructure.outbound.storage import (
+from noesis.bounded_context.notes.application.dtos import NoteSummaryDto
+from noesis.bounded_context.notes.domain.value_objects import NoteArea
+from noesis.bounded_context.notes.infrastructure.outbound.storage import (
     FallbackNoteReadRepositoryAdapter,
     FilesystemNoteReadRepositoryAdapter,
     ObsidianMcpNoteReadRepositoryAdapter,
 )
-from noesis.bounded_context.knowledge.infrastructure.outbound.storage.mappers import NoteMapper
+from noesis.bounded_context.notes.infrastructure.outbound.storage.mappers import NoteMapper
 from noesis.exceptions import ObsidianMcpError
 from noesis.shared_kernel.infrastructure.outbound.mcp import ObsidianMcpClient
 

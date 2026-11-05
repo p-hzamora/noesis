@@ -1,8 +1,8 @@
-"""What a work brief means to Knowledge: its area, search text and provenance."""
+"""What a work brief means to Notes: its area, search text and provenance."""
 
 import pytest
 
-from noesis.bounded_context.knowledge.domain.value_objects import CommitRef, NoteArea, WorkBrief
+from noesis.bounded_context.notes.domain.value_objects import CommitRef, NoteArea, WorkBrief
 
 pytestmark = pytest.mark.unit
 

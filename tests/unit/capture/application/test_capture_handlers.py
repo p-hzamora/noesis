@@ -16,7 +16,7 @@ from tests.support.capture_support import (
     RecordingPublisher,
     a_commit,
 )
-from tests.support.knowledge_support import FixedClock
+from tests.support.notes_support import FixedClock
 
 from noesis.bounded_context.capture.application.dtos import (
     CaptureOutcomeEnum,

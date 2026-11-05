@@ -5,11 +5,11 @@ from pathlib import Path
 
 import pytest
 from tests.support.fake_claude import TTL_DECISION, success_envelope, write_fake_claude
-from tests.support.knowledge_support import a_brief
+from tests.support.notes_support import a_brief
 
-from noesis.bounded_context.knowledge.application.mappers import WorkBriefMapper
-from noesis.bounded_context.knowledge.domain.value_objects import CurationActionEnum, NoteKindEnum
-from noesis.bounded_context.knowledge.infrastructure.outbound.curation import (
+from noesis.bounded_context.notes.application.mappers import WorkBriefMapper
+from noesis.bounded_context.notes.domain.value_objects import CurationActionEnum, NoteKindEnum
+from noesis.bounded_context.notes.infrastructure.outbound.curation import (
     ClaudeCliCuratorAdapter,
     default_system_prompt,
 )
