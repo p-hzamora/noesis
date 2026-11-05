@@ -10,6 +10,7 @@ from noesis.core import (
     Environment,
     load_claude_code_settings,
     load_environment,
+    resolve_env_file,
 )
 
 
@@ -18,14 +19,15 @@ class CliState:
     """What the root callback parsed.
 
     Attributes:
-        env_file: Explicit configuration file, or None for the default location.
+        env_file: Explicit configuration file, or None to resolve it from the repository
+            (`.noesis-config`) or fall back to the default location.
     """
 
     env_file: Path | None = None
 
     def environment(self) -> Environment:
-        """Load the settings for this invocation."""
-        return load_environment(self.env_file)
+        """Load the settings for this invocation (explicit file, then repository profile)."""
+        return load_environment(resolve_env_file(self.env_file, Path.cwd()))
 
     def claude_code(self) -> ClaudeCodeSettings:
         """Claude Code's location settings (independent of the noesis configuration file)."""

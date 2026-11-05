@@ -17,8 +17,8 @@ EnvFileOption = Annotated[
     Path | None,
     typer.Option(
         "--env-file",
-        envvar="NOESIS_ENV_FILE",
-        help="Configuration file to read (default: ~/.config/noesis/.env).",
+        help="Explicit configuration file, overriding the repository profile (default: "
+        "`.noesis-config` profile, else ~/.config/noesis/.env).",
         dir_okay=False,
     ),
 ]

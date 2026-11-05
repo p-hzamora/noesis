@@ -12,9 +12,14 @@ def _xdg_dir(variable: str, fallback: str) -> Path:
     return Path(value) if value and Path(value).is_absolute() else Path.home() / fallback
 
 
+def default_config_dir() -> Path:
+    """`$XDG_CONFIG_HOME/noesis` (normally `~/.config/noesis`)."""
+    return _xdg_dir("XDG_CONFIG_HOME", ".config") / APP_DIR_NAME
+
+
 def default_env_file() -> Path:
     """`$XDG_CONFIG_HOME/noesis/.env` (normally `~/.config/noesis/.env`)."""
-    return _xdg_dir("XDG_CONFIG_HOME", ".config") / APP_DIR_NAME / ".env"
+    return default_config_dir() / ".env"
 
 
 def default_state_dir() -> Path:
