@@ -117,3 +117,32 @@ Behaviour change: a storage failure during `curate` now parks the brief and fail
 `KNOWLEDGE_201` (ticket and `knowledge retry` next step), including on the default filesystem
 backend, where it used to fail with `KNOWLEDGE_102` and lose the brief. `--no-park` keeps
 `KNOWLEDGE_102`. NFS stays the filesystem backend pointed at a mount; no separate backend.
+
+## Amendment 3: per-repository profiles (supersedes the cwd `.env` rule)
+
+Hooks and CLI calls ran with the default `~/.config/noesis/.env` unless the agent remembered
+`--env-file`, so a fresh session with another model could silently lose the configuration in
+use. The "a `.env` in the current directory is never read" rule above stays for `.env` files.
+It no longer blocks a repository from selecting a profile.
+
+Decisions:
+
+- R1 A repository selects its profile with `.noesis-config` at its root, one line:
+  `profile = <name>`. That is the only key allowed; any other line is an error.
+- R2 Profiles live outside the repository, in `~/.config/noesis/profiles/<repo>/<name>.env`,
+  one folder per repository (`<repo>` is the repository's folder name). Secrets and executable
+  or file-path settings (`NOESIS_CURATOR_CLAUDE_BIN`, `NOESIS_CURATOR_SYSTEM_PROMPT_FILE`,
+  `NOESIS_OBSIDIAN_MCP_TOKEN`) are only ever read from a user-side profile, so a cloned
+  repository cannot run a binary, read a file or send a token through its own files.
+- R3 The `.noesis-config` search starts at the working directory and stops at the first
+  directory that contains `.git`; a parent repository's file is never used.
+- R4 Precedence: `--env-file`, then the repository profile, then the default
+  `~/.config/noesis/.env`. Environment variables still override every file. The `NOESIS_ENV_FILE`
+  variable is removed: a shell-wide default would silently override every repository profile.
+- R5 A missing profile file is not an error (same as a missing `.env`); `config show` reports the
+  resolved `env_file`, so a wrong profile is visible.
+- R6 The resolution lives in `core/repo_config.py` and is called only by `CliState.environment()`;
+  the hook command keeps its explicit `--env-file` only when one was given at install time.
+
+Consequences: a repository's metadata can grow beside `profile` later, in the same
+`profiles/<repo>/` folder, without changing the repository file.
