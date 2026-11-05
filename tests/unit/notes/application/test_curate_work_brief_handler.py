@@ -16,6 +16,7 @@ from tests.support.notes_support import (
 
 from noesis.bounded_context.notes.application.dtos import CurationResultDto, NoteSummaryDto
 from noesis.bounded_context.notes.application.handlers.commands import (
+    ApplyCurationHandler,
     CurateWorkBriefCommand,
     CurateWorkBriefHandler,
     RetryParkedCurationCommand,
@@ -53,12 +54,13 @@ class _World:
             return self.units[-1]
 
         self.handler = CurateWorkBriefHandler(
-            uow_factory=unit_of_work,
+            apply=ApplyCurationHandler(
+                uow_factory=unit_of_work, clock=FixedClock(), policy=AutoCurationPolicy()
+            ),
             read_repository=self.read_repository,
             curator=curator,
             queue=self.queue,
             clock=FixedClock(),
-            policy=AutoCurationPolicy(),
             retry_delay_seconds=7.0,
             sleep=sleep,
         )
