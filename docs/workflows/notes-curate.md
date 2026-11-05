@@ -1,16 +1,16 @@
-# `knowledge curate --brief-file F`
+# `notes curate --brief-file F`
 
 ```mermaid
 sequenceDiagram
     autonumber
-    participant Cmd as knowledge curate
-    participant Boot as build_knowledge
+    participant Cmd as notes curate
+    participant Boot as build_notes
     participant H as CurateWorkBriefHandler
     participant Map as WorkBriefMapper
     participant Read as INoteReadRepository<br/>(filesystem keyword search, or Obsidian MCP<br/>with filesystem fallback)
     participant Cur as ICurator<br/>(ClaudeCliCuratorAdapter)
     participant Pol as AutoCurationPolicy (domain)
-    participant UoW as IKnowledgeUnitOfWork<br/>(files, or Obsidian MCP: NOESIS_WRITER_BACKEND)
+    participant UoW as INotesUnitOfWork<br/>(files, or Obsidian MCP: NOESIS_WRITER_BACKEND)
     participant Q as IParkedCurationQueue
 
     Cmd->>Cmd: load F as WorkBriefContract (else INVALID_WORK_BRIEF)
@@ -26,7 +26,7 @@ sequenceDiagram
     end
     alt every attempt failed
         H->>Q: park(contract, error) -> ticket
-        H-->>Cmd: CurationFailedError (next step: knowledge retry ticket)
+        H-->>Cmd: CurationFailedError (next step: notes retry ticket)
     else decisions
         loop each decision
             H->>UoW: get existing auto note and manual note (from the writer's backend)
@@ -37,7 +37,7 @@ sequenceDiagram
         H->>UoW: commit (MCP: validate all, send one by one, not atomic)
         alt NoteStorageError (lookup or commit)
             H->>Q: park(contract, error) -> ticket
-            H-->>Cmd: CurationFailedError KNOWLEDGE_201 (written / not_written, knowledge retry ticket)
+            H-->>Cmd: CurationFailedError NOTES_201 (written / not_written, notes retry ticket)
         else stored
             H-->>Cmd: CurationResultDto -> CurationResponse
         end

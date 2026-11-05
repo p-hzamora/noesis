@@ -41,7 +41,7 @@ noesis uses DDD, CQRS and hexagonal architecture. The layer rules are enforced b
 import-linter (`make imports`) and `tests/architecture/test_layers.py`, so a violation
 fails CI.
 
-- Bounded contexts (`capture`, `knowledge`) never import each other; they share only
+- Bounded contexts (`capture`, `notes`) never import each other; they share only
   `shared_kernel/contracts/`.
 - Dependencies point inward: infrastructure -> application -> domain.
 - Application code does no I/O. Ports live in `application/ports/`, adapters in

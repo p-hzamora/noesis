@@ -6,7 +6,7 @@ top to bottom once; afterwards use the checklist at the end when you design a co
 ## 1. What happens when you type a command
 
 ```text
-$ noesis knowledge search "ttl cache" --repo demo --json
+$ noesis notes search "ttl cache" --repo demo --json
   └─┬──┘ └───┬───┘ └─┬──┘ └────┬────┘ └────┬────┘ └─┬─┘
  program  command  sub-  argument      option     flag
           group   command (positional) (key value) (on/off)
@@ -49,7 +49,7 @@ Big tools group verbs under nouns, like `git remote add`. noesis does the same:
 
 ```text
 noesis capture   on | off | status | runs        (Capture context)
-noesis knowledge curate | retry | parked | search | list  (Knowledge context)
+noesis notes curate | retry | parked | search | list  (Notes context)
 noesis hook      claude-code                     (machine entry point for agent hooks)
 noesis config    show | init
 noesis doctor
@@ -82,7 +82,7 @@ noesis: `--env-file` / `--session` on the command line, then `NOESIS_*` variable
 
 
 Keeping results on stdout and everything else on stderr is what makes piping work:
-`noesis knowledge list --json | jq '.result.notes[].path'` stays clean even when warnings
+`noesis notes list --json | jq '.result.notes[].path'` stays clean even when warnings
 are printed.
 
 ## 6. Exit codes
@@ -135,7 +135,7 @@ Do not start a process for every test. noesis exposes `run(argv) -> exit code`
 pytest's `capsys`:
 
 ```python
-assert run(["knowledge", "list", "--json"]) == 1
+assert run(["notes", "list", "--json"]) == 1
 assert json.loads(capsys.readouterr().out)["error"]["code"] == "CORE_002_VAULT_NOT_CONFIGURED"
 ```
 

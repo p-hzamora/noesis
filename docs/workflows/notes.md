@@ -1,16 +1,16 @@
-# `knowledge retry | parked | search | list`
+# `notes retry | parked | search | list`
 
 ```mermaid
 flowchart LR
-    retry["knowledge retry TICKET"] --> rh[RetryParkedCurationHandler]
-    rh -->|get| q[("state/knowledge/parked/*.json")]
+    retry["notes retry TICKET"] --> rh[RetryParkedCurationHandler]
+    rh -->|get| q[("state/notes/parked/*.json")]
     rh -->|"curate once, never re-park"| ch[CurateWorkBriefHandler]
     rh -->|"discard on success"| q
 
-    parked["knowledge parked"] --> ph[ListParkedCurationsHandler] --> q
+    parked["notes parked"] --> ph[ListParkedCurationsHandler] --> q
 
-    search["knowledge search TEXT --repo R --limit N"] --> sh[SearchNotesHandler]
-    list["knowledge list --repo R --origin auto|manual"] --> lh[ListNotesHandler]
+    search["notes search TEXT --repo R --limit N"] --> sh[SearchNotesHandler]
+    list["notes list --repo R --origin auto|manual"] --> lh[ListNotesHandler]
     sh --> rr["INoteReadRepository<br/>(chosen by NOESIS_SEARCH_BACKEND)"]
     lh --> rr
     rr -->|"filesystem (default)"| fs[FilesystemNoteReadRepositoryAdapter]
@@ -54,7 +54,7 @@ network). With `obsidian-mcp`:
 
 ### Does `curate` use the MCP search?
 
-Yes. `CurateWorkBriefHandler` shares the read repository with `knowledge search`, so with
+Yes. `CurateWorkBriefHandler` shares the read repository with `notes search`, so with
 `obsidian-mcp` the curator's related notes (`RELATED_NOTES_LIMIT = 8`) come from Obsidian's
 index, which also covers manual notes and know-how folders. It is wrapped in the same
 fallback, so curation never fails because Obsidian is closed (the curator runs detached from
@@ -81,14 +81,14 @@ win on every backend). Search, `list` and the curator's related notes follow
 **Partial failure.** MCP `commit` renders and validates every note first; if one cannot be
 rendered nothing is sent. Notes are then sent one at a time. It is not atomic: if a send fails
 midway, the `NoteStorageError` metadata lists `written` and `not_written` paths ("not written"
-means "not confirmed"). The brief is parked and `knowledge retry <ticket>` overwrites every
+means "not confirmed"). The brief is parked and `notes retry <ticket>` overwrites every
 note; it re-runs the curator, so it is idempotent per path, not byte-identical. The filesystem
 writer is not all-or-nothing across files either.
 
 **Parking.** Any storage failure during `curate` (lookup or commit, any backend) parks the
-brief like a curator failure: `KNOWLEDGE_201`, exit 1, the ticket, the `written` / `not_written`
-metadata when present, and the next step `noesis knowledge retry <ticket>`. With `--no-park` the
-`NoteStorageError` (`KNOWLEDGE_102`) propagates. `retry` keeps the ticket when storage fails
+brief like a curator failure: `NOTES_201`, exit 1, the ticket, the `written` / `not_written`
+metadata when present, and the next step `noesis notes retry <ticket>`. With `--no-park` the
+`NoteStorageError` (`NOTES_102`) propagates. `retry` keeps the ticket when storage fails
 again. A failure of the related-notes search is not a storage failure.
 
 **Vault requirement.**
@@ -98,7 +98,7 @@ again. A failure of the related-notes search is not a storage failure.
 | `filesystem` | `filesystem` | yes (`CORE_002` otherwise) |
 | `filesystem` | `obsidian-mcp` | yes |
 | `mcp` | `filesystem` | yes |
-| `mcp` | `obsidian-mcp` | no for curate, retry, search, parked; `knowledge list` still fails with `CORE_002` |
+| `mcp` | `obsidian-mcp` | no for curate, retry, search, parked; `notes list` still fails with `CORE_002` |
 
 Without a vault there is no MCP-to-files search fallback: a search failure raises
 `INTEGRATION_102` unparked.

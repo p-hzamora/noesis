@@ -12,7 +12,7 @@ src/noesis/
                    IUnitOfWork, IClock, BaseDto, shared adapters, published contracts
   bounded_context/
     capture/       sessions, commits, gating, work briefs, agent hooks (see below)
-    knowledge/     notes, curation, storage (see below)
+    notes/         notes, curation, storage (see below)
   diagnostics/     host-level checks behind `noesis doctor` (not a bounded context, not kernel)
     application/     RunDiagnosticsHandler, CheckForUpdateHandler, assess_update (policy),
                      IEnvironmentProbe, ICheckoutInspector, DiagnosticReportDto, UpdateCheckDto
@@ -28,38 +28,38 @@ Rules (enforced by import-linter, see `pyproject.toml`):
 - `diagnostics` knows no bounded context and no settings: the composition root hands it plain
   values (paths, binary name, installed hook events).
 - The domain imports no delivery framework, no subprocess, no settings.
-- Bounded contexts never import each other; Capture hands Knowledge a versioned work-brief
+- Bounded contexts never import each other; Capture hands Notes a versioned work-brief
   contract across a process boundary.
 
 Output contract of the CLI: `emit()` prints either text or the JSON envelope; deliberate
 errors are `AppException`s with a stable `__error_code__`, an `__exit_code__`, and
 `next_steps`.
 
-## Knowledge context
+## Notes context
 
 ```text
 WorkBriefContract ──► CurateWorkBriefHandler
-                        ├─ WorkBriefMapper.to_domain(contract) -> WorkBrief      ACL into Knowledge's model
+                        ├─ WorkBriefMapper.to_domain(contract) -> WorkBrief      ACL into Notes's model
                         ├─ INoteReadRepository.search(brief.search_text())       related notes
                         ├─ ICurator.curate(brief, related)                       LLM judgment (retry once)
                         ├─ AutoCurationPolicy.apply(decision, existing notes)    domain rules
-                        └─ IKnowledgeUnitOfWork: notes.save(...) + commit        all or nothing
+                        └─ INotesUnitOfWork: notes.save(...) + commit        all or nothing
                       on repeated curator failure, or a storage failure (NoteStorageError):
-                        IParkedCurationQueue.park -> `noesis knowledge retry`
+                        IParkedCurationQueue.park -> `noesis notes retry`
 ```
 
 | Piece | Where | Notes |
 |---|---|---|
 | `Note` aggregate | `domain/entities/note.py` | Required sections per kind, canonical headings, `Not recorded` filler; manual notes cannot be revised by automation. |
-| `WorkBrief` | `domain/value_objects/work_brief.py`, `application/mappers/` | Knowledge's own copy of the brief, translated from the contract by `WorkBriefMapper`; owns the rules on it (area, search text, provenance). The contract stays data-only; the parked queue stores the contract so a retry re-enters through the command. |
+| `WorkBrief` | `domain/value_objects/work_brief.py`, `application/mappers/` | Notes's own copy of the brief, translated from the contract by `WorkBriefMapper`; owns the rules on it (area, search text, provenance). The contract stays data-only; the parked queue stores the contract so a retry re-enters through the command. |
 | `NoteLocation` | `domain/value_objects/` | Auto: `<area>/auto/<kind>s/<slug>.md`; manual: `<area>/<kind>s/<slug>.md`. |
 | `AutoCurationPolicy` | `domain/policies/` | Manual note on the same topic wins (`covered by <path>`); create/update both upsert the auto note. |
 | `ClaudeCliCuratorAdapter` | `infrastructure/outbound/curation/` | `claude -p --output-format json --json-schema` with no tools, no settings, no saved session, a budget cap; prompt on stdin; reads `structured_output`. The system prompt holds the admission rule; the adapter receives it as text from the composition root (`build_curator`), which reads `NOESIS_CURATOR_SYSTEM_PROMPT_FILE` or falls back to the packaged `prompts/curator_system.md` (`default_system_prompt()`). |
 | `curator_response_schema.py` | same folder | Anti-corruption layer: pydantic schema sent to the CLI, translated into domain decisions; malformed entries become reported skips. |
 | Filesystem adapters | `infrastructure/outbound/storage/` | Markdown + YAML frontmatter under `NOESIS_VAULT_DIR`; each file is written atomically, staged notes are written on commit (not all-or-nothing across files; a retry overwrites). Works for Obsidian vaults, plain folders and NFS (a mount). The default writer (`NOESIS_WRITER_BACKEND=filesystem`). |
-| MCP writer | `infrastructure/outbound/storage/` | `McpNoteRepositoryAdapter` + `McpKnowledgeUnitOfWorkAdapter` implement `INoteRepository` / `IKnowledgeUnitOfWork` over Obsidian's MCP server (`vault_read`, `vault_list`, `vault_write`) with the same `NoteMapper`, so the Markdown is byte-identical to the filesystem writer's. Stages on `save`, sends on `commit`. Selected by `NOESIS_WRITER_BACKEND=mcp` in `build_unit_of_work_factory`; reuses `NOESIS_OBSIDIAN_MCP_*`. See [Writer backend](#writer-backend). |
-| Obsidian MCP search | `infrastructure/outbound/storage/` | `ObsidianMcpNoteReadRepositoryAdapter` implements `INoteReadRepository` over the official `mcp` SDK (streamable HTTP, client in `shared_kernel/infrastructure/outbound/mcp/`); `FallbackNoteReadRepositoryAdapter` degrades to the filesystem adapter on `ObsidianMcpError`. Selected by `NOESIS_SEARCH_BACKEND` in `build_knowledge` (default `filesystem`: no MCP call). Read side only; the curate handler shares it (so related notes come from Obsidian too, with the same fallback); `list` always reads files, and writes follow `NOESIS_WRITER_BACKEND`, not the search backend. See [knowledge workflow](workflows/knowledge.md#search-backend). |
-| Parked queue | `infrastructure/outbound/queue/` | One JSON file per failed brief under `$NOESIS_STATE_DIR/knowledge/parked/`. A brief is parked when the curator keeps failing and when storing the notes fails (`NoteStorageError`); both surface as `KNOWLEDGE_201`. |
+| MCP writer | `infrastructure/outbound/storage/` | `McpNoteRepositoryAdapter` + `McpNotesUnitOfWorkAdapter` implement `INoteRepository` / `INotesUnitOfWork` over Obsidian's MCP server (`vault_read`, `vault_list`, `vault_write`) with the same `NoteMapper`, so the Markdown is byte-identical to the filesystem writer's. Stages on `save`, sends on `commit`. Selected by `NOESIS_WRITER_BACKEND=mcp` in `build_unit_of_work_factory`; reuses `NOESIS_OBSIDIAN_MCP_*`. See [Writer backend](#writer-backend). |
+| Obsidian MCP search | `infrastructure/outbound/storage/` | `ObsidianMcpNoteReadRepositoryAdapter` implements `INoteReadRepository` over the official `mcp` SDK (streamable HTTP, client in `shared_kernel/infrastructure/outbound/mcp/`); `FallbackNoteReadRepositoryAdapter` degrades to the filesystem adapter on `ObsidianMcpError`. Selected by `NOESIS_SEARCH_BACKEND` in `build_notes` (default `filesystem`: no MCP call). Read side only; the curate handler shares it (so related notes come from Obsidian too, with the same fallback); `list` always reads files, and writes follow `NOESIS_WRITER_BACKEND`, not the search backend. See [notes workflow](workflows/notes.md#search-backend). |
+| Parked queue | `infrastructure/outbound/queue/` | One JSON file per failed brief under `$NOESIS_STATE_DIR/notes/parked/`. A brief is parked when the curator keeps failing and when storing the notes fails (`NoteStorageError`); both surface as `NOTES_201`. |
 
 ### Writer backend
 
@@ -67,7 +67,7 @@ WorkBriefContract ──► CurateWorkBriefHandler
 Rules, recorded here and in ADR-0001 Amendment 2:
 
 - R1. The writer is chosen by a composition-root function (`build_unit_of_work_factory` in
-  `interfaces/cli/bootstrap/knowledge_handlers_builder.py`, `match` + `assert_never`) from
+  `interfaces/cli/bootstrap/notes_handlers_builder.py`, `match` + `assert_never`) from
   `NOESIS_WRITER_BACKEND`. There is no application-layer resolver.
 - R2. `uow.notes` reads from the backend it writes (the manual-wins lookup sees the same notes the
   writer stores). Search, `list` and the curator's related notes follow `NOESIS_SEARCH_BACKEND`.
@@ -77,10 +77,10 @@ Rules, recorded here and in ADR-0001 Amendment 2:
 - R4. Only `NoteStorageError` leaves a writer. MCP `commit` renders and validates every note
   first (nothing is sent if one fails), then sends them one at a time. It is not atomic across
   notes and is convergent on retry; the error lists the `written` and `not_written` paths.
-- R5. A storage failure parks the brief and fails with `KNOWLEDGE_201`; `--no-park` keeps
-  `KNOWLEDGE_102`. `knowledge retry` keeps the ticket when storage fails again.
+- R5. A storage failure parks the brief and fails with `NOTES_201`; `--no-park` keeps
+  `NOTES_102`. `notes retry` keeps the ticket when storage fails again.
 - R6. A vault is required only where files are used (`needs_vault`: writer or search is
-  `filesystem`). `knowledge list` always needs it; without a vault there is no MCP-to-files
+  `filesystem`). `notes list` always needs it; without a vault there is no MCP-to-files
   search fallback.
 - R7. Search and writer share `NOESIS_OBSIDIAN_MCP_*` and one client builder
   (`build_obsidian_mcp_client`), the only place that unwraps the token.
@@ -88,7 +88,7 @@ Rules, recorded here and in ADR-0001 Amendment 2:
   `storage/mappers/`; every writer and reader uses it.
 - R9. The `doctor` writer probe writes `noesis-doctor-probe.md` at the vault root, then deletes it.
 
-Tuning the curator: read the `skipped` list of `noesis knowledge curate --json`, copy
+Tuning the curator: read the `skipped` list of `noesis notes curate --json`, copy
 `prompts/curator_system.md` to a file of your own, edit it, and point
 `NOESIS_CURATOR_SYSTEM_PROMPT_FILE` at it (an installed package is overwritten on upgrade).
 An unreadable or empty file fails with `CORE_005_CURATOR_PROMPT_UNREADABLE`. Storage and
@@ -104,7 +104,7 @@ Claude Code hook JSON ─► infrastructure/inbound/claude_code (ACL: payload ->
 FlushCaptureHandler, cheapest check first:
    opted in? ─ pending? ─ outside debounce? ─ significant (summed)? ─ transcript has real work?
    └─► WorkBriefContract ─► IWorkBriefPublisherFactory.for_mode(session.mode)
-          live:    DetachedProcess…Adapter  -> `python -m noesis knowledge curate --brief-file … --json`
+          live:    DetachedProcess…Adapter  -> `python -m noesis notes curate --brief-file … --json`
           dry-run: DryRun…Adapter           -> brief file only
 ```
 
@@ -119,7 +119,7 @@ FlushCaptureHandler, cheapest check first:
 | Hook ACL | `infrastructure/inbound/claude_code/` | `ClaudeCodeHookPayload` (tolerant model of the hook JSON) and `route()`, which returns a `RecordCommitCommand` or `FlushCaptureCommand`, or None for irrelevant events. |
 | Agent hook registry | `application/ports/agent_hooks/`, `infrastructure/outbound/agent_hooks/` | `IAgentHookRegistry` (`status`, `plan`, `apply`) and `ClaudeCodeSettingsAdapter`; see the next section. |
 
-Capture and Knowledge never import each other (import-linter "independence" contract);
+Capture and Notes never import each other (import-linter "independence" contract);
 the work-brief contract in `shared_kernel/contracts/` is their only shared language.
 
 ## Integration with agents
