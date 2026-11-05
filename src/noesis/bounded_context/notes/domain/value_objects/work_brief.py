@@ -1,4 +1,4 @@
-"""The finished work Notes curates, in Notes's own terms.
+"""The finished work Notes curates, in Notes' own terms.
 
 Capture publishes it as `WorkBriefContract`; Notes translates that contract into this
 value object at its edge, so the rules about what a brief means here live with Notes

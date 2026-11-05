@@ -1,11 +1,11 @@
-"""Mapper from the published work-brief contract to Notes's own model."""
+"""Mapper from the published work-brief contract to Notes' own model."""
 
 from noesis.bounded_context.notes.domain.value_objects import CommitRef, WorkBrief
 from noesis.shared_kernel.contracts import WorkBriefContract
 
 
 class WorkBriefMapper:
-    """`to_domain` is Notes's anti-corruption layer for the work brief.
+    """`to_domain` is Notes' anti-corruption layer for the work brief.
 
     Fields are copied one by one on purpose: a new contract version must be translated here
     explicitly, never leak into the domain unnoticed.

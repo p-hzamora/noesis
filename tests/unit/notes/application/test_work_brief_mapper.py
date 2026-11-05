@@ -1,4 +1,4 @@
-"""Translating the published work-brief contract into Notes's model."""
+"""Translating the published work-brief contract into Notes' model."""
 
 import pytest
 from tests.support.notes_support import a_brief
