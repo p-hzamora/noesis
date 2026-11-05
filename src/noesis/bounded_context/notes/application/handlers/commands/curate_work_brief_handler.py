@@ -79,7 +79,7 @@ class CurateWorkBriefHandler(IHandler[CurateWorkBriefCommand, CurationResultDto]
             brief.search_text(), area=brief.area, limit=RELATED_NOTES_LIMIT
         )
         related: list[NoteSummaryDto] = list(found.notes)
-        decisions: tuple[CurationDecision, ...] = await self._curate(action, brief, related)
+        decisions: tuple[CurationDecision, ...] = await self._judge(action, brief, related)
         try:
             return await self._apply.handle(
                 ApplyCurationCommand(
@@ -104,7 +104,7 @@ class CurateWorkBriefHandler(IHandler[CurateWorkBriefCommand, CurationResultDto]
                 ],
             ) from error
 
-    async def _curate(
+    async def _judge(
         self, action: CurateWorkBriefCommand, brief: WorkBrief, related: list[NoteSummaryDto]
     ) -> tuple[CurationDecision, ...]:
         """Run the curator, retrying after a pause; park and raise when it keeps failing.
@@ -115,7 +115,7 @@ class CurateWorkBriefHandler(IHandler[CurateWorkBriefCommand, CurationResultDto]
         last_error: CuratorFailedError | None = None
         for attempt in range(1, action.max_attempts + 1):
             try:
-                return await self._curator.curate(brief, related)
+                return await self._curator.judge(brief, related)
             except CuratorFailedError as error:
                 last_error = error
                 if attempt < action.max_attempts:

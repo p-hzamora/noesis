@@ -95,7 +95,7 @@ class ClaudeCliCuratorAdapter(ICurator):
         ]  # fmt: skip
         return [*arguments, "--model", self._model] if self._model else arguments
 
-    async def curate(
+    async def judge(
         self, brief: WorkBrief, related: Sequence[NoteSummaryDto]
     ) -> tuple[CurationDecision, ...]:
         """Run the curator once.
