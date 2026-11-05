@@ -6,11 +6,13 @@ from types import TracebackType
 from typing import Self
 
 from noesis.bounded_context.notes.application.dtos import (
+    ApplyFailureRecordDto,
     NoteSearchResultDto,
     NoteSummaryDto,
     ParkedCurationDto,
 )
 from noesis.bounded_context.notes.application.ports.curation import ICurator
+from noesis.bounded_context.notes.application.ports.failures import IApplyFailureLog
 from noesis.bounded_context.notes.application.ports.queue import IParkedCurationQueue
 from noesis.bounded_context.notes.application.ports.read_repositories import INoteReadRepository
 from noesis.bounded_context.notes.application.ports.uow import INotesUnitOfWork
@@ -183,6 +185,43 @@ class InMemoryParkedQueue(IParkedCurationQueue):
 
     async def discard(self, ticket: str) -> None:
         self.parked.pop(ticket, None)
+
+
+class InMemoryApplyFailureLog(IApplyFailureLog):
+    """Failed-apply records in a list; `fail_with` scripts a record that cannot be written."""
+
+    def __init__(self, fail_with: NoteStorageError | None = None) -> None:
+        self.records: list[dict[str, object]] = []
+        self.fail_with: NoteStorageError | None = fail_with
+
+    async def record(
+        self,
+        *,
+        raw_payload: str,
+        area: NoteArea,
+        commits: tuple[str, ...],
+        session: str | None,
+        errors: Sequence[str],
+        now: datetime,
+    ) -> ApplyFailureRecordDto:
+        if self.fail_with is not None:
+            raise self.fail_with
+        self.records.append(
+            {
+                "raw_payload": raw_payload,
+                "area": area.value,
+                "commits": commits,
+                "session": session,
+                "errors": list(errors),
+            }
+        )
+        ticket: str = f"apply-{len(self.records)}"
+        folder: str = "/state/notes/apply-failed"
+        return ApplyFailureRecordDto(
+            ticket=ticket,
+            path=f"{folder}/{ticket}.json",
+            payload_path=f"{folder}/{ticket}.payload.json",
+        )
 
 
 def a_brief(repository: str = "demo", session_id: str = "abcd1234ef") -> WorkBriefContract:
