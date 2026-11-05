@@ -6,7 +6,7 @@ from noesis.shared_kernel.infrastructure.outbound.mcp import ObsidianMcpClient
 
 def build_obsidian_mcp_client(environment: Environment) -> ObsidianMcpClient:
     """The client for `NOESIS_OBSIDIAN_MCP_*`, shared by search, the writer and doctor."""
-    settings = environment.knowledge
+    settings = environment.notes
     token = settings.obsidian_mcp_token
     return ObsidianMcpClient(
         settings.obsidian_mcp_url,

@@ -11,7 +11,7 @@ from .brief_files import BriefFiles
 
 
 class DryRunWorkBriefPublisherAdapter(IWorkBriefPublisher):
-    """Writes the brief file only; `noesis knowledge curate --brief-file` can replay it later."""
+    """Writes the brief file only; `noesis notes curate --brief-file` can replay it later."""
 
     def __init__(self, *, files: BriefFiles, clock: IClock) -> None:
         self._files: BriefFiles = files

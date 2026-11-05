@@ -24,7 +24,7 @@ from .integration_errors import (
     SkillGuideNotFoundError,
 )
 from .interface_errors import InvalidWorkBriefError
-from .knowledge_errors import (
+from .notes_errors import (
     CurationFailedError,
     CuratorFailedError,
     InvalidNoteAreaError,

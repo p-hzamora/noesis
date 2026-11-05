@@ -29,7 +29,7 @@ def _view(environment: Environment) -> ConfigShowResponse:
         env_file_exists=environment.env_file.is_file(),
         settings={
             "runtime": environment.runtime.model_dump(mode="json"),
-            "knowledge": environment.knowledge.model_dump(mode="json"),
+            "notes": environment.notes.model_dump(mode="json"),
             "capture": environment.capture.model_dump(mode="json"),
             "curator": environment.curator.model_dump(mode="json"),
         },

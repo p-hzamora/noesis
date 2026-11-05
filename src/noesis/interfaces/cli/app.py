@@ -29,7 +29,7 @@ app: typer.Typer = typer.Typer(
     pretty_exceptions_enable=False,
 )
 app.add_typer(commands.capture_app, name="capture")
-app.add_typer(commands.knowledge_app, name="knowledge")
+app.add_typer(commands.notes_app, name="notes")
 app.add_typer(commands.hook_app, name="hook")
 app.add_typer(commands.integrate_app, name="integrate")
 app.add_typer(commands.skills_app, name="skills")

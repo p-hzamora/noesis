@@ -22,7 +22,7 @@ from noesis.exceptions import AgentSettingsInvalidError
 from noesis.shared_kernel.enums import SearchEngineEnum, WriterBackendEnum
 
 from .agent_hooks_handlers_builder import build_agent_hooks
-from .knowledge_handlers_builder import needs_vault
+from .notes_handlers_builder import needs_vault
 from .obsidian_mcp_client_builder import build_obsidian_mcp_client
 
 UPDATE_CHECK_TIMEOUT_SECONDS: float = (
@@ -68,12 +68,12 @@ def build_diagnostics(environment: Environment | None = None) -> RunDiagnosticsH
 
 def uses_obsidian_mcp(environment: Environment) -> bool:
     """Whether notes are searched through Obsidian's MCP server."""
-    return environment.knowledge.search_backend is SearchEngineEnum.OBSIDIAN_MCP
+    return environment.notes.search_backend is SearchEngineEnum.OBSIDIAN_MCP
 
 
 def uses_mcp_writer(environment: Environment) -> bool:
     """Whether notes are written through Obsidian's MCP server."""
-    return environment.knowledge.writer_backend is WriterBackendEnum.MCP
+    return environment.notes.writer_backend is WriterBackendEnum.MCP
 
 
 async def run_diagnostics(
@@ -103,17 +103,15 @@ async def run_diagnostics(
         installed_events = None
     query = RunDiagnosticsQuery(
         env_file=environment.env_file,
-        vault_dir=environment.knowledge.vault_dir,
+        vault_dir=environment.notes.vault_dir,
         state_dir=environment.runtime.state_dir,
         curator_binary=environment.curator.claude_bin,
         hooks_settings_file=settings_file,
         installed_hook_events=installed_events,
-        obsidian_mcp_url=environment.knowledge.obsidian_mcp_url
+        obsidian_mcp_url=environment.notes.obsidian_mcp_url
         if uses_obsidian_mcp(environment)
         else None,
-        writer_mcp_url=environment.knowledge.obsidian_mcp_url
-        if uses_mcp_writer(environment)
-        else None,
+        writer_mcp_url=environment.notes.obsidian_mcp_url if uses_mcp_writer(environment) else None,
         vault_required=needs_vault(environment),
         update_package_dir=installed_package_dir(),
     )

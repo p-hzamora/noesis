@@ -23,7 +23,7 @@ from .configurations import (
     CaptureSettings,
     ClaudeCodeSettings,
     CuratorSettings,
-    KnowledgeSettings,
+    NotesSettings,
     RuntimeSettings,
     default_env_file,
     default_state_dir,
@@ -37,14 +37,14 @@ class Environment:
     Attributes:
         env_file: The `.env` file that was read (it may not exist).
         runtime: State folder and logging.
-        knowledge: Where notes are stored.
+        notes: Where notes are stored.
         capture: Capture thresholds.
         curator: Curator run settings.
     """
 
     env_file: Path
     runtime: RuntimeSettings
-    knowledge: KnowledgeSettings
+    notes: NotesSettings
     capture: CaptureSettings
     curator: CuratorSettings
 
@@ -66,17 +66,17 @@ def load_environment(env_file: Path | None = None) -> Environment:
     path: Path = (env_file or default_env_file()).expanduser()
     problems: list[JsonValue] = []
     runtime: RuntimeSettings | None = _load(RuntimeSettings, path, problems)
-    knowledge: KnowledgeSettings | None = _load(KnowledgeSettings, path, problems)
+    notes: NotesSettings | None = _load(NotesSettings, path, problems)
     capture: CaptureSettings | None = _load(CaptureSettings, path, problems)
     curator: CuratorSettings | None = _load(CuratorSettings, path, problems)
-    if runtime is None or knowledge is None or capture is None or curator is None:
+    if runtime is None or notes is None or capture is None or curator is None:
         raise InvalidConfigurationError(
             f"Invalid configuration in {path} or the environment.",
             {"env_file": str(path), "problems": problems},
             next_steps=[f"Fix the variables listed in 'problems' (in {path} or the environment)."],
         )
     return Environment(
-        env_file=path, runtime=runtime, knowledge=knowledge, capture=capture, curator=curator
+        env_file=path, runtime=runtime, notes=notes, capture=capture, curator=curator
     )
 
 

@@ -1,4 +1,4 @@
-"""Live publisher: starts `noesis knowledge curate` as a detached process and returns at once.
+"""Live publisher: starts `noesis notes curate` as a detached process and returns at once.
 
 The hook must never wait for a model run. The child lives in its own process session,
 writes its JSON result next to the brief, and is not killed when the hook exits.
@@ -21,7 +21,7 @@ RECURSION_GUARD: Mapping[str, str] = {"NOESIS_HOOK": "1"}
 
 
 class DetachedProcessWorkBriefPublisherAdapter(IWorkBriefPublisher):
-    """Writes the brief file, then spawns `<command> knowledge curate --brief-file <file> --json`."""
+    """Writes the brief file, then spawns `<command> notes curate --brief-file <file> --json`."""
 
     def __init__(
         self,
@@ -41,7 +41,7 @@ class DetachedProcessWorkBriefPublisherAdapter(IWorkBriefPublisher):
         try:
             brief_file: Path = self._files.write(brief, now=self._clock.now())
             _spawn_detached(
-                [*self._command, "knowledge", "curate", "--brief-file", str(brief_file), "--json"],
+                [*self._command, "notes", "curate", "--brief-file", str(brief_file), "--json"],
                 environment={**self._environment, **RECURSION_GUARD},
                 stdout=BriefFiles.result_of(brief_file),
                 stderr=BriefFiles.log_of(brief_file),

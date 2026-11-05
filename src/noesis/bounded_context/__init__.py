@@ -1,1 +1,1 @@
-"""Bounded contexts: Capture (agent sessions) and Knowledge (notes and curation)."""
+"""Bounded contexts: Capture (agent sessions) and Notes (notes and curation)."""

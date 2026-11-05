@@ -1,6 +1,6 @@
-"""Work brief: what Capture hands to Knowledge about one unit of finished work.
+"""Work brief: what Capture hands to Notes about one unit of finished work.
 
-It crosses a process boundary as JSON (`noesis knowledge curate --brief-file`), so it is
+It crosses a process boundary as JSON (`noesis notes curate --brief-file`), so it is
 versioned. It deliberately carries no diff: only commit subjects, a capped diff stat, the
 session goal, and an excerpt of the conversation.
 """

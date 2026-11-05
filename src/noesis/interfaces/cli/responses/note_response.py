@@ -1,4 +1,4 @@
-"""`noesis knowledge list|search` output."""
+"""`noesis notes list|search` output."""
 
 from noesis.shared_kernel.enums import SearchEngineEnum
 from noesis.utils import FrozenObject
@@ -7,7 +7,7 @@ from .i_renderable_response import IRenderableResponse
 
 
 class NoteResponse(FrozenObject):
-    """A note as listed by `noesis knowledge list|search`.
+    """A note as listed by `noesis notes list|search`.
 
     Attributes:
         path: Vault-relative path.
@@ -27,7 +27,7 @@ class NoteResponse(FrozenObject):
 
 
 class NoteListResponse(IRenderableResponse):
-    """`noesis knowledge list|search`: notes, best match first for searches.
+    """`noesis notes list|search`: notes, best match first for searches.
 
     Attributes:
         notes: The notes.
@@ -45,7 +45,7 @@ class NoteListResponse(IRenderableResponse):
 
 
 class NoteSearchResponse(NoteListResponse):
-    """`noesis knowledge search`: notes plus the backend that actually answered.
+    """`noesis notes search`: notes plus the backend that actually answered.
 
     Attributes:
         backend: The implemented backend that produced `notes`, which is
@@ -59,7 +59,7 @@ class NoteSearchResponse(NoteListResponse):
 
 
 class NoteSearchFallbackResponse(NoteSearchResponse):
-    """`noesis knowledge search` when Obsidian could not answer and files were searched instead.
+    """`noesis notes search` when Obsidian could not answer and files were searched instead.
 
     Only this variant carries `notice`.
 
