@@ -19,21 +19,21 @@ installed noesis version. Use `noesis <command> --help` for anything not covered
 ## Which env file
 
 The env file decides the state dir (where capture flags and the journal live), the vault
-and the capture thresholds. The Claude Code hooks read only the env file in their own
-command. If you run `capture on` against a different env file, the flag goes into a state
-dir the hooks never read. The commit is then ignored, and no error is shown.
+and the capture thresholds. noesis picks it from the repository, so no flag is needed:
 
-1. Look in `<repo>/.claude/settings.json` and `<repo>/.claude/settings.local.json` for a
-   hook command that runs `noesis` with `--env-file <path>`, for example
-   `/home/me/.local/bin/noesis --env-file /home/me/lab/noesis.env hook claude-code`.
-   Remove any shell quotes from the path. Resolve a relative path against the repo root.
-2. If you find one, pass that same `--env-file <path>` on every noesis command in this
-   session: `capture`, `knowledge`, `config show` and `doctor`. It is a global flag, so it
-   goes before the subcommand: `noesis --env-file <path> capture on …`, never after.
-3. If you find none, leave the flag out. noesis then uses its default env file
-   (`~/.config/noesis/.env`, or `$NOESIS_ENV_FILE`). Tell the user the default is in use.
+1. Look for `<repo>/.noesis-config` (the nearest one, up to the git root). It holds one line,
+   `profile = <name>`. The profile file is
+   `~/.config/noesis/profiles/<repo folder name>/<name>.env`.
+2. If it exists, run noesis from inside that repo and do not pass any env flag. Every
+   command, the Claude Code hooks included, then reads the same profile.
+3. If there is no `.noesis-config`, noesis uses `~/.config/noesis/.env`. Tell the user the
+   default is in use.
+4. Pass `--env-file <path>` only when the user asks for a specific file. It is a global flag,
+   so it goes before the subcommand: `noesis --env-file <path> capture on …`. It overrides
+   the repository profile.
 
-In the examples below, `[--env-file <path>]` means: include the flag when step 2 applies.
+`NOESIS_ENV_FILE` no longer exists; do not set it. In the examples below, every command runs
+from the repository, so no flag appears.
 
 ## Capture this session's work
 

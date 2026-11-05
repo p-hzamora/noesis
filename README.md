@@ -39,8 +39,10 @@ hooks from then on; `noesis capture runs --session <id>` shows what happened.
 
 ## Configuration
 
-Settings come from `~/.config/noesis/.env` (override with `--env-file` or
-`NOESIS_ENV_FILE`) and from `NOESIS_*` environment variables, which win over the file.
+Settings come from a repository profile when the repo has a `.noesis-config`
+(`profile = <name>`, file in `~/.config/noesis/profiles/<repo>/<name>.env`), otherwise from
+`~/.config/noesis/.env`. `--env-file` overrides both. `NOESIS_*` environment variables win over
+the file.
 `noesis config show` prints the effective values; the generated file documents every key.
 
 ## Command line

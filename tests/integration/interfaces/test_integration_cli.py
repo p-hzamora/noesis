@@ -142,7 +142,7 @@ def test_the_installable_skill_stub_defers_to_the_cli_guide() -> None:
     assert stub.startswith("---\nname: noesis\ndescription: ")
     assert "noesis skills get noesis" in stub
     assert "${CLAUDE_SESSION_ID}" in stub
-    assert ".claude/settings.local.json" in stub
+    assert ".noesis-config" in stub
     assert "noesis --env-file <path> capture on" in stub
 
 

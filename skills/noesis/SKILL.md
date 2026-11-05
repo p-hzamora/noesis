@@ -14,20 +14,20 @@ Run `noesis --version`. If it fails with "command not found", tell the user noes
 installed (`uv tool install <path-or-url-of-the-noesis-repo>`) and stop. Do not try other
 executables and do not guess commands.
 
-## 2. Find the env file the repo's hooks use
+## 2. Check which config the repo selects
 
-A repo can pin its own noesis config. The env file sets the state dir, the vault and the
-capture thresholds. The hooks read only their own env file. If `capture on` uses a
-different one, commits are ignored and no error is shown.
+noesis picks its config from the repo itself. The env file sets the state dir, the vault and
+the capture thresholds. The hooks use the same lookup, so no flag is needed.
 
-1. Read `<repo>/.claude/settings.json` and `<repo>/.claude/settings.local.json`, if they
-   exist. Look for a hook command that contains `noesis` and `--env-file <path>`.
-   Remove any shell quotes from the path.
-2. If you find one, pass that same `--env-file <path>` on every noesis command in this
-   session. It is a global flag, so it goes before the subcommand:
-   `noesis --env-file <path> capture on …`. This covers `capture on|off|status|runs`,
-   `knowledge search|list|parked|retry`, `config show` and `doctor`.
-3. If you find none, leave the flag out and tell the user the default env file is in use.
+1. Look for `<repo>/.noesis-config` (or the nearest one up to the git root). It holds
+   `profile = <name>`, and the profile file is
+   `~/.config/noesis/profiles/<repo folder name>/<name>.env`.
+2. If it exists, run noesis from inside the repo with no env flag.
+3. If it does not exist, noesis uses `~/.config/noesis/.env`. Tell the user the default is
+   in use.
+4. Pass `--env-file <path>` only when the user asks for a specific file. It is a global
+   flag, so it goes before the subcommand: `noesis --env-file <path> capture on …`.
+   `NOESIS_ENV_FILE` no longer exists; do not set it.
 
 ## 3. Load the version-matched guide before running any other noesis command
 
@@ -41,7 +41,7 @@ cover. If `skills get` is unknown, the installed noesis is too old: say so and u
 
 ## 4. After `capture on`, verify
 
-Run `capture status` with the same `--env-file` (or none, if you used none). Check that
+Run `capture status` from the same repo, with the same `--env-file` (or none). Check that
 `enabled` is `true`. Then tell the user which env file, state dir and vault were used.
 If `enabled` is not `true`, say that capture is not on. Do not report success.
 
