@@ -101,9 +101,10 @@ vault folder is only required where files are used (not with writer `mcp` + sear
 ## Setup and diagnosis
 
 ```bash
-noesis [--env-file <path>] doctor --json                       # vault, state dir, git, curator CLI, hooks, writer, search backend
+noesis [--env-file <path>] doctor --json                       # vault, state dir, git, curator CLI, hooks, writer, search backend, update (warn only)
 noesis [--env-file <path>] config show --json                  # effective settings and their file
 noesis [--env-file <path>] config init --vault-dir <folder>    # create the env file (default ~/.config/noesis/.env)
+noesis update check --json                             # behind / ahead / diverged / up_to_date / unknown vs origin; exit 0 always
 noesis integrate claude-code status --json             # hooks in the user settings file only
 noesis integrate claude-code install                   # preview; add --yes to write
 ```

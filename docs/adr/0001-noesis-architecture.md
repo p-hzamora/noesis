@@ -146,3 +146,43 @@ Decisions:
 
 Consequences: a repository's metadata can grow beside `profile` later, in the same
 `profiles/<repo>/` folder, without changing the repository file.
+
+## Amendment 4 (2026-11-05): update check
+
+A noesis installed with `uv tool install` from a checkout silently falls behind its origin. The
+user needs a way to see that, and `doctor` is where they already look.
+
+Decisions:
+
+- R1 No new context. The check lives in `noesis/diagnostics/` (Amendment 1): it reads the host,
+  not notes or sessions. `CheckForUpdateHandler` and the pure `assess_update` policy are
+  application code; the verdict is `UpdateVerdictEnum` (`up_to_date`, `behind`, `ahead`,
+  `diverged`, `unknown`).
+- R2 The port is `ICheckoutInspector.inspect(package_dir) -> CheckoutSnapshot`, in
+  `diagnostics/application/ports/updates/`. Its adapter, `GitCheckoutInspectorAdapter`, runs the
+  `git` executable with `asyncio` subprocesses and never raises: a missing checkout, no
+  `origin`, an unreachable origin or a timeout leave snapshot fields as None, and the verdict is
+  `unknown` with a named reason. The package folder only counts as a checkout when it is the
+  `src/noesis` of the repository root, so a package inside an unrelated repository's `.venv` is
+  not mistaken for one.
+- R3 `noesis update check [--json]` always exits 0, whatever the verdict. For `behind` and
+  `diverged` it prints `git -C <checkout> pull` and `uv tool install --reinstall <checkout>`.
+- R4 `doctor` gets a warn-only `update` check: it is always `ok`, so the doctor exit code does
+  not change, and it renders `warn` (JSON: `warning: true`) for `behind`, `ahead`, `diverged` and
+  `unknown`, with the fix command as next step where one exists (`behind`, `diverged`); only
+  `up_to_date` renders as a plain `ok`.
+- R5 Telling `behind`, `ahead` and `diverged` apart needs origin's commit in the local object
+  store. When it is missing after `git ls-remote --symref origin HEAD`, the adapter runs
+  `git fetch --quiet --no-tags --no-write-fetch-head --refmap= origin <default-branch>` and then
+  `git merge-base --is-ancestor` in both directions. The fetch only adds objects: HEAD, the
+  working tree, `FETCH_HEAD` and every ref (the empty `--refmap=` stops git from also moving
+  `refs/remotes/origin/*`) stay as they were. If the fetch fails or times out the verdict is
+  `unknown`, never a guess. The strictly read-only alternative would report `unknown` in the most
+  common `behind` case, so it was rejected.
+- R6 Time budgets are constants in `bootstrap/diagnostics_handlers_builder.py`: 15 s for
+  `update check` and 3 s for `doctor`. They cover the whole inspection, network included. There
+  is no setting for them.
+
+Consequences: `doctor` makes one short network call to origin when run from a checkout; outside a
+checkout it makes none. The user's own git configuration (credentials, URL rewrites) decides
+whether origin is reachable, and prompts are disabled (`GIT_TERMINAL_PROMPT=0`).

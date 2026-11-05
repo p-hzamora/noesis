@@ -12,6 +12,8 @@ flowchart LR
     dh -.->|"only when search is obsidian-mcp or writer is mcp"| mp[ObsidianMcpProbeAdapter]
     mp -->|"vault_list root; write and delete noesis-doctor-probe.md"| obs[("Obsidian MCP")]
     probe --> checks["env file, vault dir, state dir,<br/>curator binary, Claude Code hooks,<br/>writer, search backend"]
+    dh --> upd["CheckForUpdateHandler → ICheckoutInspector (git)"]
+    upd --> checks
     checks --> dr["DoctorResponse, exit 1 if any check fails"]
 
     show["config show"] --> env[load_environment] --> cs[ConfigShowResponse]
@@ -32,6 +34,12 @@ The `search_backend` check makes no MCP call on the default `filesystem` backend
 entry names with `NOESIS_VAULT_DIR`: unreachable server or a different vault fails the check
 (exit 1) with a next step. Obsidian does not report which folder it serves, so equal root
 listings are the evidence of "same vault".
+
+The last check, `update`, compares the noesis checkout's git HEAD with origin's default
+branch (the same query as `noesis update check`, with a 3 s budget). It never fails the
+run: every verdict except `up_to_date` (`behind`, `ahead`, `diverged`, `unknown`) shows as a
+`warn` line, with the fix command as the next step for `behind` and `diverged`. It may fetch
+git objects into the checkout's `.git`, and moves no ref or file.
 
 `skills get noesis` is what the installed agent skill stub runs, so the guide always
 matches the installed version.
