@@ -142,7 +142,7 @@ class RunDiagnosticsHandler(IHandler[RunDiagnosticsQuery, DiagnosticReportDto]):
         )
 
     async def _check_writer(self, action: RunDiagnosticsQuery) -> DiagnosticCheckDto:
-        """Whether the configured writer can store notes: the MCP accepts a hidden probe write."""
+        """Whether the configured writer can store notes: the MCP accepts a probe write and delete."""
         if action.writer_mcp_url is None:
             return DiagnosticCheckDto(
                 name="writer",

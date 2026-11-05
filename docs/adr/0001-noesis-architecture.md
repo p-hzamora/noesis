@@ -89,8 +89,8 @@ Decisions:
 - **D-012** Only `NoteStorageError` is parked.
 - **D-013** `needs_vault` is the single owner of the vault requirement; a vault-less read
   repository fails `list` lazily and has no MCP-to-files fallback.
-- **D-014** `doctor` gets a `writer` check; on `mcp` it writes the fixed hidden file
-  `.noesis/doctor-probe.md`.
+- **D-014** `doctor` gets a `writer` check; on `mcp` it writes `noesis-doctor-probe.md`
+  at the vault root, then deletes it.
 - **D-015** `NoteMapper` stays in infrastructure `storage/mappers/` (it imports `yaml`), shared
   by every writer and reader.
 
@@ -111,7 +111,7 @@ Rules (also in `docs/architecture.md`, "Writer backend"):
 - R7 Search and writer share `NOESIS_OBSIDIAN_MCP_*` and one client builder that unwraps the
   secret.
 - R8 `NoteMapper` is the single renderer, in infrastructure `storage/mappers/`.
-- R9 The doctor writer probe writes the fixed hidden file `.noesis/doctor-probe.md`.
+- R9 The doctor writer probe writes `noesis-doctor-probe.md` at the vault root, then deletes it.
 
 Behaviour change: a storage failure during `curate` now parks the brief and fails with
 `KNOWLEDGE_201` (ticket and `knowledge retry` next step), including on the default filesystem

@@ -31,7 +31,7 @@ Cache lookups for sixty seconds.
 """
 MANUAL_NOTE: str = "---\ntype: decision\ntitle: Use a TTL cache\n---\n\n# Use a TTL cache\n\n## Decision\n\nMine.\n"
 TOKEN: str = "s3cret-token"
-PROBE_PATH: str = ".noesis/doctor-probe.md"
+PROBE_PATH: str = "noesis-doctor-probe.md"
 
 
 @pytest.fixture
@@ -393,7 +393,7 @@ def curator_on_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.mark.usefixtures("curator_on_path")
-def test_doctor_probes_the_mcp_writer_with_a_hidden_write(
+def test_doctor_probes_the_mcp_writer_and_deletes_the_probe_file(
     vault: Path, served: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     with fake_obsidian_mcp(served) as server:
@@ -404,7 +404,8 @@ def test_doctor_probes_the_mcp_writer_with_a_hidden_write(
     assert check["ok"] is True
     assert "accepted a write" in check["detail"]  # type: ignore[operator]
     assert list(_writes(server)) == [PROBE_PATH]
-    assert (served / PROBE_PATH).is_file()
+    assert [tool for tool, _ in server.calls if tool == "vault_delete"] == ["vault_delete"]
+    assert not (served / PROBE_PATH).exists()
 
 
 @pytest.mark.usefixtures("curator_on_path")
