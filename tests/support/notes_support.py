@@ -144,7 +144,7 @@ class ScriptedCurator(ICurator):
         self.related_seen: list[Sequence[NoteSummaryDto]] = []
         self.briefs_seen: list[WorkBrief] = []
 
-    async def curate(
+    async def judge(
         self, brief: WorkBrief, related: Sequence[NoteSummaryDto]
     ) -> tuple[CurationDecision, ...]:
         self.calls += 1
