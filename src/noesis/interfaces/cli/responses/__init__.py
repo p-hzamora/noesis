@@ -15,7 +15,7 @@ from .capture_run_response import CaptureRunListResponse, CaptureRunResponse
 from .capture_status_response import CaptureStatusResponse
 from .config_init_response import ConfigInitResponse
 from .config_show_response import ConfigShowResponse
-from .curation_response import CurationResponse, SkippedCandidateResponse
+from .curation_response import CurationPreviewResponse, CurationResponse, SkippedCandidateResponse
 from .doctor_response import DoctorCheckResponse, DoctorResponse
 from .error_response import ErrorDetail, ErrorResponse
 from .i_renderable_response import IRenderableResponse
@@ -41,6 +41,7 @@ __all__ = [
     "CaptureStatusResponse",
     "ConfigInitResponse",
     "ConfigShowResponse",
+    "CurationPreviewResponse",
     "CurationResponse",
     "DoctorCheckResponse",
     "DoctorResponse",

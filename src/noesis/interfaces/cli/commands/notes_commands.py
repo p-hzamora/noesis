@@ -8,7 +8,9 @@ from typing import Annotated
 import typer
 from pydantic import ValidationError
 
+from noesis.bounded_context.notes.application.dtos import CurationResultDto, RejectedEntryDto
 from noesis.bounded_context.notes.application.handlers.commands import (
+    ApplyCurationCommand,
     CurateWorkBriefCommand,
     RetryParkedCurationCommand,
 )
@@ -17,14 +19,25 @@ from noesis.bounded_context.notes.application.handlers.queries import (
     ListParkedCurationsQuery,
     SearchNotesQuery,
 )
-from noesis.bounded_context.notes.domain.value_objects import NoteArea, NoteOriginEnum
+from noesis.bounded_context.notes.domain.value_objects import (
+    CurationDecision,
+    NoteArea,
+    NoteOriginEnum,
+)
+from noesis.bounded_context.notes.domain.value_objects.work_brief import SHORT_SESSION_LENGTH
+from noesis.bounded_context.notes.infrastructure.outbound.curation.apply_input_schema import (
+    parse_decisions_strict,
+)
+from noesis.core.git_root import find_git_root
 from noesis.exceptions import (
     InvalidWorkBriefError,
+    NotInGitRepositoryError,
 )
 from noesis.interfaces.cli import output
-from noesis.interfaces.cli.bootstrap import NotesHandlers, build_notes
+from noesis.interfaces.cli.bootstrap import NotesHandlers, build_apply, build_notes
 from noesis.interfaces.cli.options import JsonOption
 from noesis.interfaces.cli.responses import (
+    CurationPreviewResponse,
     CurationResponse,
     NoteListResponse,
     NoteSearchFallbackResponse,
@@ -93,6 +106,81 @@ def curate(
     result = CurationResponse.model_validate(asyncio.run(handlers.curate.handle(command)))
     _warn(handlers)
     output.emit(result)
+
+
+def _repository_area() -> NoteArea:
+    """The area of the git repository the command runs in.
+
+    Raises:
+        NotInGitRepositoryError: The working directory is outside any git repository.
+    """
+    root: Path | None = find_git_root(Path.cwd())
+    if root is None:
+        raise NotInGitRepositoryError(
+            f"{Path.cwd()} is not inside a git repository.",
+            {"cwd": str(Path.cwd())},
+            next_steps=["Run the command from inside the repository the notes belong to."],
+        )
+    return NoteArea.for_repository(root.name)
+
+
+def _read_payload(source: str) -> tuple[str, RejectedEntryDto | None]:
+    """The decisions text from a file or stdin (`-`), or why it cannot be read."""
+    if source == "-":
+        return sys.stdin.read(), None
+    try:
+        return Path(source).read_text(encoding="utf-8"), None
+    except (OSError, UnicodeDecodeError) as error:
+        return "", RejectedEntryDto(index=None, reason=f"cannot read {source}: {error}")
+
+
+@notes_app.command("apply")
+def apply(
+    context: typer.Context,
+    decisions_file: Annotated[
+        str,
+        typer.Option(
+            "--decisions-file",
+            help='JSON file with {"decisions": [...]} (same entries as the curator\'s answer); '
+            "`-` reads stdin.",
+        ),
+    ],
+    session: Annotated[
+        str | None, typer.Option("--session", help="Session id recorded on the notes.")
+    ] = None,
+    commit: Annotated[
+        list[str] | None,
+        typer.Option("--commit", help="Commit SHA the notes come from (repeatable)."),
+    ] = None,
+    dry_run: Annotated[
+        bool, typer.Option("--dry-run", help="Show the paths and outcomes without writing.")
+    ] = False,
+    as_json: JsonOption = False,
+) -> None:
+    """Store note drafts you wrote as auto notes, without calling the curator."""
+    area: NoteArea = _repository_area()
+    raw_payload, unreadable = _read_payload(decisions_file)
+    decisions: tuple[CurationDecision, ...] = ()
+    rejected: tuple[RejectedEntryDto, ...] = (unreadable,) if unreadable else ()
+    if unreadable is None:
+        decisions, rejected = parse_decisions_strict(raw_payload)
+    command = ApplyCurationCommand(
+        area=area,
+        decisions=decisions,
+        rejected=rejected,
+        raw_payload=raw_payload,
+        commits=tuple(commit or ()),
+        session=session[:SHORT_SESSION_LENGTH] if session else None,
+        dry_run=dry_run,
+    )
+    stored: CurationResultDto = asyncio.run(
+        build_apply(cli_state(context).environment()).handle(command)
+    )
+    output.emit(
+        CurationPreviewResponse.model_validate(stored)
+        if dry_run
+        else CurationResponse.model_validate(stored)
+    )
 
 
 @notes_app.command("retry")

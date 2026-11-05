@@ -23,7 +23,7 @@ from .integration_errors import (
     ObsidianMcpToolError,
     SkillGuideNotFoundError,
 )
-from .interface_errors import InvalidWorkBriefError
+from .interface_errors import InvalidWorkBriefError, NotInGitRepositoryError
 from .notes_errors import (
     ApplyFailedError,
     CurationFailedError,
@@ -61,6 +61,7 @@ __all__ = [
     "InvalidWorkBriefError",
     "ManualNoteProtectedError",
     "NoteStorageError",
+    "NotInGitRepositoryError",
     "ObsidianMcpError",
     "ObsidianMcpToolError",
     "ParkedCurationNotFoundError",
