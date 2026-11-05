@@ -16,7 +16,7 @@ with any of them.
 ```bash
 uv tool install git+https://github.com/p-hzamora/noesis   # or: uv tool install -e . from a checkout
 noesis config init --vault-dir ~/brain  # writes ~/.config/noesis/.env
-noesis doctor                           # checks folders, git, and the curator CLI
+noesis doctor                           # checks folders, git, the curator CLI, and whether this checkout is behind origin
 ```
 
 ## Use it from Claude Code
@@ -51,6 +51,7 @@ the file.
 noesis --help | --version
 noesis config show|init [--json]
 noesis doctor [--json]
+noesis update check [--json]                # is this checkout behind its origin? (exit 0 always)
 noesis knowledge curate --brief-file FILE   # judge a work brief, store auto notes
 noesis knowledge parked | retry TICKET      # failed curations
 noesis knowledge search TEXT [--repo R]     # find notes
