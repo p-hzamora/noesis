@@ -1,6 +1,8 @@
 ---
 name: noesis
-description: Capture this session's finished work into the user's knowledge vault, look up what the vault already records (decisions, gotchas, run outcomes), and manage failed curations, through the `noesis` CLI. Use when the user asks to record work in the vault, turn capture on or off, check what was captured, or search past decisions and gotchas.
+description: Capture finished work into the knowledge vault, search past decisions and gotchas, and manage failed curations with the `noesis` CLI.
+when_to_use: Use when the user asks to record work in the vault, turn capture on or off, check what was captured, search past decisions and gotchas, or retry a parked curation.
+argument-hint: "[capture on|off|status|runs | search <text> | list | parked]"
 ---
 
 # noesis
