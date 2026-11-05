@@ -33,6 +33,7 @@ from .note_response import (
 from .parked_curation_response import ParkedCurationListResponse, ParkedCurationResponse
 from .skill_guide_response import SkillGuideListResponse, SkillGuideResponse
 from .success_response import SuccessResponse
+from .update_check_response import UpdateCheckResponse
 
 __all__ = [
     "CaptureRunListResponse",
@@ -59,4 +60,5 @@ __all__ = [
     "SkillGuideResponse",
     "SkippedCandidateResponse",
     "SuccessResponse",
+    "UpdateCheckResponse",
 ]

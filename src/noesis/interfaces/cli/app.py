@@ -34,6 +34,7 @@ app.add_typer(commands.hook_app, name="hook")
 app.add_typer(commands.integrate_app, name="integrate")
 app.add_typer(commands.skills_app, name="skills")
 app.add_typer(commands.config_app, name="config")
+app.add_typer(commands.update_app, name="update")
 app.command("doctor")(commands.doctor)
 
 

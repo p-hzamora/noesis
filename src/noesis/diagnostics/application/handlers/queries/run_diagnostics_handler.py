@@ -2,11 +2,18 @@
 
 from pathlib import Path
 
-from noesis.diagnostics.application.dtos import DiagnosticCheckDto, DiagnosticReportDto
+from noesis.diagnostics.application.dtos import (
+    DiagnosticCheckDto,
+    DiagnosticReportDto,
+    UpdateCheckDto,
+)
+from noesis.diagnostics.application.enums import UpdateVerdictEnum
 from noesis.diagnostics.application.ports.probes import IEnvironmentProbe, IObsidianMcpProbe
 from noesis.exceptions import ObsidianMcpError
 from noesis.shared_kernel.application.handlers import IHandler
 from noesis.utils import FrozenObject
+
+from .check_for_update_handler import CheckForUpdateQuery
 
 
 class RunDiagnosticsQuery(FrozenObject):
@@ -26,6 +33,8 @@ class RunDiagnosticsQuery(FrozenObject):
             writer is the filesystem (then no MCP call is made).
         vault_required: Whether something still uses local files; when False an unset vault
             is not a failure.
+        update_package_dir: Folder of the installed package, to check for an update; None
+            skips the `update` check.
     """
 
     env_file: Path
@@ -37,16 +46,22 @@ class RunDiagnosticsQuery(FrozenObject):
     obsidian_mcp_url: str | None = None
     writer_mcp_url: str | None = None
     vault_required: bool = True
+    update_package_dir: Path | None = None
 
 
 class RunDiagnosticsHandler(IHandler[RunDiagnosticsQuery, DiagnosticReportDto]):
     """Runs every check, in a fixed order, against the probe."""
 
     def __init__(
-        self, *, probe: IEnvironmentProbe, obsidian: IObsidianMcpProbe | None = None
+        self,
+        *,
+        probe: IEnvironmentProbe,
+        obsidian: IObsidianMcpProbe | None = None,
+        updates: IHandler[CheckForUpdateQuery, UpdateCheckDto] | None = None,
     ) -> None:
         self._probe: IEnvironmentProbe = probe
         self._obsidian: IObsidianMcpProbe | None = obsidian
+        self._updates: IHandler[CheckForUpdateQuery, UpdateCheckDto] | None = updates
 
     async def handle(self, action: RunDiagnosticsQuery) -> DiagnosticReportDto:
         """The report; `ok` is False when any check failed."""
@@ -61,8 +76,26 @@ class RunDiagnosticsHandler(IHandler[RunDiagnosticsQuery, DiagnosticReportDto]):
             self._check_agent_hooks(action.hooks_settings_file, action.installed_hook_events),
             await self._check_writer(action),
             await self._check_search_backend(action),
+            *await self._check_update(action),
         )
         return DiagnosticReportDto(ok=all(check.ok for check in checks), checks=checks)
+
+    async def _check_update(self, action: RunDiagnosticsQuery) -> tuple[DiagnosticCheckDto, ...]:
+        """Warn-only: anything but up to date is worth knowing about but never fails the run."""
+        if self._updates is None or action.update_package_dir is None:
+            return ()
+        update: UpdateCheckDto = await self._updates.handle(
+            CheckForUpdateQuery(package_dir=action.update_package_dir)
+        )
+        return (
+            DiagnosticCheckDto(
+                name="update",
+                ok=True,
+                detail=update.reason,
+                next_step="; ".join(update.next_steps) or None,
+                warning=update.verdict is not UpdateVerdictEnum.UP_TO_DATE,
+            ),
+        )
 
     def _check_config_file(self, env_file: Path) -> DiagnosticCheckDto:
         state: str = "found" if self._probe.is_file(env_file) else "not created, defaults in use"

@@ -11,12 +11,14 @@ class DiagnosticCheckDto(BaseDto):
         ok: Whether it passed.
         detail: What was found.
         next_step: How to fix it, or what to do next.
+        warning: Whether it passed but deserves attention (never fails the run).
     """
 
     name: str
     ok: bool
     detail: str
     next_step: str | None = None
+    warning: bool = False
 
 
 class DiagnosticReportDto(BaseDto):
