@@ -1,10 +1,10 @@
-"""Translating the published work-brief contract into Knowledge's model."""
+"""Translating the published work-brief contract into Notes's model."""
 
 import pytest
-from tests.support.knowledge_support import a_brief
+from tests.support.notes_support import a_brief
 
-from noesis.bounded_context.knowledge.application.mappers import WorkBriefMapper
-from noesis.bounded_context.knowledge.domain.value_objects import CommitRef, WorkBrief
+from noesis.bounded_context.notes.application.mappers import WorkBriefMapper
+from noesis.bounded_context.notes.domain.value_objects import CommitRef, WorkBrief
 from noesis.shared_kernel.contracts import WorkBriefContract
 
 pytestmark = pytest.mark.unit

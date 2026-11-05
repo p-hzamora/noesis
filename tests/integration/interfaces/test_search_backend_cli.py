@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 from tests.support.fake_claude import TTL_DECISION, success_envelope, write_fake_claude
 from tests.support.fake_obsidian_mcp import fake_obsidian_mcp, free_port
-from tests.support.knowledge_support import a_brief
+from tests.support.notes_support import a_brief
 
 from noesis.interfaces.cli import run
 from noesis.shared_kernel.domain import JsonObject
@@ -66,7 +66,7 @@ def _closed_url() -> str:
 def test_search_goes_through_the_mcp_in_the_same_envelope_and_shape(
     vault: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    assert run(["knowledge", "search", "ttl cache", "--json"]) == 0
+    assert run(["notes", "search", "ttl cache", "--json"]) == 0
     filesystem: JsonObject = _json(capsys)
 
     # Obsidian ranks a note by its own index: the canned hit has none of the query's words.
@@ -74,7 +74,7 @@ def test_search_goes_through_the_mcp_in_the_same_envelope_and_shape(
         vault, canned=[("repos/demo/auto/decisions/use-ttl-cache.md", 9)]
     ) as server:
         _use_mcp(monkeypatch, server.url)
-        assert run(["knowledge", "search", "anything at all", "--json"]) == 0
+        assert run(["notes", "search", "anything at all", "--json"]) == 0
         via_mcp: JsonObject = _json(capsys)
 
     assert [call[0] for call in server.calls] == ["search_simple", "vault_read"]
@@ -95,12 +95,12 @@ def test_search_goes_through_the_mcp_in_the_same_envelope_and_shape(
 def test_repo_restricts_results_to_repos_r_on_both_backends(
     vault: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    assert run(["knowledge", "search", "ttl", "--repo", "other", "--json"]) == 0
+    assert run(["notes", "search", "ttl", "--repo", "other", "--json"]) == 0
     assert _paths(_json(capsys)) == ["repos/other/decisions/use-ttl-cache.md"]
 
     with fake_obsidian_mcp(vault) as server:
         _use_mcp(monkeypatch, server.url)
-        assert run(["knowledge", "search", "ttl", "--repo", "other", "--json"]) == 0
+        assert run(["notes", "search", "ttl", "--repo", "other", "--json"]) == 0
         assert _paths(_json(capsys)) == ["repos/other/decisions/use-ttl-cache.md"]
         assert server.calls[0][0] == "search_simple"
 
@@ -110,13 +110,13 @@ def test_with_obsidian_closed_search_falls_back_to_files_and_exits_zero(
 ) -> None:
     _use_mcp(monkeypatch, _closed_url())
 
-    assert run(["knowledge", "search", "ttl cache", "--repo", "demo", "--json"]) == 0
+    assert run(["notes", "search", "ttl cache", "--repo", "demo", "--json"]) == 0
     envelope: JsonObject = _json(capsys)
     assert _paths(envelope) == ["repos/demo/auto/decisions/use-ttl-cache.md"]
     assert envelope["result"]["notice"] == FALLBACK_NOTICE  # type: ignore[index]
     assert envelope["result"]["backend"] == "filesystem"  # files answered, not the MCP  # type: ignore[index]
 
-    assert run(["knowledge", "search", "ttl cache", "--repo", "demo"]) == 0
+    assert run(["notes", "search", "ttl cache", "--repo", "demo"]) == 0
     text: str = capsys.readouterr().out
     assert "repos/demo/auto/decisions/use-ttl-cache.md" in text
     assert text.count(FALLBACK_NOTICE) == 1
@@ -128,8 +128,8 @@ def test_default_settings_never_call_the_mcp(
 ) -> None:
     with fake_obsidian_mcp(vault) as server:
         monkeypatch.setenv("NOESIS_OBSIDIAN_MCP_URL", server.url)  # configured, but not selected
-        assert run(["knowledge", "search", "ttl", "--json"]) == 0
-        assert run(["knowledge", "list", "--json"]) == 0
+        assert run(["notes", "search", "ttl", "--json"]) == 0
+        assert run(["notes", "list", "--json"]) == 0
         assert run(["doctor", "--json"]) in (0, 1)
 
     assert server.calls == []
@@ -142,7 +142,7 @@ def test_list_never_uses_the_mcp(
 ) -> None:
     with fake_obsidian_mcp(vault) as server:
         _use_mcp(monkeypatch, server.url)
-        assert run(["knowledge", "list", "--json"]) == 0
+        assert run(["notes", "list", "--json"]) == 0
 
     assert server.calls == []
     assert len(_paths(_json(capsys))) == 2
@@ -166,7 +166,7 @@ def test_curate_uses_the_mcp_search_for_related_notes(
     brief: Path = _curate_fixtures(tmp_path, monkeypatch)
     with fake_obsidian_mcp(vault) as server:
         _use_mcp(monkeypatch, server.url)
-        assert run(["knowledge", "curate", "--brief-file", str(brief), "--json"]) == 0
+        assert run(["notes", "curate", "--brief-file", str(brief), "--json"]) == 0
 
     assert server.calls[0][0] == "search_simple"
     result: JsonObject = _json(capsys)["result"]  # type: ignore[assignment]
@@ -180,7 +180,7 @@ def test_curate_still_succeeds_when_obsidian_is_closed(
     brief: Path = _curate_fixtures(tmp_path, monkeypatch)
     _use_mcp(monkeypatch, _closed_url())
 
-    assert run(["knowledge", "curate", "--brief-file", str(brief), "--json"]) == 0
+    assert run(["notes", "curate", "--brief-file", str(brief), "--json"]) == 0
 
     captured = capsys.readouterr()
     result: JsonObject = json.loads(captured.out)["result"]  # stdout stays pure JSON

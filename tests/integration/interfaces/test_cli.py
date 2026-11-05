@@ -65,7 +65,7 @@ def test_config_show_reports_effective_settings(
     result: object = _json(capsys.readouterr().out)["result"]
     assert isinstance(result, dict)
     assert result["env_file_exists"] is True
-    assert result["settings"]["knowledge"]["vault_dir"] == str(tmp_path)  # type: ignore[index]
+    assert result["settings"]["notes"]["vault_dir"] == str(tmp_path)  # type: ignore[index]
 
 
 def test_invalid_configuration_prints_problems_on_stderr(

@@ -1,22 +1,22 @@
-"""In-memory fakes of the Knowledge ports, and builders for briefs and decisions."""
+"""In-memory fakes of the Notes ports, and builders for briefs and decisions."""
 
 from collections.abc import Sequence
 from datetime import UTC, datetime
 from types import TracebackType
 from typing import Self
 
-from noesis.bounded_context.knowledge.application.dtos import (
+from noesis.bounded_context.notes.application.dtos import (
     NoteSearchResultDto,
     NoteSummaryDto,
     ParkedCurationDto,
 )
-from noesis.bounded_context.knowledge.application.ports.curation import ICurator
-from noesis.bounded_context.knowledge.application.ports.queue import IParkedCurationQueue
-from noesis.bounded_context.knowledge.application.ports.read_repositories import INoteReadRepository
-from noesis.bounded_context.knowledge.application.ports.uow import IKnowledgeUnitOfWork
-from noesis.bounded_context.knowledge.domain.entities import Note
-from noesis.bounded_context.knowledge.domain.repositories import INoteRepository
-from noesis.bounded_context.knowledge.domain.value_objects import (
+from noesis.bounded_context.notes.application.ports.curation import ICurator
+from noesis.bounded_context.notes.application.ports.queue import IParkedCurationQueue
+from noesis.bounded_context.notes.application.ports.read_repositories import INoteReadRepository
+from noesis.bounded_context.notes.application.ports.uow import INotesUnitOfWork
+from noesis.bounded_context.notes.domain.entities import Note
+from noesis.bounded_context.notes.domain.repositories import INoteRepository
+from noesis.bounded_context.notes.domain.value_objects import (
     CurationActionEnum,
     CurationDecision,
     NoteArea,
@@ -70,7 +70,7 @@ class InMemoryNoteRepository(INoteRepository):
         self.staged[note.location.relative_path] = note
 
 
-class InMemoryKnowledgeUnitOfWork(IKnowledgeUnitOfWork):
+class InMemoryNotesUnitOfWork(INotesUnitOfWork):
     """Commits staged notes into `stored`; counts commits.
 
     `commit_errors` scripts storage failures: each `commit` pops and raises one while any remain

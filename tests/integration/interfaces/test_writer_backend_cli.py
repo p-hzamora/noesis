@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 from tests.support.fake_claude import TTL_DECISION, success_envelope, write_fake_claude
 from tests.support.fake_obsidian_mcp import fake_obsidian_mcp, free_port
-from tests.support.knowledge_support import a_brief
+from tests.support.notes_support import a_brief
 
 from noesis.interfaces.cli import run
 from noesis.shared_kernel.domain import JsonObject
@@ -86,7 +86,7 @@ def _use_curator(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, *decisions: Js
 
 
 def _curate(brief: Path, *extra: str) -> int:
-    return run(["knowledge", "curate", "--brief-file", str(brief), "--json", *extra])
+    return run(["notes", "curate", "--brief-file", str(brief), "--json", *extra])
 
 
 def _output(capsys: pytest.CaptureFixture[str]) -> str:
@@ -184,17 +184,17 @@ def test_unreachable_mcp_writer_parks_and_retry_succeeds_after_recovery(
     assert _curate(brief) == 1
     error: JsonObject = _error(_json(capsys))
     ticket: str = error["metadata"]["ticket"]  # type: ignore[index]
-    assert error["code"] == "KNOWLEDGE_201_CURATION_FAILED"
+    assert error["code"] == "NOTES_201_CURATION_FAILED"
     assert ticket
-    assert f"Fix the cause, then run `noesis knowledge retry {ticket}`." in error["next_steps"]  # type: ignore[operator]
+    assert f"Fix the cause, then run `noesis notes retry {ticket}`." in error["next_steps"]  # type: ignore[operator]
 
     with fake_obsidian_mcp(served, port=port) as server:  # the server is back on the same URL
-        assert run(["knowledge", "retry", ticket, "--json"]) == 0
+        assert run(["notes", "retry", ticket, "--json"]) == 0
         assert _json(capsys)["result"]["created"] == [TTL_PATH]  # type: ignore[index]
 
     assert (served / TTL_PATH).is_file()
     assert _writes(server) == {TTL_PATH: (served / TTL_PATH).read_text(encoding="utf-8")}
-    assert run(["knowledge", "parked", "--json"]) == 0
+    assert run(["notes", "parked", "--json"]) == 0
     assert _json(capsys)["result"]["parked"] == []  # type: ignore[index]
 
 
@@ -211,7 +211,7 @@ def test_partial_write_parks_and_retry_completes(
         _use_mcp_writer(monkeypatch, server.url)
         assert _curate(brief) == 1
         error: JsonObject = _error(_json(capsys))
-        assert error["code"] == "KNOWLEDGE_201_CURATION_FAILED"
+        assert error["code"] == "NOTES_201_CURATION_FAILED"
         assert error["metadata"]["written"] == [TTL_PATH]  # type: ignore[index]
         assert error["metadata"]["not_written"] == [LRU_PATH]  # type: ignore[index]
         ticket: str = error["metadata"]["ticket"]  # type: ignore[index]
@@ -219,14 +219,14 @@ def test_partial_write_parks_and_retry_completes(
         assert not (served / LRU_PATH).exists()
 
         server.fail_write_after = None  # the server recovers
-        assert run(["knowledge", "retry", ticket, "--json"]) == 0
+        assert run(["notes", "retry", ticket, "--json"]) == 0
         retried: JsonObject = _json(capsys)
         # TTL was written by the partial run, so the retry finds it and overwrites it (FR-008).
         assert retried["result"]["created"] == [LRU_PATH]  # type: ignore[index]
         assert retried["result"]["updated"] == [TTL_PATH]  # type: ignore[index]
 
     assert (served / LRU_PATH).is_file()
-    assert run(["knowledge", "parked", "--json"]) == 0
+    assert run(["notes", "parked", "--json"]) == 0
     assert _json(capsys)["result"]["parked"] == []  # type: ignore[index]
 
 
@@ -265,9 +265,9 @@ def test_vault_is_required_only_where_files_are_used(
 
         assert _curate(brief) == 0
         assert _json(capsys)["result"]["created"] == [TTL_PATH]  # type: ignore[index]
-        assert run(["knowledge", "search", "ttl cache", "--json"]) == 0
+        assert run(["notes", "search", "ttl cache", "--json"]) == 0
         assert _json(capsys)["ok"] is True
-        assert run(["knowledge", "parked", "--json"]) == 0
+        assert run(["notes", "parked", "--json"]) == 0
         assert _json(capsys)["ok"] is True
     assert (served / TTL_PATH).is_file()
 
@@ -278,10 +278,10 @@ def test_vault_less_list_and_search(
     _use_mcp_writer(monkeypatch, _closed_url())
     monkeypatch.setenv("NOESIS_SEARCH_BACKEND", "obsidian-mcp")
 
-    assert run(["knowledge", "list", "--json"]) == 1
+    assert run(["notes", "list", "--json"]) == 1
     assert _error(_json(capsys))["code"] == "CORE_002_VAULT_NOT_CONFIGURED"
 
-    assert run(["knowledge", "search", "ttl", "--json"]) == 1
+    assert run(["notes", "search", "ttl", "--json"]) == 1
     envelope: JsonObject = _json(capsys)
     assert _error(envelope)["code"] == "INTEGRATION_102_OBSIDIAN_MCP_FAILED"
     assert "searched files instead" not in json.dumps(envelope)  # no fallback without a vault
@@ -330,14 +330,14 @@ def test_writer_token_is_sent_and_never_printed(
         monkeypatch.setenv("NOESIS_OBSIDIAN_MCP_TOKEN", "wrong-s3cret")  # rejected by the server
         assert _curate(brief) == 1
         rejected: str = _output(capsys)
-        assert run(["knowledge", "curate", "--brief-file", str(brief)]) == 1
+        assert run(["notes", "curate", "--brief-file", str(brief)]) == 1
         rejected += _output(capsys)
 
     assert set(server.authorizations) >= {f"Bearer {TOKEN}"}
     assert (served / TTL_PATH).is_file()
     assert TOKEN not in printed
     assert "obsidian_mcp_token" in printed  # shown, but masked
-    assert "KNOWLEDGE_201_CURATION_FAILED" in rejected
+    assert "NOTES_201_CURATION_FAILED" in rejected
     assert "wrong-s3cret" not in rejected
 
 
@@ -352,12 +352,12 @@ def test_a_storage_failure_on_the_default_backend_parks_the_brief(
 
     assert _curate(brief) == 1
     error: JsonObject = _error(_json(capsys))
-    assert error["code"] == "KNOWLEDGE_201_CURATION_FAILED"
+    assert error["code"] == "NOTES_201_CURATION_FAILED"
     ticket: str = error["metadata"]["ticket"]  # type: ignore[index]
-    assert f"Fix the cause, then run `noesis knowledge retry {ticket}`." in error["next_steps"]  # type: ignore[operator]
+    assert f"Fix the cause, then run `noesis notes retry {ticket}`." in error["next_steps"]  # type: ignore[operator]
 
     (vault / "repos").unlink()  # storage is fixed
-    assert run(["knowledge", "retry", ticket, "--json"]) == 0
+    assert run(["notes", "retry", ticket, "--json"]) == 0
     assert _json(capsys)["result"]["created"] == [TTL_PATH]  # type: ignore[index]
     assert (vault / TTL_PATH).is_file()
 
@@ -372,8 +372,8 @@ def test_a_storage_failure_without_parking_keeps_the_storage_error_code(
     brief: Path = _use_curator(tmp_path, monkeypatch, TTL_DECISION)
 
     assert _curate(brief, "--no-park") == 1
-    assert _error(_json(capsys))["code"] == "KNOWLEDGE_102_NOTE_STORAGE_FAILED"
-    assert run(["knowledge", "parked", "--json"]) == 0
+    assert _error(_json(capsys))["code"] == "NOTES_102_NOTE_STORAGE_FAILED"
+    assert run(["notes", "parked", "--json"]) == 0
     assert _json(capsys)["result"]["parked"] == []  # type: ignore[index]
 
 

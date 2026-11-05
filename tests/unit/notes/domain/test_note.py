@@ -3,10 +3,10 @@
 from datetime import timedelta
 
 import pytest
-from tests.support.knowledge_support import NOW, a_draft, a_note
+from tests.support.notes_support import NOW, a_draft, a_note
 
-from noesis.bounded_context.knowledge.domain.entities import Note, NoteCreated, NoteRevised
-from noesis.bounded_context.knowledge.domain.value_objects import (
+from noesis.bounded_context.notes.domain.entities import Note, NoteCreated, NoteRevised
+from noesis.bounded_context.notes.domain.value_objects import (
     NoteArea,
     NoteKindEnum,
     NoteOriginEnum,

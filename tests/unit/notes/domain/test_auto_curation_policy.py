@@ -1,15 +1,15 @@
 """Rules that turn curator decisions into stored notes or reported skips."""
 
 import pytest
-from tests.support.knowledge_support import NOW, a_decision, a_note
+from tests.support.notes_support import NOW, a_decision, a_note
 
-from noesis.bounded_context.knowledge.domain.entities import Note
-from noesis.bounded_context.knowledge.domain.policies import (
+from noesis.bounded_context.notes.domain.entities import Note
+from noesis.bounded_context.notes.domain.policies import (
     AutoCurationPolicy,
     CurationOutcome,
     CurationOutcomeEnum,
 )
-from noesis.bounded_context.knowledge.domain.value_objects import (
+from noesis.bounded_context.notes.domain.value_objects import (
     CurationActionEnum,
     CurationDecision,
     NoteArea,
@@ -35,7 +35,7 @@ def _apply(
     )
 
 
-def test_new_knowledge_becomes_an_auto_note() -> None:
+def test_new_notes_becomes_an_auto_note() -> None:
     outcome: CurationOutcome = _apply(a_decision())
 
     assert outcome.outcome is CurationOutcomeEnum.CREATED
