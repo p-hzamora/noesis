@@ -11,7 +11,7 @@ class ICurator(abc.ABC):
     """Judges a work brief against the admission rule and drafts note decisions. Never writes storage."""
 
     @abc.abstractmethod
-    async def curate(
+    async def judge(
         self, brief: WorkBrief, related: Sequence[NoteSummaryDto]
     ) -> tuple[CurationDecision, ...]:
         """Decide what in `brief` is worth keeping.
