@@ -49,3 +49,9 @@ class ParkedCurationNotFoundError(ApplicationException):
     """No parked curation has the requested ticket."""
 
     __error_code__ = "NOTES_202_PARKED_CURATION_NOT_FOUND"
+
+
+class ApplyFailedError(ApplicationException):
+    """An apply was rejected or could not be stored; the payload was kept for a second try."""
+
+    __error_code__ = "NOTES_203_APPLY_FAILED"

@@ -25,6 +25,7 @@ from .integration_errors import (
 )
 from .interface_errors import InvalidWorkBriefError
 from .notes_errors import (
+    ApplyFailedError,
     CurationFailedError,
     CuratorFailedError,
     InvalidNoteAreaError,
@@ -37,6 +38,7 @@ from .notes_errors import (
 
 __all__ = [
     "AgentSettingsInvalidError",
+    "ApplyFailedError",
     "AppException",
     "ApplicationException",
     "CaptureNotEnabledError",
