@@ -22,6 +22,16 @@ def test_files_and_folders_are_told_apart(tmp_path: Path) -> None:
     assert list(tmp_path.iterdir()) == [file]  # the writability test leaves nothing behind
 
 
+def test_listing_skips_folders_without_files(tmp_path: Path) -> None:
+    (tmp_path / "note.md").write_text("x", encoding="utf-8")
+    (tmp_path / "empty").mkdir()
+    (tmp_path / "nested-empty" / "inner").mkdir(parents=True)
+    (tmp_path / "filled" / "deep").mkdir(parents=True)
+    (tmp_path / "filled" / "deep" / "a.md").write_text("x", encoding="utf-8")
+
+    assert SystemEnvironmentProbeAdapter().list_entries(tmp_path) == ("filled", "note.md")
+
+
 @pytest.mark.skipif(os.geteuid() == 0, reason="root can write anywhere")
 def test_a_read_only_folder_is_not_writable(tmp_path: Path) -> None:
     folder: Path = tmp_path / "ro"
