@@ -113,13 +113,13 @@ hook() {
   echo "== 4. journal"
   noesis capture runs --session "$session"
   echo "== 5. notes in the sandbox vault"
-  noesis knowledge list
+  noesis notes list
 }
 
 case "${1:-}" in
   init) init ;;
   hook) hook "${2:-dry-run}" ;;
-  curate) init && noesis knowledge curate --brief-file "$ROOT/docs/examples/work-brief.json" ;;
+  curate) init && noesis notes curate --brief-file "$ROOT/docs/examples/work-brief.json" ;;
   shell)
     init >/dev/null
     echo "cd $SANDBOX && export XDG_CONFIG_HOME=$CONFIG_HOME" ;;
