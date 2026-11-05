@@ -52,7 +52,8 @@ noesis --help | --version
 noesis config show|init [--json]
 noesis doctor [--json]
 noesis update check [--json]                # is this checkout behind its origin? (exit 0 always)
-noesis notes curate --brief-file FILE   # judge a work brief, store auto notes
+noesis notes curate --brief-file FILE [--dry-run]   # the curator judges a work brief, then store auto notes
+noesis notes apply --decisions-file FILE|- [--dry-run] # store note drafts you wrote, no curator
 noesis notes parked | retry TICKET      # failed curations
 noesis notes search TEXT [--repo R]     # find notes
 noesis notes list [--repo R] [--origin manual|auto]
