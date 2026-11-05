@@ -49,7 +49,7 @@ async def test_structured_output_becomes_domain_decisions(tmp_path: Path) -> Non
         tmp_path, envelope=success_envelope([TTL_DECISION, skip, bad_slug, no_title])
     )
 
-    decisions = await _adapter(claude, model="haiku").curate(
+    decisions = await _adapter(claude, model="haiku").judge(
         WorkBriefMapper.to_domain(a_brief()), []
     )
 
@@ -68,7 +68,7 @@ async def test_the_run_is_isolated_and_receives_the_brief_on_stdin(tmp_path: Pat
     claude: Path = write_fake_claude(tmp_path, envelope=success_envelope([]))
 
     assert (
-        await _adapter(claude, model="haiku").curate(WorkBriefMapper.to_domain(a_brief()), []) == ()
+        await _adapter(claude, model="haiku").judge(WorkBriefMapper.to_domain(a_brief()), []) == ()
     )
 
     argv: list[str] = (tmp_path / "argv.txt").read_text().split("\n")
@@ -117,20 +117,20 @@ async def test_unusable_answers_raise_curator_failed(
     claude: Path = write_fake_claude(tmp_path, envelope=envelope, raw=raw)
 
     with pytest.raises(CuratorFailedError, match=message):
-        await _adapter(claude).curate(WorkBriefMapper.to_domain(a_brief()), [])
+        await _adapter(claude).judge(WorkBriefMapper.to_domain(a_brief()), [])
 
 
 async def test_missing_executable_timeout_and_crash_raise_curator_failed(tmp_path: Path) -> None:
     with pytest.raises(CuratorFailedError, match="Cannot start"):
-        await _adapter(tmp_path / "missing").curate(WorkBriefMapper.to_domain(a_brief()), [])
+        await _adapter(tmp_path / "missing").judge(WorkBriefMapper.to_domain(a_brief()), [])
 
     slow: Path = write_fake_claude(tmp_path, envelope=success_envelope([]), sleep_seconds=5)
     with pytest.raises(CuratorFailedError, match="timed out"):
-        await _adapter(slow, timeout=0.5).curate(WorkBriefMapper.to_domain(a_brief()), [])
+        await _adapter(slow, timeout=0.5).judge(WorkBriefMapper.to_domain(a_brief()), [])
 
     crashing: Path = write_fake_claude(tmp_path, raw="", exit_code=3)
     with pytest.raises(CuratorFailedError, match="exited with 3"):
-        await _adapter(crashing).curate(WorkBriefMapper.to_domain(a_brief()), [])
+        await _adapter(crashing).judge(WorkBriefMapper.to_domain(a_brief()), [])
 
 
 def test_the_packaged_system_prompt_ships_with_the_adapter() -> None:
