@@ -119,7 +119,7 @@ name = "Domain stays free of delivery and process frameworks"
 type = "forbidden"
 source_modules = [
     "noesis.shared_kernel.domain",
-    "noesis.bounded_context.knowledge.domain",
+    "noesis.bounded_context.notes.domain",
     "noesis.bounded_context.capture.domain",
 ]
 forbidden_modules = ["typer", "subprocess", "pydantic_settings", "noesis.core"]
@@ -137,12 +137,12 @@ source_modules = ["noesis.diagnostics"]
 forbidden_modules = ["noesis.bounded_context", "noesis.core", "noesis.interfaces", "typer"]
 
 [[tool.importlinter.contracts]]
-name = "Knowledge layers point inward"
+name = "Notes layers point inward"
 type = "layers"
 layers = [
-    "noesis.bounded_context.knowledge.infrastructure",
-    "noesis.bounded_context.knowledge.application",
-    "noesis.bounded_context.knowledge.domain",
+    "noesis.bounded_context.notes.infrastructure",
+    "noesis.bounded_context.notes.application",
+    "noesis.bounded_context.notes.domain",
 ]
 
 [[tool.importlinter.contracts]]
@@ -163,14 +163,14 @@ layers = [
 [[tool.importlinter.contracts]]
 name = "Bounded contexts are independent (they share only the kernel's contracts)"
 type = "independence"
-modules = ["noesis.bounded_context.capture", "noesis.bounded_context.knowledge"]
+modules = ["noesis.bounded_context.capture", "noesis.bounded_context.notes"]
 
 [[tool.importlinter.contracts]]
 name = "Domain and application layers stay free of I/O libraries"
 type = "forbidden"
 source_modules = [
-    "noesis.bounded_context.knowledge.domain",
-    "noesis.bounded_context.knowledge.application",
+    "noesis.bounded_context.notes.domain",
+    "noesis.bounded_context.notes.application",
     "noesis.bounded_context.capture.domain",
     "noesis.bounded_context.capture.application",
     "noesis.diagnostics.application",
