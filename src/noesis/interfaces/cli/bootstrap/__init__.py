@@ -13,7 +13,15 @@ from .capture_handlers_builder import (
     build_capture,
     curator_command,
 )
-from .diagnostics_handlers_builder import build_diagnostics, run_diagnostics
+from .diagnostics_handlers_builder import (
+    DOCTOR_UPDATE_TIMEOUT_SECONDS,
+    UPDATE_CHECK_TIMEOUT_SECONDS,
+    build_diagnostics,
+    build_update_check,
+    installed_package_dir,
+    run_diagnostics,
+    run_update_check,
+)
 from .knowledge_handlers_builder import (
     PARKED_FOLDER,
     KnowledgeHandlers,
@@ -31,18 +39,23 @@ __all__ = [
     "CaptureHandlers",
     "KnowledgeHandlers",
     "CAPTURE_FOLDER",
+    "DOCTOR_UPDATE_TIMEOUT_SECONDS",
     "LOCK_TIMEOUT_SECONDS",
     "PARKED_FOLDER",
+    "UPDATE_CHECK_TIMEOUT_SECONDS",
     "build_agent_hooks",
     "build_capture",
     "build_curator",
     "build_diagnostics",
     "build_knowledge",
     "build_obsidian_mcp_client",
+    "build_update_check",
     "build_unit_of_work_factory",
     "curator_command",
     "curator_system_prompt",
+    "installed_package_dir",
     "needs_vault",
     "require_vault",
     "run_diagnostics",
+    "run_update_check",
 ]

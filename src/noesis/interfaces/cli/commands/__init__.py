@@ -7,6 +7,7 @@ from .hook_commands import hook_app
 from .integrate_commands import integrate_app
 from .knowledge_commands import knowledge_app
 from .skills_commands import skills_app
+from .update_commands import update_app
 
 __all__ = [
     "capture_app",
@@ -16,4 +17,5 @@ __all__ = [
     "integrate_app",
     "knowledge_app",
     "skills_app",
+    "update_app",
 ]

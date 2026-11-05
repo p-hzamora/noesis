@@ -4,12 +4,16 @@ from pathlib import Path
 
 import pytest
 
+from noesis.diagnostics.application.dtos import UpdateCheckDto
+from noesis.diagnostics.application.enums import UpdateVerdictEnum
 from noesis.diagnostics.application.handlers.queries import (
+    CheckForUpdateQuery,
     RunDiagnosticsHandler,
     RunDiagnosticsQuery,
 )
 from noesis.diagnostics.application.ports.probes import IEnvironmentProbe, IObsidianMcpProbe
 from noesis.exceptions import ObsidianMcpError
+from noesis.shared_kernel.application.handlers import IHandler
 
 pytestmark = pytest.mark.unit
 
@@ -264,3 +268,63 @@ async def test_an_unset_vault_does_not_fail_the_vault_check_when_no_vault_is_req
     vault = next(check for check in report.checks if check.name == "vault")
     assert vault.ok
     assert report.ok
+
+
+class _Updates(IHandler[CheckForUpdateQuery, UpdateCheckDto]):
+    def __init__(self, verdict: UpdateVerdictEnum, *, next_steps: tuple[str, ...] = ()) -> None:
+        self.verdict: UpdateVerdictEnum = verdict
+        self.next_steps: tuple[str, ...] = next_steps
+        self.queries: list[CheckForUpdateQuery] = []
+
+    async def handle(self, action: CheckForUpdateQuery) -> UpdateCheckDto:
+        self.queries.append(action)
+        return UpdateCheckDto(
+            verdict=self.verdict, reason=f"reason {self.verdict}", next_steps=self.next_steps
+        )
+
+
+async def test_no_update_check_without_a_handler_or_a_package_dir() -> None:
+    names = lambda report: [check.name for check in report.checks]  # noqa: E731
+    updates = _Updates(UpdateVerdictEnum.BEHIND)
+
+    without_handler = await RunDiagnosticsHandler(probe=_healthy()).handle(
+        _query(update_package_dir=Path("/p"))
+    )
+    without_dir = await RunDiagnosticsHandler(probe=_healthy(), updates=updates).handle(_query())
+
+    assert "update" not in names(without_handler) and "update" not in names(without_dir)
+    assert updates.queries == []
+
+
+@pytest.mark.parametrize(
+    ("verdict", "warning"),
+    [
+        (UpdateVerdictEnum.BEHIND, True),
+        (UpdateVerdictEnum.DIVERGED, True),
+        (UpdateVerdictEnum.AHEAD, True),
+        (UpdateVerdictEnum.UNKNOWN, True),
+        (UpdateVerdictEnum.UP_TO_DATE, False),
+    ],
+)
+async def test_the_update_check_never_fails_the_report(
+    verdict: UpdateVerdictEnum, warning: bool
+) -> None:
+    updates = _Updates(verdict, next_steps=("git -C /c pull", "uv tool install --reinstall /c"))
+
+    report = await RunDiagnosticsHandler(probe=_healthy(), updates=updates).handle(
+        _query(update_package_dir=Path("/c/src/noesis"))
+    )
+
+    check = report.checks[-1]
+    assert report.ok and check.ok
+    assert check.name == "update"
+    assert check.warning is warning
+    assert check.detail == f"reason {verdict}"
+    assert updates.queries == [CheckForUpdateQuery(package_dir=Path("/c/src/noesis"))]
+    assert check.next_step == "git -C /c pull; uv tool install --reinstall /c"
+
+
+async def test_ordinary_checks_are_not_warnings() -> None:
+    report = await RunDiagnosticsHandler(probe=_healthy()).handle(_query())
+
+    assert not any(check.warning for check in report.checks)
