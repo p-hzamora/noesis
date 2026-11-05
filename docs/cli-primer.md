@@ -49,7 +49,7 @@ Big tools group verbs under nouns, like `git remote add`. noesis does the same:
 
 ```text
 noesis capture   on | off | status | runs        (Capture context)
-noesis notes curate | retry | parked | search | list  (Notes context)
+noesis notes curate | apply | retry | parked | search | list  (Notes context)
 noesis hook      claude-code                     (machine entry point for agent hooks)
 noesis config    show | init
 noesis doctor

@@ -186,3 +186,41 @@ Decisions:
 Consequences: `doctor` makes one short network call to origin when run from a checkout; outside a
 checkout it makes none. The user's own git configuration (credentials, URL rewrites) decides
 whether origin is reachable, and prompts are disabled (`GIT_TERMINAL_PROMPT=0`).
+
+## Amendment 5 (2026-11-05): `notes`, and a store step of its own
+
+`knowledge curate` was the only writer, and "curate" named both the whole flow and the model
+step. The store step is now separate and reachable without a model, and the context is renamed
+for what it owns: a note from its creation through validation to storing it or not.
+
+Decisions:
+
+- **D-016** The bounded context, package, CLI group, builder (`build_notes`), settings key and
+  glossary term `Knowledge` become `Notes` / `notes`. No alias, no migration.
+- **D-017** Error codes `KNOWLEDGE_xxx` become `NOTES_xxx` (same numbers), the state folder
+  `<state>/knowledge/` becomes `<state>/notes/`, and `config show` reports `settings.notes`.
+  Anything that branched on the old codes, read the old key, or kept parked tickets under the
+  old folder must be updated or discarded.
+- **D-018** `ICurator.curate` is `ICurator.judge`: the curator only judges and drafts.
+  `notes curate` keeps its name and means judge + apply.
+- **D-019** `ApplyCurationHandler` runs the auto-curation policy and the unit of work. It needs
+  no brief and no model. `CurateWorkBriefHandler` calls it, so curate's behaviour, parking and
+  `notes retry` are unchanged.
+- **D-020** `noesis notes apply --decisions-file F|-` stores drafts written by a person or an
+  agent. The area is the git root of the working directory (`repos/<repo>`); there is no
+  `--path` or `--area`, so the scaffold and the manual-wins rule cannot be bypassed. Outside a
+  git repository it fails with `INTERFACE_002_NOT_IN_GIT_REPOSITORY` (exit 2). Provenance
+  (`--session`, `--commit`) is optional.
+- **D-021** `apply` reuses the curator's entry model but is strict (`apply_input_schema.py`): any
+  malformed entry fails the whole call before anything is written.
+- **D-022** `apply` never parks briefs. A rejected payload or a storage failure is kept by
+  `IApplyFailureLog` (`<state>/notes/apply-failed/<ticket>.json` plus the payload verbatim) and
+  reported as `NOTES_203_APPLY_FAILED`; if the record cannot be written either, the payload is
+  returned in the error. Re-applying the payload is the retry. A list or replay command is left
+  for a later change.
+- **D-023** `--dry-run` on `notes apply` and `notes curate` runs the policy against the existing
+  notes and reports paths and outcomes without writing, parking or recording a failure.
+
+Capture is unchanged except for the command string its detached publisher spawns (`notes
+curate`). The hook entries in Claude Code's settings (`noesis ... hook claude-code`) are
+untouched.

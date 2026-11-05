@@ -11,10 +11,10 @@ installed noesis version. Use `noesis <command> --help` for anything not covered
   follow `next_steps` when the user agrees.
 - Exit codes: 0 ok, 1 the operation failed, 2 invalid command line.
 - Never guess commands or flags. If something is not in this guide, run `--help`.
-- Never edit files under a vault's `auto/` folders by hand and never write notes yourself;
-  noesis owns them. Read them freely.
-- Costly or settings-changing commands (`notes curate`, `integrate … --yes`) only when
-  the user asked for them.
+- Never edit files under a vault's `auto/` folders by hand. To record a note yourself, use
+  `notes apply` (below); noesis picks the path. Read the notes freely.
+- Costly or settings-changing commands (`notes curate`, `notes apply`, `integrate … --yes`)
+  only when the user asked for them. `--dry-run` on both shows the result without writing.
 
 ## Which env file
 
@@ -77,6 +77,41 @@ MCP answers and serves the vault of `NOESIS_VAULT_DIR`.
 Results carry each note's `path`. For the full text, read that file under the vault
 folder (`noesis [--env-file <path>] config show --json` -> `settings.notes.vault_dir`).
 
+## Record a note yourself
+
+When the user asks you to record something in the vault, write the draft and let noesis store
+it. No curator runs. Run it from inside the repository: the note goes to
+`repos/<repo folder name>/auto/<kind>s/<slug>.md`, never anywhere else, and a manual note on
+the same topic is never touched (it is reported as skipped, `covered by <path>`).
+
+```bash
+noesis notes apply --decisions-file draft.json --dry-run --json     # preview: paths, created/updated/skipped
+noesis notes apply --decisions-file draft.json --json               # write
+cat draft.json | noesis notes apply --decisions-file - --session <SESSION_ID> --commit <SHA> --json
+```
+
+`--session` and `--commit` (repeatable) are optional provenance; without them the note simply
+has no `session` / `commits`. The file is:
+
+```json
+{"decisions": [{
+  "action": "create", "candidate": "TTL cache for logins", "reason": "non-obvious choice",
+  "kind": "decision", "slug": "use-ttl-cache", "title": "Use a TTL cache",
+  "sections": [{"heading": "Decision", "body": "Keep tokens in memory."}]
+}]}
+```
+
+`kind` is `decision`, `gotcha`, `run` or `glossary`; missing required sections are filled with
+`Not recorded`. Check `result.skipped` after every call. Outside a git repository the command
+fails with `INTERFACE_002_NOT_IN_GIT_REPOSITORY` (exit 2).
+
+`apply` is strict: one malformed entry fails the whole call with `NOTES_203_APPLY_FAILED`
+(exit 1) and writes nothing. A storage failure fails the same way. Either way the payload you
+sent is kept, so nothing is lost: `error.metadata` has `rejected` (entry `index` and `reason`),
+`written` / `not_written` (storage), `ticket`, `record_path` and `payload_path`. Fix the entries
+and run `apply` again with `--decisions-file <payload_path>`. If the record itself cannot be
+kept, the payload is in `error.metadata.raw_payload`.
+
 ## Failed curations
 
 ```bash
@@ -84,7 +119,8 @@ noesis [--env-file <path>] notes parked --json           # tickets of briefs who
 noesis [--env-file <path>] notes retry <TICKET> --json   # retry one, in the foreground
 ```
 
-A brief is parked when the curator keeps failing and also when storing the notes fails (vault
+`notes curate --dry-run` runs the curator and shows what it would store, without writing and
+without parking. A brief is parked when the curator keeps failing and also when storing the notes fails (vault
 folder not writable, Obsidian's MCP unreachable): both are `NOTES_201_CURATION_FAILED` with a
 `ticket` in `error.metadata`. Follow its `next_steps`: fix the cause, then `notes retry
 <TICKET>`. A storage failure may carry `written` and `not_written` paths (some notes were stored
@@ -116,4 +152,6 @@ are not included. To inspect a project file, pass
 
 Common error codes: `CORE_002_VAULT_NOT_CONFIGURED` (run `config init`),
 `CAPTURE_001_INVALID_SESSION_ID`, `NOTES_201_CURATION_FAILED` (curation or storage failed; see `notes parked`),
+`NOTES_203_APPLY_FAILED` (`notes apply` rejected an entry or could not store; the payload was kept),
+`INTERFACE_002_NOT_IN_GIT_REPOSITORY` (run `notes apply` from inside the repository),
 `INTEGRATION_101_AGENT_SETTINGS_INVALID` (the settings file is not valid JSON).

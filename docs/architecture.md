@@ -38,27 +38,35 @@ errors are `AppException`s with a stable `__error_code__`, an `__exit_code__`, a
 ## Notes context
 
 ```text
-WorkBriefContract ──► CurateWorkBriefHandler
-                        ├─ WorkBriefMapper.to_domain(contract) -> WorkBrief      ACL into Notes's model
+WorkBriefContract ──► CurateWorkBriefHandler                  (`notes curate`: judge, then apply)
+                        ├─ WorkBriefMapper.to_domain(contract) -> WorkBrief      ACL into Notes' model
                         ├─ INoteReadRepository.search(brief.search_text())       related notes
-                        ├─ ICurator.curate(brief, related)                       LLM judgment (retry once)
-                        ├─ AutoCurationPolicy.apply(decision, existing notes)    domain rules
-                        └─ INotesUnitOfWork: notes.save(...) + commit        all or nothing
+                        ├─ ICurator.judge(brief, related)                        LLM judgment (retry once)
+                        └─ ApplyCurationHandler.handle(area, decisions, provenance)
+                             ├─ AutoCurationPolicy.apply(decision, existing)     domain rules
+                             └─ INotesUnitOfWork: notes.save(...) + commit       all or nothing
                       on repeated curator failure, or a storage failure (NoteStorageError):
                         IParkedCurationQueue.park -> `noesis notes retry`
+
+drafts written by a person or an agent ──► ApplyCurationHandler      (`notes apply`: no curator)
+                        area = git root of the cwd; strict parse; `--dry-run` skips save + commit
+                      on a rejected entry or a storage failure:
+                        IApplyFailureLog.record(raw payload, errors) -> NOTES_203, kept for a second try
 ```
 
 | Piece | Where | Notes |
 |---|---|---|
 | `Note` aggregate | `domain/entities/note.py` | Required sections per kind, canonical headings, `Not recorded` filler; manual notes cannot be revised by automation. |
-| `WorkBrief` | `domain/value_objects/work_brief.py`, `application/mappers/` | Notes's own copy of the brief, translated from the contract by `WorkBriefMapper`; owns the rules on it (area, search text, provenance). The contract stays data-only; the parked queue stores the contract so a retry re-enters through the command. |
+| `WorkBrief` | `domain/value_objects/work_brief.py`, `application/mappers/` | Notes' own copy of the brief, translated from the contract by `WorkBriefMapper`; owns the rules on it (area, search text, provenance). The contract stays data-only; the parked queue stores the contract so a retry re-enters through the command. |
 | `NoteLocation` | `domain/value_objects/` | Auto: `<area>/auto/<kind>s/<slug>.md`; manual: `<area>/<kind>s/<slug>.md`. |
 | `AutoCurationPolicy` | `domain/policies/` | Manual note on the same topic wins (`covered by <path>`); create/update both upsert the auto note. |
 | `ClaudeCliCuratorAdapter` | `infrastructure/outbound/curation/` | `claude -p --output-format json --json-schema` with no tools, no settings, no saved session, a budget cap; prompt on stdin; reads `structured_output`. The system prompt holds the admission rule; the adapter receives it as text from the composition root (`build_curator`), which reads `NOESIS_CURATOR_SYSTEM_PROMPT_FILE` or falls back to the packaged `prompts/curator_system.md` (`default_system_prompt()`). |
+| `apply_input_schema.py` | same folder | Strict reader of `notes apply` input. Reuses the curator's entry model but never downgrades: every flawed entry is reported with its index, and any one fails the call before anything is written. |
 | `curator_response_schema.py` | same folder | Anti-corruption layer: pydantic schema sent to the CLI, translated into domain decisions; malformed entries become reported skips. |
 | Filesystem adapters | `infrastructure/outbound/storage/` | Markdown + YAML frontmatter under `NOESIS_VAULT_DIR`; each file is written atomically, staged notes are written on commit (not all-or-nothing across files; a retry overwrites). Works for Obsidian vaults, plain folders and NFS (a mount). The default writer (`NOESIS_WRITER_BACKEND=filesystem`). |
 | MCP writer | `infrastructure/outbound/storage/` | `McpNoteRepositoryAdapter` + `McpNotesUnitOfWorkAdapter` implement `INoteRepository` / `INotesUnitOfWork` over Obsidian's MCP server (`vault_read`, `vault_list`, `vault_write`) with the same `NoteMapper`, so the Markdown is byte-identical to the filesystem writer's. Stages on `save`, sends on `commit`. Selected by `NOESIS_WRITER_BACKEND=mcp` in `build_unit_of_work_factory`; reuses `NOESIS_OBSIDIAN_MCP_*`. See [Writer backend](#writer-backend). |
 | Obsidian MCP search | `infrastructure/outbound/storage/` | `ObsidianMcpNoteReadRepositoryAdapter` implements `INoteReadRepository` over the official `mcp` SDK (streamable HTTP, client in `shared_kernel/infrastructure/outbound/mcp/`); `FallbackNoteReadRepositoryAdapter` degrades to the filesystem adapter on `ObsidianMcpError`. Selected by `NOESIS_SEARCH_BACKEND` in `build_notes` (default `filesystem`: no MCP call). Read side only; the curate handler shares it (so related notes come from Obsidian too, with the same fallback); `list` always reads files, and writes follow `NOESIS_WRITER_BACKEND`, not the search backend. See [notes workflow](workflows/notes.md#search-backend). |
+| Failure log | `infrastructure/outbound/failures/` | `JsonFileApplyFailureLogAdapter`: for each failed `notes apply`, `<state>/notes/apply-failed/<ticket>.json` (report) and `<ticket>.payload.json|txt` (the input, verbatim, ready to re-apply). Failures never park a brief: only `curate` parks. |
 | Parked queue | `infrastructure/outbound/queue/` | One JSON file per failed brief under `$NOESIS_STATE_DIR/notes/parked/`. A brief is parked when the curator keeps failing and when storing the notes fails (`NoteStorageError`); both surface as `NOTES_201`. |
 
 ### Writer backend
