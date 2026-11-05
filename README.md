@@ -52,10 +52,10 @@ noesis --help | --version
 noesis config show|init [--json]
 noesis doctor [--json]
 noesis update check [--json]                # is this checkout behind its origin? (exit 0 always)
-noesis knowledge curate --brief-file FILE   # judge a work brief, store auto notes
-noesis knowledge parked | retry TICKET      # failed curations
-noesis knowledge search TEXT [--repo R]     # find notes
-noesis knowledge list [--repo R] [--origin manual|auto]
+noesis notes curate --brief-file FILE   # judge a work brief, store auto notes
+noesis notes parked | retry TICKET      # failed curations
+noesis notes search TEXT [--repo R]     # find notes
+noesis notes list [--repo R] [--origin manual|auto]
 noesis capture on|off|status|runs --session ID [--mode live|dry-run]
 noesis hook claude-code                     # stdin: Claude Code hook JSON (always exits 0)
 noesis integrate claude-code install|uninstall|status [--settings F] [--yes]

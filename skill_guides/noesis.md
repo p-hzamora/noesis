@@ -13,7 +13,7 @@ installed noesis version. Use `noesis <command> --help` for anything not covered
 - Never guess commands or flags. If something is not in this guide, run `--help`.
 - Never edit files under a vault's `auto/` folders by hand and never write notes yourself;
   noesis owns them. Read them freely.
-- Costly or settings-changing commands (`knowledge curate`, `integrate … --yes`) only when
+- Costly or settings-changing commands (`notes curate`, `integrate … --yes`) only when
   the user asked for them.
 
 ## Which env file
@@ -64,8 +64,8 @@ still running.
 ## Look up what the vault already knows
 
 ```bash
-noesis [--env-file <path>] knowledge search "<words>" --repo <repo> --json   # best match first
-noesis [--env-file <path>] knowledge list --repo <repo> --origin auto --json  # auto | manual
+noesis [--env-file <path>] notes search "<words>" --repo <repo> --json   # best match first
+noesis [--env-file <path>] notes list --repo <repo> --origin auto --json  # auto | manual
 ```
 
 If the user set `NOESIS_SEARCH_BACKEND=obsidian-mcp`, search goes through Obsidian (it also finds
@@ -75,18 +75,18 @@ still exits 0 with file results and the message `Obsidian MCP unreachable, searc
 MCP answers and serves the vault of `NOESIS_VAULT_DIR`.
 
 Results carry each note's `path`. For the full text, read that file under the vault
-folder (`noesis [--env-file <path>] config show --json` -> `settings.knowledge.vault_dir`).
+folder (`noesis [--env-file <path>] config show --json` -> `settings.notes.vault_dir`).
 
 ## Failed curations
 
 ```bash
-noesis [--env-file <path>] knowledge parked --json           # tickets of briefs whose curation failed
-noesis [--env-file <path>] knowledge retry <TICKET> --json   # retry one, in the foreground
+noesis [--env-file <path>] notes parked --json           # tickets of briefs whose curation failed
+noesis [--env-file <path>] notes retry <TICKET> --json   # retry one, in the foreground
 ```
 
 A brief is parked when the curator keeps failing and also when storing the notes fails (vault
-folder not writable, Obsidian's MCP unreachable): both are `KNOWLEDGE_201_CURATION_FAILED` with a
-`ticket` in `error.metadata`. Follow its `next_steps`: fix the cause, then `knowledge retry
+folder not writable, Obsidian's MCP unreachable): both are `NOTES_201_CURATION_FAILED` with a
+`ticket` in `error.metadata`. Follow its `next_steps`: fix the cause, then `notes retry
 <TICKET>`. A storage failure may carry `written` and `not_written` paths (some notes were stored
 before it failed); retry overwrites them all, so do not write notes by hand.
 
@@ -96,7 +96,7 @@ before it failed); retry overwrites them all, so do not write notes by hand.
 `NOESIS_VAULT_DIR`, which can be an NFS mount) or `mcp` (through Obsidian's MCP server, using the
 `NOESIS_OBSIDIAN_MCP_*` settings). Search follows `NOESIS_SEARCH_BACKEND` independently. The
 vault folder is only required where files are used (not with writer `mcp` + search
-`obsidian-mcp`, except for `knowledge list`).
+`obsidian-mcp`, except for `notes list`).
 
 ## Setup and diagnosis
 
@@ -115,5 +115,5 @@ are not included. To inspect a project file, pass
 `integrate claude-code status --settings <repo>/.claude/settings.json`.
 
 Common error codes: `CORE_002_VAULT_NOT_CONFIGURED` (run `config init`),
-`CAPTURE_001_INVALID_SESSION_ID`, `KNOWLEDGE_201_CURATION_FAILED` (curation or storage failed; see `knowledge parked`),
+`CAPTURE_001_INVALID_SESSION_ID`, `NOTES_201_CURATION_FAILED` (curation or storage failed; see `notes parked`),
 `INTEGRATION_101_AGENT_SETTINGS_INVALID` (the settings file is not valid JSON).

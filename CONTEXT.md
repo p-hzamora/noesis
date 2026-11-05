@@ -8,7 +8,7 @@ The vocabulary of the project. Use these terms in code, docs, and conversation.
 Detecting units of finished work inside an agent session and deciding when they are ready
 to hand over. Knows sessions, commits, and transcripts; knows nothing about notes.
 
-**Knowledge** (bounded context):
+**Notes** (bounded context):
 Deciding what is worth keeping and storing it. Knows notes, curation, and storage; knows
 nothing about agent sessions.
 
@@ -17,7 +17,7 @@ One agent session that the user switched on for capture. Holds the commits waiti
 handed over and how far the transcript has been read.
 
 **Work brief**:
-The compact, versioned description of finished work that Capture hands to Knowledge:
+The compact, versioned description of finished work that Capture hands to Notes:
 repository, commits, diff stat, session goal, and an excerpt of the conversation. Never a diff.
 
 **Hand-over**:
