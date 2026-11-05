@@ -37,11 +37,13 @@ class CurateWorkBriefCommand(FrozenObject):
         brief: The finished work.
         max_attempts: Curator runs before giving up (2 = one automatic retry).
         park_on_failure: Whether to park the brief for a manual retry when every attempt fails.
+        dry_run: Judge and report what would be stored without writing and without parking.
     """
 
     brief: WorkBriefContract
     max_attempts: int
     park_on_failure: bool
+    dry_run: bool = False
 
 
 class CurateWorkBriefHandler(IHandler[CurateWorkBriefCommand, CurationResultDto]):
@@ -87,10 +89,11 @@ class CurateWorkBriefHandler(IHandler[CurateWorkBriefCommand, CurationResultDto]
                     decisions=decisions,
                     commits=brief.commit_shas(),
                     session=brief.short_session(),
+                    dry_run=action.dry_run,
                 )
             )
         except NoteStorageError as error:
-            if not action.park_on_failure:
+            if not action.park_on_failure or action.dry_run:
                 raise
             ticket: str = await self._queue.park(
                 action.brief, error=error.message, now=self._clock.now()
@@ -121,7 +124,7 @@ class CurateWorkBriefHandler(IHandler[CurateWorkBriefCommand, CurationResultDto]
                 if attempt < action.max_attempts:
                     await self._sleep(self._retry_delay_seconds)
         reason: str = last_error.message if last_error else "the curator was never run"
-        if not action.park_on_failure:
+        if not action.park_on_failure or action.dry_run:
             raise CurationFailedError(
                 f"Curation failed: {reason}", {"repository": action.brief.repository}
             )

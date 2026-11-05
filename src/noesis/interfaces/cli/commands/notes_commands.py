@@ -96,16 +96,27 @@ def curate(
     park: Annotated[
         bool, typer.Option("--park/--no-park", help="Park the brief when every attempt fails.")
     ] = True,
+    dry_run: Annotated[
+        bool,
+        typer.Option("--dry-run", help="Judge and show the paths and outcomes without writing."),
+    ] = False,
     as_json: JsonOption = False,
 ) -> None:
-    """Ask the curator what in a work brief is worth keeping, and store it as auto notes."""
+    """Ask the curator what in a work brief is worth keeping, then store it as auto notes."""
     command = CurateWorkBriefCommand(
-        brief=_load_brief(brief_file), max_attempts=max_attempts, park_on_failure=park
+        brief=_load_brief(brief_file),
+        max_attempts=max_attempts,
+        park_on_failure=park,
+        dry_run=dry_run,
     )
     handlers = _handlers(context)
-    result = CurationResponse.model_validate(asyncio.run(handlers.curate.handle(command)))
+    stored: CurationResultDto = asyncio.run(handlers.curate.handle(command))
     _warn(handlers)
-    output.emit(result)
+    output.emit(
+        CurationPreviewResponse.model_validate(stored)
+        if dry_run
+        else CurationResponse.model_validate(stored)
+    )
 
 
 def _repository_area() -> NoteArea:
