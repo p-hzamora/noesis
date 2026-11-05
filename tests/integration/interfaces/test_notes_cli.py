@@ -153,3 +153,42 @@ def test_invalid_brief_and_missing_vault_are_reported(
     bad.write_text('{"contract_version": 2}', encoding="utf-8")
     assert run(["notes", "curate", "--brief-file", str(bad), "--json"]) == 2
     assert _out(capsys)["error"]["code"] == "INTERFACE_001_INVALID_WORK_BRIEF"  # type: ignore[index]
+
+
+def test_curate_dry_run_shows_the_decision_without_writing_or_parking(
+    vault: Path,
+    brief_file: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    _use_claude(tmp_path, monkeypatch, envelope=success_envelope([TTL_DECISION]))
+
+    assert run(["notes", "curate", "--brief-file", str(brief_file), "--dry-run", "--json"]) == 0
+
+    assert _out(capsys)["result"] == {
+        "repository": "demo",
+        "created": ["repos/demo/auto/decisions/use-ttl-cache.md"],
+        "updated": [],
+        "skipped": [],
+        "dry_run": True,
+    }
+    assert not (vault / "repos").exists()
+
+
+def test_curate_dry_run_does_not_park_a_failed_judgement(
+    vault: Path,
+    brief_file: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    _use_claude(tmp_path, monkeypatch, exit_code=1)
+
+    assert run(["notes", "curate", "--brief-file", str(brief_file), "--dry-run", "--json"]) == 1
+
+    error: JsonObject = _out(capsys)["error"]  # type: ignore[assignment]
+    assert error["code"] == "NOTES_201_CURATION_FAILED"
+    assert "ticket" not in error["metadata"]  # type: ignore[operator]
+    assert run(["notes", "parked", "--json"]) == 0
+    assert _out(capsys)["result"] == {"parked": []}

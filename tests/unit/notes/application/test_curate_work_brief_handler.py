@@ -66,8 +66,12 @@ class _World:
         )
 
 
-def _command(max_attempts: int = 2, park: bool = True) -> CurateWorkBriefCommand:
-    return CurateWorkBriefCommand(brief=a_brief(), max_attempts=max_attempts, park_on_failure=park)
+def _command(
+    max_attempts: int = 2, park: bool = True, dry_run: bool = False
+) -> CurateWorkBriefCommand:
+    return CurateWorkBriefCommand(
+        brief=a_brief(), max_attempts=max_attempts, park_on_failure=park, dry_run=dry_run
+    )
 
 
 async def test_admitted_decisions_are_stored_and_skips_reported() -> None:
@@ -263,4 +267,37 @@ async def test_retry_that_hits_a_storage_failure_keeps_the_ticket_then_succeeds(
 
     result: CurationResultDto = await retry.handle(RetryParkedCurationCommand(ticket="ticket-1"))
     assert len(result.created) == 1
+    assert world.queue.parked == {}
+
+
+async def test_a_dry_run_judges_and_reports_but_stores_nothing() -> None:
+    world = _World(ScriptedCurator((a_decision(),)))
+
+    result: CurationResultDto = await world.handler.handle(_command(dry_run=True))
+
+    assert result.created == ("repos/demo/auto/decisions/use-ttl-cache.md",)
+    assert world.curator.calls == 1
+    assert world.repository.stored == {}
+    assert world.units[0].commits == 0
+    assert world.queue.parked == {}
+
+
+async def test_a_dry_run_never_parks_a_failed_judgement() -> None:
+    world = _World(ScriptedCurator("boom", "still broken"))
+
+    with pytest.raises(CurationFailedError) as raised:
+        await world.handler.handle(_command(dry_run=True))
+
+    assert world.queue.parked == {}
+    assert "ticket" not in raised.value.metadata
+    assert raised.value.next_steps == ()
+
+
+async def test_a_dry_run_does_not_park_when_reading_existing_notes_fails() -> None:
+    world = _World(ScriptedCurator((a_decision(),)))
+    world.repository.get_errors.append(NoteStorageError("vault unreadable"))
+
+    with pytest.raises(NoteStorageError):
+        await world.handler.handle(_command(dry_run=True))
+
     assert world.queue.parked == {}
