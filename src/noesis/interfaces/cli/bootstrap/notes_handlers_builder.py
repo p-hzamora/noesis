@@ -23,6 +23,9 @@ from noesis.bounded_context.notes.infrastructure.outbound.curation import (
     ClaudeCliCuratorAdapter,
     default_system_prompt,
 )
+from noesis.bounded_context.notes.infrastructure.outbound.failures import (
+    JsonFileApplyFailureLogAdapter,
+)
 from noesis.bounded_context.notes.infrastructure.outbound.queue import (
     JsonFileParkedCurationQueueAdapter,
 )
@@ -45,6 +48,7 @@ from noesis.shared_kernel.infrastructure.outbound.clock import SystemClockAdapte
 from .obsidian_mcp_client_builder import build_obsidian_mcp_client
 
 PARKED_FOLDER: tuple[str, ...] = ("notes", "parked")
+APPLY_FAILED_FOLDER: tuple[str, ...] = ("notes", "apply-failed")
 MCP_FALLBACK_NOTICE: str = "Obsidian MCP unreachable, searched files instead"
 
 
@@ -203,6 +207,27 @@ def build_unit_of_work_factory(
             return lambda: McpNotesUnitOfWorkAdapter(McpNoteRepositoryAdapter(client, mapper))
         case _ as unhandled:
             assert_never(unhandled)
+
+
+def build_apply(environment: Environment) -> ApplyCurationHandler:
+    """Wire the apply handler: storage and the failure log, never the curator or the queue.
+
+    Args:
+        environment: Loaded settings.
+
+    Returns:
+        The handler behind `noesis notes apply`.
+    """
+    if needs_vault(environment):
+        require_vault(environment)
+    return ApplyCurationHandler(
+        uow_factory=build_unit_of_work_factory(environment, NoteMapper()),
+        clock=SystemClockAdapter(),
+        policy=AutoCurationPolicy(),
+        failures=JsonFileApplyFailureLogAdapter(
+            environment.runtime.state_dir.joinpath(*APPLY_FAILED_FOLDER)
+        ),
+    )
 
 
 def build_notes(environment: Environment, *, curator: ICurator | None = None) -> NotesHandlers:

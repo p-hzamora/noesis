@@ -1,5 +1,7 @@
 """`noesis notes curate|retry` output."""
 
+from typing import Literal
+
 from noesis.utils import FrozenObject
 
 from .i_renderable_response import IRenderableResponse
@@ -39,5 +41,25 @@ class CurationResponse(IRenderableResponse):
         ]
         lines += [f"  created {path}" for path in self.created]
         lines += [f"  updated {path}" for path in self.updated]
+        lines += [f"  skipped {item.candidate}: {item.reason}" for item in self.skipped]
+        return "\n".join(lines)
+
+
+class CurationPreviewResponse(CurationResponse):
+    """`--dry-run`: what curation would store; nothing was written.
+
+    Attributes:
+        dry_run: Always true, so a caller cannot mistake a preview for a stored result.
+    """
+
+    dry_run: Literal[True] = True
+
+    def render(self) -> str:
+        lines: list[str] = [
+            f"{self.repository}: would create {len(self.created)}, update {len(self.updated)}, "
+            f"skip {len(self.skipped)} (dry run, nothing written)"
+        ]
+        lines += [f"  would create {path}" for path in self.created]
+        lines += [f"  would update {path}" for path in self.updated]
         lines += [f"  skipped {item.candidate}: {item.reason}" for item in self.skipped]
         return "\n".join(lines)
