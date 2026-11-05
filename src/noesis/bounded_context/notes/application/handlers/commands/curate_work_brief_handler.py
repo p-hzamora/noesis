@@ -2,32 +2,17 @@
 
 import asyncio
 from collections.abc import Awaitable, Callable
-from datetime import datetime
 
 from noesis.bounded_context.notes.application.dtos import (
     CurationResultDto,
     NoteSearchResultDto,
     NoteSummaryDto,
-    SkippedCandidateDto,
 )
 from noesis.bounded_context.notes.application.mappers import WorkBriefMapper
 from noesis.bounded_context.notes.application.ports.curation import ICurator
 from noesis.bounded_context.notes.application.ports.queue import IParkedCurationQueue
 from noesis.bounded_context.notes.application.ports.read_repositories import INoteReadRepository
-from noesis.bounded_context.notes.application.ports.uow import INotesUnitOfWork
-from noesis.bounded_context.notes.domain.entities import Note
-from noesis.bounded_context.notes.domain.policies import (
-    AutoCurationPolicy,
-    CurationOutcome,
-    CurationOutcomeEnum,
-)
-from noesis.bounded_context.notes.domain.value_objects import (
-    CurationDecision,
-    NoteArea,
-    NoteLocation,
-    NoteOriginEnum,
-    WorkBrief,
-)
+from noesis.bounded_context.notes.domain.value_objects import CurationDecision, WorkBrief
 from noesis.exceptions import (
     CurationFailedError,
     CuratorFailedError,
@@ -37,6 +22,8 @@ from noesis.shared_kernel.application.handlers import IHandler
 from noesis.shared_kernel.application.ports.clock import IClock
 from noesis.shared_kernel.contracts import WorkBriefContract
 from noesis.utils import FrozenObject
+
+from .apply_curation_handler import ApplyCurationCommand, ApplyCurationHandler
 
 RELATED_NOTES_LIMIT: int = 8
 
@@ -63,21 +50,19 @@ class CurateWorkBriefHandler(IHandler[CurateWorkBriefCommand, CurationResultDto]
     def __init__(
         self,
         *,
-        uow_factory: Callable[[], INotesUnitOfWork],
+        apply: ApplyCurationHandler,
         read_repository: INoteReadRepository,
         curator: ICurator,
         queue: IParkedCurationQueue,
         clock: IClock,
-        policy: AutoCurationPolicy,
         retry_delay_seconds: float,
         sleep: Sleeper = asyncio.sleep,
     ) -> None:
-        self._uow_factory: Callable[[], INotesUnitOfWork] = uow_factory
+        self._apply: ApplyCurationHandler = apply
         self._read_repository: INoteReadRepository = read_repository
         self._curator: ICurator = curator
         self._queue: IParkedCurationQueue = queue
         self._clock: IClock = clock
-        self._policy: AutoCurationPolicy = policy
         self._retry_delay_seconds: float = retry_delay_seconds
         self._sleep: Sleeper = sleep
 
@@ -96,7 +81,14 @@ class CurateWorkBriefHandler(IHandler[CurateWorkBriefCommand, CurationResultDto]
         related: list[NoteSummaryDto] = list(found.notes)
         decisions: tuple[CurationDecision, ...] = await self._curate(action, brief, related)
         try:
-            outcomes: list[CurationOutcome] = await self._store(brief, decisions)
+            return await self._apply.handle(
+                ApplyCurationCommand(
+                    area=brief.area,
+                    decisions=decisions,
+                    commits=brief.commit_shas(),
+                    session=brief.short_session(),
+                )
+            )
         except NoteStorageError as error:
             if not action.park_on_failure:
                 raise
@@ -111,16 +103,6 @@ class CurateWorkBriefHandler(IHandler[CurateWorkBriefCommand, CurationResultDto]
                     f"Fix the cause, then run `noesis notes retry {ticket}`.",
                 ],
             ) from error
-        return CurationResultDto(
-            repository=brief.repository,
-            created=_paths(outcomes, CurationOutcomeEnum.CREATED),
-            updated=_paths(outcomes, CurationOutcomeEnum.UPDATED),
-            skipped=tuple(
-                SkippedCandidateDto(candidate=outcome.candidate, reason=outcome.reason)
-                for outcome in outcomes
-                if outcome.outcome is CurationOutcomeEnum.SKIPPED
-            ),
-        )
 
     async def _curate(
         self, action: CurateWorkBriefCommand, brief: WorkBrief, related: list[NoteSummaryDto]
@@ -149,49 +131,3 @@ class CurateWorkBriefHandler(IHandler[CurateWorkBriefCommand, CurationResultDto]
             {"repository": action.brief.repository, "ticket": ticket},
             next_steps=[f"Fix the cause, then run `noesis notes retry {ticket}`."],
         ) from last_error
-
-    async def _store(
-        self, brief: WorkBrief, decisions: tuple[CurationDecision, ...]
-    ) -> list[CurationOutcome]:
-        """Apply the policy to every decision and commit the resulting notes together."""
-        now: datetime = self._clock.now()
-        area: NoteArea = brief.area
-        commits: tuple[str, ...] = brief.commit_shas()
-        session: str = brief.short_session()
-        outcomes: list[CurationOutcome] = []
-        async with self._uow_factory() as uow:
-            for decision in decisions:
-                existing_auto: Note | None = None
-                existing_manual: Note | None = None
-                if decision.draft is not None:
-                    location = NoteLocation(
-                        area=area,
-                        origin=NoteOriginEnum.AUTO,
-                        kind=decision.draft.kind,
-                        slug=decision.draft.slug,
-                    )
-                    existing_auto = await uow.notes.get(location)
-                    existing_manual = await uow.notes.get(
-                        location.with_origin(NoteOriginEnum.MANUAL)
-                    )
-                outcome: CurationOutcome = self._policy.apply(
-                    decision,
-                    area=area,
-                    existing_auto=existing_auto,
-                    existing_manual=existing_manual,
-                    commits=commits,
-                    session=session,
-                    now=now,
-                )
-                if outcome.note is not None:
-                    await uow.notes.save(outcome.note)
-                outcomes.append(outcome)
-            await uow.commit()
-        return outcomes
-
-
-def _paths(outcomes: list[CurationOutcome], kind: CurationOutcomeEnum) -> tuple[str, ...]:
-    """Paths of the notes behind outcomes of one kind."""
-    return tuple(
-        o.note.location.relative_path for o in outcomes if o.outcome is kind and o.note is not None
-    )

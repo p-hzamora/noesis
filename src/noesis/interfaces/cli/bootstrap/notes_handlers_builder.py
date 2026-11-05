@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import assert_never
 
 from noesis.bounded_context.notes.application.handlers.commands import (
+    ApplyCurationHandler,
     CurateWorkBriefHandler,
     RetryParkedCurationHandler,
 )
@@ -223,12 +224,15 @@ def build_notes(environment: Environment, *, curator: ICurator | None = None) ->
     )
 
     curate = CurateWorkBriefHandler(
-        uow_factory=build_unit_of_work_factory(environment, mapper),
+        apply=ApplyCurationHandler(
+            uow_factory=build_unit_of_work_factory(environment, mapper),
+            clock=SystemClockAdapter(),
+            policy=AutoCurationPolicy(),
+        ),
         read_repository=read_repository,
         curator=curator or build_curator(environment),
         queue=queue,
         clock=SystemClockAdapter(),
-        policy=AutoCurationPolicy(),
         retry_delay_seconds=environment.curator.retry_seconds,
     )
     return NotesHandlers(
