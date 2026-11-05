@@ -54,10 +54,10 @@ sandbox: ## Create the sandbox git repo (.sandbox/, or FILE=/new/path): make san
 	scripts/sandbox.sh init $(if $(FILE),--file "$(FILE)")
 
 sandbox-hook: ## Simulate a Claude Code commit + Stop hook: make sandbox-hook MODE=live|dry-run
-	scripts/sandbox.sh hook $(MODE)
+	scripts/sandbox.sh hook $(MODE) $(if $(FILE),--file "$(FILE)")
 
 sandbox-curate: ## Run the real curator (haiku) on docs/examples/work-brief.json
-	scripts/sandbox.sh curate
+	scripts/sandbox.sh curate $(if $(FILE),--file "$(FILE)")
 
 sandbox-env: ## Print the export line to point noesis at the sandbox (FILE=… as above)
 	@scripts/sandbox.sh shell $(if $(FILE),--file "$(FILE)")
