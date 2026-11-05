@@ -29,5 +29,5 @@ class IEnvironmentProbe(abc.ABC):
 
     @abc.abstractmethod
     def list_entries(self, folder: Path) -> tuple[str, ...]:
-        """Names of the files and folders directly inside `folder` (empty when it is missing)."""
+        """Names of the files and non-empty folders directly inside `folder` (empty when it is missing)."""
         ...
