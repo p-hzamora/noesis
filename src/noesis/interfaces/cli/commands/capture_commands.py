@@ -36,7 +36,7 @@ def _handlers(context: typer.Context) -> CaptureHandlers:
 def _status(context: typer.Context, dto: CaptureStatusDto) -> CaptureStatusResponse:
     """The status plus where it lives, so callers can match it against the hooks' config."""
     environment: Environment = cli_state(context).environment()
-    vault: Path | None = environment.knowledge.vault_dir
+    vault: Path | None = environment.notes.vault_dir
     return CaptureStatusResponse.model_validate(dto).model_copy(
         update={
             "env_file": str(environment.env_file),

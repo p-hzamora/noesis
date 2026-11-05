@@ -1,4 +1,4 @@
-"""`noesis knowledge curate|retry` output."""
+"""`noesis notes curate|retry` output."""
 
 from noesis.utils import FrozenObject
 
@@ -18,7 +18,7 @@ class SkippedCandidateResponse(FrozenObject):
 
 
 class CurationResponse(IRenderableResponse):
-    """`noesis knowledge curate|retry`: what curation stored.
+    """`noesis notes curate|retry`: what curation stored.
 
     Attributes:
         repository: Repository the brief came from.

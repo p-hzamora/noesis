@@ -14,7 +14,7 @@ class SearchEngineEnum(StrEnum):
 
 
 class WriterBackendEnum(StrEnum):
-    """Where `knowledge curate` stores the notes.
+    """Where `notes curate` stores the notes.
 
     FILESYSTEM: Markdown files under the vault folder (a plain folder, an Obsidian vault, an NFS
     mount). MCP: Obsidian's MCP server (`vault_write`), for a vault noesis cannot reach as files.

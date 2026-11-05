@@ -1,4 +1,4 @@
-"""`noesis knowledge parked` output."""
+"""`noesis notes parked` output."""
 
 from noesis.utils import FrozenObject
 
@@ -6,10 +6,10 @@ from .i_renderable_response import IRenderableResponse
 
 
 class ParkedCurationResponse(FrozenObject):
-    """One parked brief of `noesis knowledge parked`.
+    """One parked brief of `noesis notes parked`.
 
     Attributes:
-        ticket: Id to pass to `noesis knowledge retry`.
+        ticket: Id to pass to `noesis notes retry`.
         repository: Repository of the brief.
         head: Newest commit of the brief.
         parked_at: When it was parked (ISO).
@@ -24,7 +24,7 @@ class ParkedCurationResponse(FrozenObject):
 
 
 class ParkedCurationListResponse(IRenderableResponse):
-    """`noesis knowledge parked`: every parked brief, oldest first.
+    """`noesis notes parked`: every parked brief, oldest first.
 
     Attributes:
         parked: The parked briefs.

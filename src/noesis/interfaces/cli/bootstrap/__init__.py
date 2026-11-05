@@ -22,11 +22,11 @@ from .diagnostics_handlers_builder import (
     run_diagnostics,
     run_update_check,
 )
-from .knowledge_handlers_builder import (
+from .notes_handlers_builder import (
     PARKED_FOLDER,
-    KnowledgeHandlers,
+    NotesHandlers,
     build_curator,
-    build_knowledge,
+    build_notes,
     build_unit_of_work_factory,
     curator_system_prompt,
     needs_vault,
@@ -37,7 +37,7 @@ from .obsidian_mcp_client_builder import build_obsidian_mcp_client
 __all__ = [
     "AgentHooksHandlers",
     "CaptureHandlers",
-    "KnowledgeHandlers",
+    "NotesHandlers",
     "CAPTURE_FOLDER",
     "DOCTOR_UPDATE_TIMEOUT_SECONDS",
     "LOCK_TIMEOUT_SECONDS",
@@ -47,7 +47,7 @@ __all__ = [
     "build_capture",
     "build_curator",
     "build_diagnostics",
-    "build_knowledge",
+    "build_notes",
     "build_obsidian_mcp_client",
     "build_update_check",
     "build_unit_of_work_factory",
