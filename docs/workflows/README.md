@@ -19,5 +19,6 @@ Legend used in every diagram:
 5. [`notes curate --brief-file F`](notes-curate.md)
 6. [`notes apply --decisions-file F`](notes-apply.md)
 7. [`notes retry | parked | search | list`](notes.md)
-8. [`integrate claude-code install | uninstall | status`](integrate-claude-code.md)
-9. [`doctor`, `config`, `skills`](setup.md)
+8. [`notes recall TASK`](notes-recall.md)
+9. [`integrate claude-code install | uninstall | status`](integrate-claude-code.md)
+10. [`doctor`, `config`, `skills`](setup.md)

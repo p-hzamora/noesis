@@ -77,6 +77,28 @@ MCP answers and serves the vault of `NOESIS_VAULT_DIR`.
 Results carry each note's `path`. For the full text, read that file under the vault
 folder (`noesis [--env-file <path>] config show --json` -> `settings.notes.vault_dir`).
 
+## Recall notes before a task
+
+Run it once, when you start a task that touches code the vault may already cover (a bug, a
+design choice, an unfamiliar area). Do not run it for trivial edits.
+
+```bash
+noesis notes recall "<one sentence on the task>" --repo <repo> --json
+```
+
+- Pass one sentence about the task, not a pasted prompt. noesis keeps its keywords (3+ letters,
+  no stopwords); a sentence with none fails with `NOTES_204_NO_RECALL_TERMS` (exit 1).
+- Without `--repo` or `--area` the repository you are in is used; outside a git repository it
+  fails with `INTERFACE_002_NOT_IN_GIT_REPOSITORY`.
+- The result has `entries` (`kind`, `title`, `path`, `date`, `snippet`), best first, plus
+  `considered` and `omitted`. `--limit` (1..20, default 5) and `--budget-tokens` (default 1000,
+  `0` is unlimited) bound it. Bodies are never included.
+- Read only the entries that look relevant, by `path`, under the vault folder. Do not open them all.
+- Tell the user which notes you used (their paths) and why. If `entries` is empty (exit 0,
+  text `no relevant notes`), say so and go on without them.
+- Do not loop: one recall per task. Do not retry with other wording when it is empty. If the
+  result has `notice`, Obsidian was unreachable and files were searched; tell the user, do not retry.
+
 ## Record a note yourself
 
 When the user asks you to record something in the vault, write the draft and let noesis store
@@ -154,4 +176,5 @@ Common error codes: `CORE_002_VAULT_NOT_CONFIGURED` (run `config init`),
 `CAPTURE_001_INVALID_SESSION_ID`, `NOTES_201_CURATION_FAILED` (curation or storage failed; see `notes parked`),
 `NOTES_203_APPLY_FAILED` (`notes apply` rejected an entry or could not store; the payload was kept),
 `INTERFACE_002_NOT_IN_GIT_REPOSITORY` (run `notes apply` from inside the repository),
+`NOTES_204_NO_RECALL_TERMS` (`notes recall` task has no usable keyword),
 `INTEGRATION_101_AGENT_SETTINGS_INVALID` (the settings file is not valid JSON).
