@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 
 import pytest
+from tests.support.git_support import add_worktree, init_repo, isolate_git
 
 from noesis.interfaces.cli import run
 from noesis.shared_kernel.domain import JsonObject
@@ -282,3 +283,16 @@ def test_the_old_knowledge_group_no_longer_exists(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     assert run(["knowledge", "list"]) == 2
+
+
+def test_a_linked_worktree_writes_under_the_main_repository_area(
+    vault: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    isolate_git(monkeypatch)
+    main = init_repo(tmp_path / "main-repo" / "demo")
+    monkeypatch.chdir(add_worktree(main, tmp_path / "demo-feature", "feat/x"))
+
+    assert run(["notes", "apply", "--decisions-file", str(_decisions(tmp_path)), "--json"]) == 0
+
+    assert _out(capsys)["result"]["created"] == [NOTE_PATH]
+    assert (vault / NOTE_PATH).is_file()

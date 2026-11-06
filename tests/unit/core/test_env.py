@@ -130,3 +130,19 @@ def test_an_unknown_writer_backend_is_rejected(tmp_path: Path) -> None:
         load_environment(env_file)
 
     assert "NOESIS_WRITER_BACKEND" in str(raised.value.metadata["problems"])
+
+
+def test_ambient_session_ids_are_read_from_the_process_environment(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("NOESIS_SESSION_ID", "mine")
+    monkeypatch.setenv("CODEX_THREAD_ID", "thread-1")
+    monkeypatch.setenv("CODEX_SESSION_ID", "")
+
+    identity = load_environment(tmp_path / "missing.env").identity
+
+    assert (identity.noesis_session_id, identity.codex_thread_id, identity.codex_session_id) == (
+        "mine",
+        "thread-1",
+        None,
+    )

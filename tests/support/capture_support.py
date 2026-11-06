@@ -11,17 +11,29 @@ from noesis.bounded_context.capture.application.dtos import (
     AgentHooksDto,
     CaptureRunDto,
     PublicationDto,
+    RepositoryLocationDto,
     TranscriptSnapshotDto,
 )
 from noesis.bounded_context.capture.application.ports.agent_hooks import IAgentHookRegistry
+from noesis.bounded_context.capture.application.ports.identity import ISessionIdentitySource
 from noesis.bounded_context.capture.application.ports.journal import ICaptureJournal
 from noesis.bounded_context.capture.application.ports.publishing import IWorkBriefPublisher
+from noesis.bounded_context.capture.application.ports.read_repositories import (
+    ICaptureSessionTreeReader,
+)
+from noesis.bounded_context.capture.application.ports.registry import IRepoRegistry
 from noesis.bounded_context.capture.application.ports.transcript import ITranscriptReader
 from noesis.bounded_context.capture.application.ports.uow import ICaptureUnitOfWork
 from noesis.bounded_context.capture.application.ports.vcs import IVcsReader
 from noesis.bounded_context.capture.domain.entities import CaptureSession
 from noesis.bounded_context.capture.domain.repositories import ICaptureSessionRepository
-from noesis.bounded_context.capture.domain.value_objects import CommitRecord, DiffSize, SessionId
+from noesis.bounded_context.capture.domain.value_objects import (
+    CommitRecord,
+    DiffSize,
+    RepoId,
+    SessionId,
+    WorktreeHead,
+)
 from noesis.shared_kernel.contracts import WorkBriefContract
 
 START: datetime = datetime(2026, 10, 30, 12, 0, tzinfo=UTC)
@@ -82,23 +94,85 @@ class InMemoryCaptureUnitOfWork(ICaptureUnitOfWork):
 
 
 class FakeVcs(IVcsReader):
-    """A repository whose HEAD the test sets."""
+    """A repository with worktrees whose HEADs the test sets."""
 
-    def __init__(self, head: CommitRecord | None = None, root: Path | None = REPO) -> None:
-        self.head: CommitRecord | None = head or a_commit()
-        self.root: Path | None = root
+    def __init__(self) -> None:
+        self.location: RepositoryLocationDto | None = RepositoryLocationDto(
+            common_dir=REPO / ".git", root=REPO, name="demo"
+        )
+        self.heads: dict[str, WorktreeHead] = {}
+        self.commits: dict[str, CommitRecord] = {}
+        self.set_head()
 
-    async def repository_root(self, cwd: Path) -> Path | None:
-        return self.root
+    def set_head(
+        self,
+        sha: str = "a" * 40,
+        *,
+        path: Path = REPO,
+        branch: str = "main",
+        at: datetime = START,
+        files: int = 2,
+        lines: int = 25,
+    ) -> None:
+        """Move the HEAD of the worktree at `path` to a commit of the given size."""
+        self.heads[str(path)] = WorktreeHead(
+            path=str(path), sha=sha, branch=branch, committed_at=at
+        )
+        self.commits[str(path)] = a_commit(sha, files=files, lines=lines)
+
+    async def common_dir(self, cwd: Path) -> RepositoryLocationDto | None:
+        return self.location
+
+    async def worktrees(self, common_dir: Path) -> list[WorktreeHead]:
+        return list(self.heads.values())
 
     async def head_commit(self, root: Path) -> CommitRecord | None:
-        return self.head
+        return self.commits.get(str(root))
 
     async def branch(self, root: Path) -> str:
         return "main"
 
     async def stat_lines(self, root: Path, shas: Sequence[str], *, limit: int) -> list[str]:
         return [f"{sha[:8]} | 3 +++" for sha in shas][:limit]
+
+
+class FakeIdentitySource(ISessionIdentitySource):
+    """An ambient id the test sets and a counter for fresh ones."""
+
+    def __init__(self, ambient: str | None = None) -> None:
+        self._ambient: str | None = ambient
+        self.fresh_calls: int = 0
+
+    def ambient(self) -> str | None:
+        return self._ambient
+
+    def fresh(self) -> str:
+        self.fresh_calls += 1
+        return f"fresh-{self.fresh_calls}"
+
+
+class RecordingRepoRegistry(IRepoRegistry):
+    """Keeps what was registered, in order."""
+
+    def __init__(self) -> None:
+        self.registered: list[tuple[str, Path]] = []
+
+    async def register(self, repo_id: RepoId, path: Path) -> None:
+        self.registered.append((repo_id.value, path))
+
+
+class InMemoryCaptureSessionTreeReader(ICaptureSessionTreeReader):
+    """Reads the parent links of the sessions stored in an in-memory repository."""
+
+    def __init__(self, repository: InMemoryCaptureSessionRepository) -> None:
+        self._repository: InMemoryCaptureSessionRepository = repository
+
+    async def children_of(self, session_id: SessionId) -> list[SessionId]:
+        return [
+            session.id
+            for session in sorted(self._repository.stored.values(), key=lambda s: s.id.value)
+            if session.parent_id == session_id.value
+        ]
 
 
 class FakeTranscripts(ITranscriptReader):

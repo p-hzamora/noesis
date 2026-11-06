@@ -146,6 +146,17 @@ def test_the_installable_skill_stub_defers_to_the_cli_guide() -> None:
     assert "noesis --env-file <path> capture on" in stub
 
 
+def test_the_installable_skill_stub_explains_profiles_session_identity_and_upgrades() -> None:
+    stub: str = (PROJECT_ROOT / "skills/noesis/SKILL.md").read_text(encoding="utf-8")
+
+    assert "<main repo folder name>" in stub
+    assert "main checkout's `.noesis-config`" in stub
+    assert "result.session_id" in stub
+    assert "generated" in stub
+    assert "capture on --parent" in stub
+    assert "run `capture on` again" in stub
+
+
 def test_the_guide_pins_the_hooks_env_file_and_verifies_capture(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
@@ -206,3 +217,21 @@ def test_doctor_reports_unreadable_agent_settings_as_a_failed_check(
     hooks = next(check for check in checks if check["name"] == "claude_code_hooks")
     assert hooks["ok"] is False
     assert hooks["detail"] == f"{settings} is not valid JSON"
+
+
+def test_the_guide_documents_session_identity_children_and_worktrees(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    run(["skills", "get", "noesis"])
+    guide: str = capsys.readouterr().out
+
+    assert "result.session_id" in guide
+    assert "capture on --parent" in guide
+    assert "--children" in guide
+    assert "CAPTURE_202_SESSION_ID_MISSING" in guide
+    assert "ambiguous_worktree" in guide
+    assert "<main repo folder name>" in guide
+    assert "CODEX_THREAD_ID" in guide
+    assert "result.generated" in guide
+    assert "INTERFACE_003_BLANK_SESSION_ID" in guide
+    assert "INTERFACE_004_SELF_PARENT_SESSION" in guide

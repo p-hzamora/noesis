@@ -7,9 +7,12 @@ from noesis.bounded_context.notes.domain.value_objects import CommitRef, NoteAre
 pytestmark = pytest.mark.unit
 
 
-def _brief(*, goal: str = "make login faster", session_id: str = "abcd1234ef") -> WorkBrief:
+def _brief(
+    *, goal: str = "make login faster", session_id: str = "abcd1234ef", session_label: str = ""
+) -> WorkBrief:
     return WorkBrief(
         session_id=session_id,
+        session_label=session_label,
         repository="demo",
         repository_path="/work/demo",
         branch="main",
@@ -39,3 +42,10 @@ def test_provenance_is_the_commit_shas_oldest_first_and_a_short_session_id() -> 
 
     assert brief.commit_shas() == ("aaa", "bbb")
     assert brief.short_session() == "01234567"
+
+
+def test_a_session_label_is_the_provenance_and_the_id_stays_opaque() -> None:
+    brief: WorkBrief = _brief(session_id="demo-12345678-abcdef012345", session_label="abcdef012345")
+
+    assert brief.short_session() == "abcdef012345"
+    assert _brief(session_id="demo-12345678-abcdef012345").short_session() == "demo-123"

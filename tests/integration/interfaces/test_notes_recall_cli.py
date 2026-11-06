@@ -152,15 +152,25 @@ def test_a_task_without_keywords_is_a_typed_failure(
     assert error["code"] == "NOTES_204_NO_RECALL_TERMS"
 
 
+@pytest.mark.parametrize("task", ["", "  "], ids=["empty", "blank"])
+def test_a_blank_task_fails_typed_with_the_json_envelope(
+    task: str, vault: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    assert run(["notes", "recall", task, "--repo", "demo", "--json"]) == 2
+
+    error: JsonObject = _json(capsys)["error"]  # type: ignore[assignment]
+    assert error["code"] == "INTERFACE_005_EMPTY_RECALL_TASK"
+    assert error["next_steps"]
+
+
 @pytest.mark.parametrize(
     "args",
     [
-        ["  "],
         ["login cache", "--limit", "0"],
         ["login cache", "--limit", "21"],
         ["login cache", "--budget-tokens", "-1"],
     ],
-    ids=["blank-task", "limit-0", "limit-21", "negative-budget"],
+    ids=["limit-0", "limit-21", "negative-budget"],
 )
 def test_invalid_arguments_are_usage_errors(
     args: list[str], vault: Path, capsys: pytest.CaptureFixture[str]

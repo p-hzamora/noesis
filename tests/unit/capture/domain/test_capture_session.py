@@ -13,11 +13,18 @@ from noesis.bounded_context.capture.domain.entities import (
 )
 from noesis.bounded_context.capture.domain.specifications import (
     FlushCandidate,
+    HeadCandidate,
+    NewCommitCandidateSpecification,
     OutsideDebounceSpecification,
     PendingWorkSpecification,
     SignificantChangeSpecification,
 )
-from noesis.bounded_context.capture.domain.value_objects import CaptureModeEnum, DiffSize, SessionId
+from noesis.bounded_context.capture.domain.value_objects import (
+    CaptureModeEnum,
+    DiffSize,
+    SessionId,
+    WorktreeHead,
+)
 from noesis.exceptions import (
     CaptureNotEnabledError,
     InvalidSessionIdError,
@@ -125,4 +132,88 @@ def test_specifications_gate_pending_debounce_and_size() -> None:
     assert debounce.is_satisfied_by(FlushCandidate(session=session, now=soon.now, final=True))
     assert debounce.is_satisfied_by(
         FlushCandidate(session=session, now=START + timedelta(seconds=301), final=False)
+    )
+
+
+# --- repository identity, parent link, observed heads (CVG-003) ---
+
+
+def test_enable_reports_whether_anything_changed_and_keeps_the_mode_when_none_is_given() -> None:
+    session = CaptureSession.create(SessionId(value="s-1"), now=START)
+
+    assert session.enable(CaptureModeEnum.DRY_RUN, now=START) is True
+    assert session.enable(None, now=START) is False  # a repeat call is a no-op
+    assert session.enable(CaptureModeEnum.DRY_RUN, now=START) is False
+    assert session.mode is CaptureModeEnum.DRY_RUN
+    assert session.enable(CaptureModeEnum.LIVE, now=START) is True
+
+
+def test_enable_without_a_mode_on_a_new_session_uses_live() -> None:
+    session = CaptureSession.create(SessionId(value="s-1"), now=START)
+
+    session.enable(None, now=START)
+
+    assert (session.enabled, session.mode) == (True, CaptureModeEnum.LIVE)
+
+
+def test_a_session_remembers_its_parent() -> None:
+    child = CaptureSession.create(SessionId(value="c"), now=START, parent_id="p")
+
+    assert child.parent_id == "p"
+
+
+def test_an_old_session_adopts_its_repo_id_without_losing_pending_commits() -> None:
+    session = _session()
+    session.record_commit(a_commit("a"), repository_path="/r", now=START)
+    assert session.repo_id is None
+
+    session.record_commit(a_commit("b"), repository_path="/r", repo_id="r-12345678", now=START)
+
+    assert [commit.sha for commit in session.pending] == ["a", "b"]
+    assert session.repo_id == "r-12345678"
+
+
+def test_a_commit_of_another_repo_id_starts_a_new_batch() -> None:
+    session = _session()
+    session.record_commit(a_commit("a"), repository_path="/r", repo_id="r-11111111", now=START)
+
+    session.record_commit(a_commit("b"), repository_path="/r", repo_id="r-22222222", now=START)
+
+    assert [commit.sha for commit in session.pending] == ["b"]
+
+
+def test_observed_heads_are_replaced_wholesale_so_stale_worktrees_drop_out() -> None:
+    session = _session()
+
+    assert session.observe_heads({"/r": "a", "/w": "b"}, now=START) is True
+    assert session.observe_heads({"/r": "a", "/w": "b"}, now=START) is False
+    session.observe_heads({"/r": "c"}, now=START)
+
+    assert session.observed_heads == {"/r": "c"}
+
+
+def _head(sha: str = "b", *, age: int = 10) -> WorktreeHead:
+    return WorktreeHead(
+        path="/w", sha=sha, branch="feat/x", committed_at=START - timedelta(seconds=age)
+    )
+
+
+def test_a_head_that_moved_recently_is_a_new_commit_candidate() -> None:
+    spec = NewCommitCandidateSpecification(window_seconds=120)
+
+    assert spec.is_satisfied_by(HeadCandidate(head=_head(), baseline_sha="a", now=START))
+    assert spec.is_satisfied_by(HeadCandidate(head=_head(), baseline_sha=None, now=START))
+
+
+def test_an_unmoved_head_is_not_a_candidate() -> None:
+    spec = NewCommitCandidateSpecification(window_seconds=120)
+
+    assert not spec.is_satisfied_by(HeadCandidate(head=_head("a"), baseline_sha="a", now=START))
+
+
+def test_an_old_commit_is_not_a_candidate_even_without_a_baseline() -> None:
+    spec = NewCommitCandidateSpecification(window_seconds=120)
+
+    assert not spec.is_satisfied_by(
+        HeadCandidate(head=_head(age=500), baseline_sha=None, now=START)
     )
