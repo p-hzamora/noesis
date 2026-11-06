@@ -1,4 +1,4 @@
-"""`noesis notes`: curate work briefs, retry parked ones, search and list notes."""
+"""`noesis notes`: curate work briefs, retry parked ones, search, recall and list notes."""
 
 import asyncio
 import sys
@@ -17,6 +17,7 @@ from noesis.bounded_context.notes.application.handlers.commands import (
 from noesis.bounded_context.notes.application.handlers.queries import (
     ListNotesQuery,
     ListParkedCurationsQuery,
+    RecallNotesQuery,
     SearchNotesQuery,
 )
 from noesis.bounded_context.notes.domain.value_objects import (
@@ -43,6 +44,8 @@ from noesis.interfaces.cli.responses import (
     NoteSearchFallbackResponse,
     NoteSearchResponse,
     ParkedCurationListResponse,
+    RecallFallbackResponse,
+    RecallResponse,
 )
 from noesis.interfaces.cli.state import cli_state
 from noesis.shared_kernel.contracts import WorkBriefContract
@@ -234,6 +237,48 @@ def search(
         return
     notice: str = handlers.notices[0]
     output.emit(NoteSearchFallbackResponse(notes=found.notes, backend=found.backend, notice=notice))
+
+
+@notes_app.command("recall")
+def recall(
+    context: typer.Context,
+    task: Annotated[str, typer.Argument(help="One sentence on what you are about to do.")],
+    area: AreaOption = None,
+    repo: RepoOption = None,
+    limit: Annotated[int, typer.Option("--limit", min=1, max=20, help="Most entries.")] = 5,
+    budget_tokens: Annotated[
+        int,
+        typer.Option(
+            "--budget-tokens", min=0, help="Rough size cap of the digest; 0 is unlimited."
+        ),
+    ] = 1000,
+    as_json: JsonOption = False,
+) -> None:
+    """List the notes worth reading before a task: kind, title, path, date and a snippet."""
+    if not task.strip():
+        raise typer.BadParameter("The task must not be empty.", param_hint="TASK")
+    scope: str | None = _area(area, repo)
+    query = RecallNotesQuery(
+        task=task,
+        area=scope if scope else _repository_area().value,
+        limit=limit,
+        budget_tokens=budget_tokens,
+    )
+    handlers = _handlers(context)
+    digest = RecallResponse.model_validate(asyncio.run(handlers.recall.handle(query)))
+    if not handlers.notices:
+        output.emit(digest)
+        return
+    notice: str = handlers.notices[0]
+    output.emit(
+        RecallFallbackResponse(
+            entries=digest.entries,
+            considered=digest.considered,
+            omitted=digest.omitted,
+            backend=digest.backend,
+            notice=notice,
+        )
+    )
 
 
 @notes_app.command("list")

@@ -13,6 +13,7 @@ from noesis.bounded_context.notes.application.handlers.commands import (
 from noesis.bounded_context.notes.application.handlers.queries import (
     ListNotesHandler,
     ListParkedCurationsHandler,
+    RecallNotesHandler,
     SearchNotesHandler,
 )
 from noesis.bounded_context.notes.application.ports.curation import ICurator
@@ -60,6 +61,7 @@ class NotesHandlers:
         curate: Curate a work brief.
         retry: Retry a parked curation.
         search: Free-text note search.
+        recall: Ranked digest of the notes worth reading for a task.
         list_notes: List notes.
         list_parked: List parked curations.
         notices: Messages the adapters raised while the handlers ran (e.g. the search fell
@@ -69,6 +71,7 @@ class NotesHandlers:
     curate: CurateWorkBriefHandler
     retry: RetryParkedCurationHandler
     search: SearchNotesHandler
+    recall: RecallNotesHandler
     list_notes: ListNotesHandler
     list_parked: ListParkedCurationsHandler
     notices: list[str]
@@ -264,6 +267,7 @@ def build_notes(environment: Environment, *, curator: ICurator | None = None) ->
         curate=curate,
         retry=RetryParkedCurationHandler(queue=queue, curate=curate),
         search=SearchNotesHandler(read_repository=read_repository),
+        recall=RecallNotesHandler(read_repository=read_repository, clock=SystemClockAdapter()),
         list_notes=ListNotesHandler(read_repository=read_repository),
         list_parked=ListParkedCurationsHandler(queue=queue),
         notices=notices,

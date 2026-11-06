@@ -7,6 +7,8 @@ from .note_location import NoteLocation
 from .note_origin_enum import NoteOriginEnum
 from .note_section import NoteSection
 from .note_slug import NoteSlug
+from .recall_candidate import RecallCandidate
+from .recall_weights import RecallWeights
 from .work_brief import CommitRef, WorkBrief
 
 __all__ = [
@@ -20,5 +22,7 @@ __all__ = [
     "NoteOriginEnum",
     "NoteSection",
     "NoteSlug",
+    "RecallCandidate",
+    "RecallWeights",
     "WorkBrief",
 ]
