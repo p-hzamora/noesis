@@ -1,5 +1,8 @@
 # `notes retry | parked | search | list`
 
+To pick the few notes worth reading before a task, see [`notes recall`](notes-recall.md): it
+reuses the same search and adds ranking and a size budget.
+
 ```mermaid
 flowchart LR
     retry["notes retry TICKET"] --> rh[RetryParkedCurationHandler]
