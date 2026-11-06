@@ -4,15 +4,21 @@ import abc
 from collections.abc import Sequence
 from pathlib import Path
 
-from noesis.bounded_context.capture.domain.value_objects import CommitRecord
+from noesis.bounded_context.capture.application.dtos import RepositoryLocationDto
+from noesis.bounded_context.capture.domain.value_objects import CommitRecord, WorktreeHead
 
 
 class IVcsReader(abc.ABC):
     """What Capture asks version control."""
 
     @abc.abstractmethod
-    async def repository_root(self, cwd: Path) -> Path | None:
-        """Root of the repository containing `cwd`, or None outside one."""
+    async def common_dir(self, cwd: Path) -> RepositoryLocationDto | None:
+        """The repository containing `cwd` (the same for every linked worktree), or None."""
+        ...
+
+    @abc.abstractmethod
+    async def worktrees(self, common_dir: Path) -> list[WorktreeHead]:
+        """HEAD of every worktree of the repository (the bare folder itself excluded)."""
         ...
 
     @abc.abstractmethod

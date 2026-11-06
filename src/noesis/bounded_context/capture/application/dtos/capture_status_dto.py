@@ -16,6 +16,8 @@ class CaptureStatusDto(BaseDto):
         pending_lines: Lines they change.
         last_handover_at: Time of the last hand-over (ISO), if any.
         failed_handovers: Consecutive hand-overs that could not start.
+        repo_id: The repository the session works in, when known.
+        parent_id: The session that started this one as a sub-agent, if any.
     """
 
     session_id: str
@@ -27,3 +29,5 @@ class CaptureStatusDto(BaseDto):
     pending_lines: int
     last_handover_at: str | None
     failed_handovers: int
+    repo_id: str | None = None
+    parent_id: str | None = None

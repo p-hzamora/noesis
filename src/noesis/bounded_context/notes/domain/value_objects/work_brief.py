@@ -37,6 +37,7 @@ class WorkBrief(ValueObject):
         diff_stat: Capped `git show --stat` lines (names and counts only).
         goal: The session's first real prompt.
         session_excerpt: User prompts and assistant prose since the last hand-over.
+        session_label: Short label of the session, when Capture provided one.
     """
 
     session_id: str
@@ -48,6 +49,7 @@ class WorkBrief(ValueObject):
     diff_stat: tuple[str, ...] = ()
     goal: str = ""
     session_excerpt: str = ""
+    session_label: str = ""
 
     @property
     def area(self) -> NoteArea:
@@ -63,5 +65,8 @@ class WorkBrief(ValueObject):
         return tuple(commit.sha for commit in self.commits)
 
     def short_session(self) -> str:
-        """The abbreviated session id recorded as the provenance of its notes."""
-        return self.session_id[:SHORT_SESSION_LENGTH]
+        """The session label recorded as the provenance of its notes.
+
+        The id itself is opaque to Notes: without a label, its first characters stand in.
+        """
+        return self.session_label or self.session_id[:SHORT_SESSION_LENGTH]

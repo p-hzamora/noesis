@@ -14,22 +14,32 @@ from noesis.bounded_context.capture.application.handlers.commands import (
 from noesis.bounded_context.capture.application.handlers.queries import (
     GetCaptureStatusHandler,
     ListCaptureRunsHandler,
+    ResolveSessionIdentityHandler,
 )
 from noesis.bounded_context.capture.application.ports.uow import ICaptureUnitOfWork
+from noesis.bounded_context.capture.application.services.identity import SessionIdentityResolver
 from noesis.bounded_context.capture.application.services.journaling import CaptureJournalRecorder
 from noesis.bounded_context.capture.application.services.publishing import (
     WorkBriefPublisherResolver,
 )
+from noesis.bounded_context.capture.domain.services import SessionIdGenerator
 from noesis.bounded_context.capture.domain.specifications import (
+    NewCommitCandidateSpecification,
     OutsideDebounceSpecification,
     SignificantChangeSpecification,
 )
 from noesis.bounded_context.capture.domain.value_objects import CaptureModeEnum, SessionId
+from noesis.bounded_context.capture.infrastructure.outbound.identity import (
+    ChainSessionIdentitySourceAdapter,
+    CodexSessionIdentitySourceAdapter,
+    StaticSessionIdentitySourceAdapter,
+)
 from noesis.bounded_context.capture.infrastructure.outbound.journal import (
     JsonlCaptureJournalAdapter,
 )
 from noesis.bounded_context.capture.infrastructure.outbound.persistence import (
     JsonFileCaptureSessionRepositoryAdapter,
+    JsonFileCaptureSessionTreeReaderAdapter,
     JsonFileCaptureUnitOfWorkAdapter,
 )
 from noesis.bounded_context.capture.infrastructure.outbound.persistence.mappers import (
@@ -40,15 +50,20 @@ from noesis.bounded_context.capture.infrastructure.outbound.publishing import (
     DetachedProcessWorkBriefPublisherAdapter,
     DryRunWorkBriefPublisherAdapter,
 )
+from noesis.bounded_context.capture.infrastructure.outbound.registry import (
+    JsonFileRepoRegistryAdapter,
+)
 from noesis.bounded_context.capture.infrastructure.outbound.transcript import (
     ClaudeCodeTranscriptReaderAdapter,
 )
 from noesis.bounded_context.capture.infrastructure.outbound.vcs import GitCliVcsReaderAdapter
 from noesis.core import Environment
+from noesis.core.git_root import repository_name
 from noesis.shared_kernel.infrastructure.outbound.clock import SystemClockAdapter
 
 CAPTURE_FOLDER: str = "capture"
 LOCK_TIMEOUT_SECONDS: float = 10.0
+NEW_COMMIT_WINDOW_SECONDS: float = 120.0
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -62,6 +77,7 @@ class CaptureHandlers:
         flush: Hand pending work over when ready.
         status: Session status.
         runs: Session journal.
+        resolve: Which stored session id a command runs under.
     """
 
     enable: EnableCaptureHandler
@@ -70,6 +86,7 @@ class CaptureHandlers:
     flush: FlushCaptureHandler
     status: GetCaptureStatusHandler
     runs: ListCaptureRunsHandler
+    resolve: ResolveSessionIdentityHandler
 
 
 def curator_command(environment: Environment) -> list[str]:
@@ -91,7 +108,7 @@ def build_capture(environment: Environment) -> CaptureHandlers:
     mapper = CaptureSessionMapper()
     journal = JsonlCaptureJournalAdapter(root / "journal")
     recorder = CaptureJournalRecorder(journal=journal, clock=clock, trace=environment.capture.trace)
-    vcs = GitCliVcsReaderAdapter()
+    vcs = GitCliVcsReaderAdapter(repository_name=repository_name)
     files = BriefFiles(root / "briefs")
 
     def unit_of_work(session_id: SessionId) -> ICaptureUnitOfWork:
@@ -101,6 +118,21 @@ def build_capture(environment: Environment) -> CaptureHandlers:
             lock_timeout_seconds=LOCK_TIMEOUT_SECONDS,
         )
 
+    registry = JsonFileRepoRegistryAdapter(
+        root / "repos.json", lock_timeout_seconds=LOCK_TIMEOUT_SECONDS
+    )
+    resolver = SessionIdentityResolver(
+        identity=ChainSessionIdentitySourceAdapter(
+            [  # harness sources first, then the variable a user exports
+                CodexSessionIdentitySourceAdapter(
+                    environment.identity.codex_thread_id, environment.identity.codex_session_id
+                ),
+                StaticSessionIdentitySourceAdapter(environment.identity.noesis_session_id),
+            ]
+        ),
+        vcs=vcs,
+        generator=SessionIdGenerator(),
+    )
     publishers = WorkBriefPublisherResolver(
         {
             CaptureModeEnum.LIVE: DetachedProcessWorkBriefPublisherAdapter(
@@ -113,10 +145,17 @@ def build_capture(environment: Environment) -> CaptureHandlers:
         }
     )
     return CaptureHandlers(
-        enable=EnableCaptureHandler(uow_factory=unit_of_work, clock=clock, recorder=recorder),
+        enable=EnableCaptureHandler(
+            uow_factory=unit_of_work, clock=clock, recorder=recorder, registry=registry
+        ),
         disable=DisableCaptureHandler(uow_factory=unit_of_work, clock=clock, recorder=recorder),
         record_commit=RecordCommitHandler(
-            uow_factory=unit_of_work, vcs=vcs, clock=clock, recorder=recorder
+            uow_factory=unit_of_work,
+            vcs=vcs,
+            clock=clock,
+            recorder=recorder,
+            registry=registry,
+            candidates=NewCommitCandidateSpecification(NEW_COMMIT_WINDOW_SECONDS),
         ),
         flush=FlushCaptureHandler(
             uow_factory=unit_of_work,
@@ -131,5 +170,8 @@ def build_capture(environment: Environment) -> CaptureHandlers:
             ),
         ),
         status=GetCaptureStatusHandler(uow_factory=unit_of_work),
-        runs=ListCaptureRunsHandler(journal=journal),
+        runs=ListCaptureRunsHandler(
+            journal=journal, tree=JsonFileCaptureSessionTreeReaderAdapter(root / "sessions")
+        ),
+        resolve=ResolveSessionIdentityHandler(resolver=resolver),
     )

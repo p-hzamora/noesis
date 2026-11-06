@@ -10,6 +10,7 @@ from .curator_settings import CuratorSettings
 from .notes_settings import NotesSettings
 from .paths import default_config_dir, default_env_file, default_state_dir
 from .runtime_settings import LogLevelEnum, RuntimeSettings
+from .session_identity_settings import SessionIdentitySettings
 
 __all__ = [
     "AppBaseSettings",
@@ -19,6 +20,7 @@ __all__ = [
     "NotesSettings",
     "LogLevelEnum",
     "RuntimeSettings",
+    "SessionIdentitySettings",
     "default_config_dir",
     "default_env_file",
     "default_state_dir",

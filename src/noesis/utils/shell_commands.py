@@ -75,3 +75,60 @@ def is_git_commit(command: str | None) -> bool:
     return bool(command) and any(
         git_subcommand(part) == "commit" for part in split_commands(command or "")
     )
+
+
+def commit_directory(command: str | None, cwd: Path) -> Path | None:
+    """The directory a `git commit` in `command` runs in, when the command moves there itself.
+
+    Follows `cd <dir> &&` chains and `git -C <dir>`, quote-aware and relative to `cwd`. It is
+    a hint, not a verdict: forms it cannot read (subshells, `$VAR`, `pushd`) give None.
+
+    Args:
+        command: A full shell command line.
+        cwd: Directory the command starts in.
+
+    Returns:
+        The resolved directory, or None when there is no commit or it runs in `cwd` itself.
+    """
+    current: Path = cwd
+    moved: bool = False
+    for part in split_commands(command or ""):
+        try:
+            tokens: list[str] = shlex.split(part)
+        except ValueError:
+            continue
+        while tokens and tokens[0] == "sudo":
+            tokens.pop(0)
+        if tokens[:1] == ["cd"] and len(tokens) > 1 and not tokens[1].startswith("-"):
+            if _unreadable(tokens[1]):
+                return None
+            current, moved = _join(current, tokens[1]), True
+            continue
+        if git_subcommand(part) == "commit":
+            for value in _git_dash_c_values(tokens):
+                if _unreadable(value):
+                    return None
+                current, moved = _join(current, value), True
+            return current.resolve() if moved else None
+    return None
+
+
+def _unreadable(target: str) -> bool:
+    """A path that needs the shell to expand it."""
+    return "$" in target or "`" in target
+
+
+def _join(base: Path, target: str) -> Path:
+    path: Path = Path(target).expanduser()
+    return path if path.is_absolute() else base / path
+
+
+def _git_dash_c_values(tokens: list[str]) -> list[str]:
+    """The `-C <dir>` values in front of git's sub-command, in order."""
+    values: list[str] = []
+    rest: list[str] = tokens[1:]
+    while rest and rest[0].startswith("-"):
+        if rest[0] == "-C" and len(rest) > 1:
+            values.append(rest[1])
+        rest = rest[2:] if rest[0] in GIT_FLAGS_WITH_VALUE else rest[1:]
+    return values

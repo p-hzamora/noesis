@@ -25,6 +25,7 @@ from .configurations import (
     CuratorSettings,
     NotesSettings,
     RuntimeSettings,
+    SessionIdentitySettings,
     default_env_file,
     default_state_dir,
 )
@@ -40,6 +41,7 @@ class Environment:
         notes: Where notes are stored.
         capture: Capture thresholds.
         curator: Curator run settings.
+        identity: Session ids found in the process environment (never in the `.env` file).
     """
 
     env_file: Path
@@ -47,6 +49,7 @@ class Environment:
     notes: NotesSettings
     capture: CaptureSettings
     curator: CuratorSettings
+    identity: SessionIdentitySettings
 
 
 def load_environment(env_file: Path | None = None) -> Environment:
@@ -76,7 +79,12 @@ def load_environment(env_file: Path | None = None) -> Environment:
             next_steps=[f"Fix the variables listed in 'problems' (in {path} or the environment)."],
         )
     return Environment(
-        env_file=path, runtime=runtime, notes=notes, capture=capture, curator=curator
+        env_file=path,
+        runtime=runtime,
+        notes=notes,
+        capture=capture,
+        curator=curator,
+        identity=SessionIdentitySettings(),
     )
 
 
@@ -107,6 +115,7 @@ def _load[S: AppBaseSettings](
 __all__ = [
     "ClaudeCodeSettings",
     "Environment",
+    "SessionIdentitySettings",
     "default_env_file",
     "default_state_dir",
     "load_claude_code_settings",

@@ -36,4 +36,6 @@ class CaptureSessionAssembler:
             pending_lines=session.pending_size.lines,
             last_handover_at=handed_over.isoformat(timespec="seconds") if handed_over else None,
             failed_handovers=session.failed_handovers,
+            repo_id=session.repo_id,
+            parent_id=session.parent_id,
         )

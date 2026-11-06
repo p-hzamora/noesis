@@ -7,6 +7,9 @@ folder under `profiles/`, which leaves room for per-repository metadata later.
 
 Lookup starts at the working directory and stops at the git root (the first directory that
 holds `.git`), so a `.noesis-config` in a parent repository is never picked up by mistake.
+A linked worktree has no `.noesis-config` of its own when the file is gitignored, so the lookup
+then reads the main worktree's file. The profile folder is named after the main repository
+folder, so a worktree and its main checkout share one profile.
 """
 
 import re
@@ -16,6 +19,7 @@ from pathlib import Path
 from noesis.exceptions import InvalidConfigurationError
 
 from .configurations import default_config_dir
+from .git_root import find_common_dir, find_main_repository, repository_name
 
 REPO_CONFIG_FILE_NAME: str = ".noesis-config"
 PROFILE_KEY: str = "profile"
@@ -30,19 +34,21 @@ class RepoConfig:
     Attributes:
         path: The `.noesis-config` file that was read.
         profile: The profile name it selects.
+        repo_name: The main repository folder name, used as the profile subfolder.
+        legacy_repo_name: The folder the file sits in, which older versions used as the
+            profile subfolder (differs from `repo_name` inside a linked worktree).
     """
 
     path: Path
     profile: str
-
-    @property
-    def repo_name(self) -> str:
-        """The repository folder name, used as the profile subfolder."""
-        return self.path.parent.name
+    repo_name: str
+    legacy_repo_name: str
 
 
 def find_repo_config(start: Path) -> Path | None:
     """The nearest `.noesis-config` from `start` up to (and including) the git root.
+
+    Inside a linked worktree with no config of its own, the main worktree's file applies.
 
     Args:
         start: Directory to begin the search in.
@@ -56,8 +62,17 @@ def find_repo_config(start: Path) -> Path | None:
         if candidate.is_file():
             return candidate
         if (directory / ".git").exists():
-            return None
+            return _main_worktree_config(directory)
     return None
+
+
+def _main_worktree_config(worktree: Path) -> Path | None:
+    """The main worktree's `.noesis-config` when `worktree` is a different, linked worktree."""
+    main: Path | None = find_main_repository(worktree)
+    if main is None or main == worktree:
+        return None
+    candidate: Path = main / REPO_CONFIG_FILE_NAME
+    return candidate if candidate.is_file() else None
 
 
 def read_repo_config(path: Path) -> RepoConfig:
@@ -104,17 +119,28 @@ def read_repo_config(path: Path) -> RepoConfig:
             {"path": str(path), "profile": profile or ""},
             next_steps=["Set 'profile = <name>' in the repository config."],
         )
-    return RepoConfig(path=path, profile=profile)
+    common_dir: Path | None = find_common_dir(path.parent)
+    return RepoConfig(
+        path=path,
+        profile=profile,
+        repo_name=repository_name(common_dir) if common_dir else path.parent.name,
+        legacy_repo_name=path.parent.name,
+    )
 
 
 def profile_env_file(config: RepoConfig) -> Path:
     """`~/.config/noesis/profiles/<repo>/<profile>.env` for this repository config."""
-    return default_config_dir() / PROFILES_DIR_NAME / config.repo_name / f"{config.profile}.env"
+    return _profile_file(config.repo_name, config.profile)
+
+
+def _profile_file(repo_name: str, profile: str) -> Path:
+    return default_config_dir() / PROFILES_DIR_NAME / repo_name / f"{profile}.env"
 
 
 def resolve_env_file(explicit: Path | None, cwd: Path) -> Path | None:
     """The `.env` to read, by precedence: explicit (`--env-file`), then the repository
-    profile, then None (the default location).
+    profile (falling back to the profile an older version stored under the worktree folder name),
+    then None (the default location).
 
     Args:
         explicit: The `--env-file` value, if any.
@@ -131,7 +157,12 @@ def resolve_env_file(explicit: Path | None, cwd: Path) -> Path | None:
     found: Path | None = find_repo_config(cwd)
     if found is None:
         return None
-    return profile_env_file(read_repo_config(found))
+    config: RepoConfig = read_repo_config(found)
+    current: Path = profile_env_file(config)
+    legacy: Path = _profile_file(config.legacy_repo_name, config.profile)
+    if not current.exists() and legacy.exists():  # profiles made before the main-name rule
+        return legacy
+    return current
 
 
 __all__ = [

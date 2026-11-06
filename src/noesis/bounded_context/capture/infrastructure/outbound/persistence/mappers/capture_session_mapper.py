@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from noesis.bounded_context.capture.domain.entities import CaptureSession
 from noesis.bounded_context.capture.domain.value_objects import (
@@ -15,11 +15,11 @@ from noesis.shared_kernel.domain import (
     JsonObject,
 )
 
-DOCUMENT_VERSION: int = 1
+DOCUMENT_VERSION: int = 2
 
 
 class _CaptureSessionDocument(BaseModel):
-    """Stored shape of a session (version 1)."""
+    """Stored shape of a session (version 2; version 1 documents load with the new fields defaulted)."""
 
     model_config = ConfigDict(extra="ignore")
 
@@ -31,6 +31,9 @@ class _CaptureSessionDocument(BaseModel):
     pending: list[CommitRecord]
     cursor: TranscriptCursor
     failed_handovers: int
+    repo_id: str | None = None
+    parent_id: str | None = None
+    observed_heads: dict[str, str] = Field(default_factory=dict)
     created_at: datetime
     updated_at: datetime
 
@@ -48,6 +51,9 @@ class CaptureSessionMapper:
             pending=list(session.pending),
             cursor=session.cursor,
             failed_handovers=session.failed_handovers,
+            repo_id=session.repo_id,
+            parent_id=session.parent_id,
+            observed_heads=dict(session.observed_heads),
             created_at=session.created_at,
             updated_at=session.updated_at,
         )
@@ -64,6 +70,9 @@ class CaptureSessionMapper:
             pending=tuple(stored.pending),
             cursor=stored.cursor,
             failed_handovers=stored.failed_handovers,
+            repo_id=stored.repo_id,
+            parent_id=stored.parent_id,
+            observed_heads=dict(stored.observed_heads),
             created_at=stored.created_at,
             updated_at=stored.updated_at,
         )
