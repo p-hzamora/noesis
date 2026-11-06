@@ -16,6 +16,15 @@ curation, and storage; knows nothing about agent sessions.
 One agent session that the user switched on for capture. Holds the commits waiting to be
 handed over and how far the transcript has been read.
 
+**Repository id**:
+`<main folder name>-<8 hex>`, derived from the repository's common git directory. Every
+worktree of a repository shares it, and so do its notes (`repos/<main folder name>/`).
+
+**Child session**:
+A capture session started with `capture on --parent`, for a sub-agent. It has its own pending
+commits and cursor, inherits the parent's mode, and is merged into the parent's runs with
+`capture runs --children`.
+
 **Work brief**:
 The compact, versioned description of finished work that Capture hands to Notes:
 repository, commits, diff stat, session goal, and an excerpt of the conversation. Never a diff.
