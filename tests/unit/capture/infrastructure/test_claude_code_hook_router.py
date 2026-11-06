@@ -59,3 +59,17 @@ def test_unknown_fields_are_ignored_and_missing_ones_default() -> None:
     payload = ClaudeCodeHookPayload.model_validate({"extra": 1})
 
     assert (payload.session_id, payload.command, payload.transcript_path) == ("", None, None)
+
+
+def test_the_directory_the_commit_command_moved_to_travels_as_the_worktree_hint() -> None:
+    command = route(
+        _payload(
+            hook_event_name="PostToolUse",
+            tool_name="Bash",
+            tool_input={"command": "cd /work/demo-feature && git add . && git commit -m x"},
+        )
+    )
+
+    assert command == RecordCommitCommand(
+        session_id="s1", cwd=Path("/repo"), worktree_hint=Path("/work/demo-feature")
+    )

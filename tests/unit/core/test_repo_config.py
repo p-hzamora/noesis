@@ -3,6 +3,7 @@
 from pathlib import Path
 
 import pytest
+from tests.support.git_support import add_worktree, init_repo, isolate_git
 
 from noesis.core.repo_config import (
     find_repo_config,
@@ -110,3 +111,57 @@ def _write(repo: Path, content: str) -> Path:
     path: Path = repo / ".noesis-config"
     path.write_text(content, encoding="utf-8")
     return path
+
+
+# --- linked worktrees ---
+
+
+@pytest.fixture
+def worktree_pair(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[Path, Path]:
+    isolate_git(monkeypatch)
+    main = init_repo(tmp_path / "work" / "billing")
+    linked = add_worktree(main, tmp_path / "work" / "billing-feature", "feat/x")
+    return main, linked
+
+
+def test_a_worktree_without_its_own_config_reads_the_main_worktrees_file(
+    worktree_pair: tuple[Path, Path],
+) -> None:
+    main, linked = worktree_pair
+    config = _write(main, "profile = fast\n")  # gitignored in real use: absent from the worktree
+
+    assert find_repo_config(linked) == config
+
+
+def test_the_profile_resolves_the_same_from_main_and_from_a_worktree(
+    worktree_pair: tuple[Path, Path], config_home: Path
+) -> None:
+    main, linked = worktree_pair
+    _write(main, "profile = fast\n")
+
+    expected = config_home / "noesis" / "profiles" / "billing" / "fast.env"
+
+    assert resolve_env_file(None, main) == expected
+    assert resolve_env_file(None, linked) == expected
+
+
+def test_a_tracked_config_inside_a_worktree_still_uses_the_main_folder_name(
+    worktree_pair: tuple[Path, Path], config_home: Path
+) -> None:
+    _, linked = worktree_pair
+    config = read_repo_config(_write(linked, "profile = fast\n"))
+
+    assert (config.repo_name, config.legacy_repo_name) == ("billing", "billing-feature")
+    assert profile_env_file(config) == config_home / "noesis" / "profiles" / "billing" / "fast.env"
+
+
+def test_a_profile_stored_under_the_old_worktree_folder_name_is_still_found(
+    worktree_pair: tuple[Path, Path], config_home: Path
+) -> None:
+    _, linked = worktree_pair
+    _write(linked, "profile = fast\n")
+    legacy = config_home / "noesis" / "profiles" / "billing-feature" / "fast.env"
+    legacy.parent.mkdir(parents=True)
+    legacy.write_text("", encoding="utf-8")
+
+    assert resolve_env_file(None, linked) == legacy

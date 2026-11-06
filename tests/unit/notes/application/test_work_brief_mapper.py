@@ -32,3 +32,18 @@ def test_the_domain_brief_carries_every_field_except_the_contract_version() -> N
     contract_fields: set[str] = set(WorkBriefContract.model_fields) - {"contract_version"}
 
     assert set(WorkBrief.model_fields) == contract_fields
+
+
+def test_a_version_one_payload_without_a_session_label_still_maps() -> None:
+    payload: dict[str, object] = a_brief().model_dump(mode="json", exclude={"session_label"})
+
+    brief: WorkBrief = WorkBriefMapper.to_domain(WorkBriefContract.model_validate(payload))
+
+    assert brief.session_label == ""
+    assert brief.short_session() == brief.session_id[:8]
+
+
+def test_the_session_label_is_carried_when_present() -> None:
+    contract: WorkBriefContract = a_brief().model_copy(update={"session_label": "abcdef012345"})
+
+    assert WorkBriefMapper.to_domain(contract).session_label == "abcdef012345"

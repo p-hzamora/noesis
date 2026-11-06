@@ -5,10 +5,12 @@ import json
 import os
 import subprocess
 import sys
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
 from tests.support.capture_support import START
+from tests.support.git_support import add_worktree, commit, git, init_repo, isolate_git
 from tests.support.notes_support import FixedClock, a_brief
 
 from noesis.bounded_context.capture.application.dtos import CaptureRunDto, TranscriptSnapshotDto
@@ -25,6 +27,7 @@ from noesis.bounded_context.capture.infrastructure.outbound.transcript import (
     ClaudeCodeTranscriptReaderAdapter,
 )
 from noesis.bounded_context.capture.infrastructure.outbound.vcs import GitCliVcsReaderAdapter
+from noesis.core.git_root import find_common_dir, find_main_repository, repository_name
 
 pytestmark = pytest.mark.integration
 
@@ -82,6 +85,10 @@ async def test_reads_only_count_edits_and_commits_as_work_and_the_excerpt_is_cap
     assert len(snapshot.excerpt) <= 4000
 
 
+def _name(common: Path) -> str:
+    return repository_name(common)
+
+
 def _git(repo: Path, *args: str) -> None:
     subprocess.run(
         ["git", "-C", str(repo), "-c", "user.name=t", "-c", "user.email=t@example.com", *args],
@@ -99,18 +106,19 @@ async def test_git_reader_reports_root_head_size_branch_and_stat(tmp_path: Path)
     _git(repo, "add", ".")
     _git(repo, "commit", "-q", "-m", "feat: first")
     (repo / "sub").mkdir()
-    vcs = GitCliVcsReaderAdapter()
+    vcs = GitCliVcsReaderAdapter(repository_name=_name)
 
-    root: Path | None = await vcs.repository_root(repo / "sub")
+    location = await vcs.common_dir(repo / "sub")
     head: CommitRecord | None = await vcs.head_commit(repo)
 
-    assert root == repo
+    assert location is not None
+    assert (location.root, location.name) == (repo.resolve(), "repo")
     assert head is not None
     assert (head.subject, head.size) == ("feat: first", DiffSize(files=2, lines=3))
     assert await vcs.branch(repo) == "main"
     assert any("a.py" in line for line in await vcs.stat_lines(repo, [head.sha], limit=15))
-    assert await vcs.repository_root(tmp_path) is None
-    assert await GitCliVcsReaderAdapter("no-such-git").repository_root(repo) is None
+    assert await vcs.common_dir(tmp_path) is None
+    assert await GitCliVcsReaderAdapter(_name, "no-such-git").common_dir(repo) is None
 
 
 async def test_dry_run_publisher_stores_the_brief(tmp_path: Path) -> None:
@@ -197,3 +205,72 @@ async def test_journal_appends_and_attaches_curation_results(tmp_path: Path) -> 
         ("handed_over", {"ok": True}),
     ]
     assert await journal.read(SessionId(value="other")) == []
+
+
+# --- worktrees (CVG-003) ---
+
+
+@pytest.fixture
+def world(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[Path, Path, Path]:
+    """(main checkout, linked worktree, bare clone)."""
+    isolate_git(monkeypatch)
+    main = init_repo(tmp_path / "billing")
+    linked = add_worktree(main, tmp_path / "billing-feature", "feat/x")
+    return main, linked, init_repo(tmp_path / "origin.git", bare=True)
+
+
+async def test_every_worktree_resolves_to_the_same_repository(
+    world: tuple[Path, Path, Path],
+) -> None:
+    main, linked, bare = world
+    vcs = GitCliVcsReaderAdapter(repository_name=_name)
+
+    from_main = await vcs.common_dir(main)
+    from_linked = await vcs.common_dir(linked)
+
+    assert from_main is not None and from_linked == from_main
+    assert (from_main.common_dir, from_main.root, from_main.name) == (
+        main / ".git",
+        main,
+        "billing",
+    )
+    from_bare = await vcs.common_dir(bare)
+    assert from_bare is not None
+    assert (from_bare.common_dir, from_bare.root, from_bare.name) == (bare, bare, "origin.git")
+
+
+async def test_the_adapter_and_core_agree_on_main_linked_bare_and_submodule_repositories(
+    world: tuple[Path, Path, Path], tmp_path: Path
+) -> None:
+    main, linked, bare = world
+    inner = init_repo(tmp_path / "inner")
+    git(main, "-c", "protocol.file.allow=always", "submodule", "add", "-q", str(inner), "lib")
+    vcs = GitCliVcsReaderAdapter(repository_name=_name)
+
+    for start in (main, linked, bare, main / "lib"):
+        location = await vcs.common_dir(start)
+        assert location is not None
+        assert location.common_dir == find_common_dir(start)
+        assert location.root == find_main_repository(start)
+        assert location.name == repository_name(location.common_dir)
+
+
+async def test_worktrees_lists_each_head_with_branch_and_commit_time(
+    world: tuple[Path, Path, Path],
+) -> None:
+    main, linked, _ = world
+    new_sha = commit(linked, "work.txt")
+    vcs = GitCliVcsReaderAdapter(repository_name=_name)
+
+    heads = {head.path: head for head in await vcs.worktrees(main / ".git")}
+
+    assert set(heads) == {str(main), str(linked)}
+    assert (heads[str(linked)].sha, heads[str(linked)].branch) == (new_sha, "feat/x")
+    assert heads[str(main)].branch == "main"
+    assert abs((datetime.now(UTC) - heads[str(linked)].committed_at).total_seconds()) < 60
+
+
+async def test_a_bare_repository_has_no_worktree_heads(world: tuple[Path, Path, Path]) -> None:
+    _, _, bare = world
+
+    assert await GitCliVcsReaderAdapter(repository_name=_name).worktrees(bare) == []

@@ -65,3 +65,20 @@ class GitWorld:
         sha: str = commit(self.publisher, name)
         git(self.publisher, "push", "-q", "origin", "main")
         return sha
+
+
+def init_repo(path: Path, *, bare: bool = False) -> Path:
+    """A fresh repository on `main` (with one commit unless `bare`); returns its resolved path."""
+    path.mkdir(parents=True, exist_ok=True)
+    subprocess.run(
+        ["git", "init", "-q", "-b", "main", *(["--bare"] if bare else []), str(path)], check=True
+    )
+    if not bare:
+        commit(path, "README.md")
+    return path.resolve()
+
+
+def add_worktree(repo: Path, path: Path, branch: str) -> Path:
+    """A linked worktree of `repo` on a new `branch`; returns its resolved path."""
+    git(repo, "worktree", "add", "-q", "-b", branch, str(path))
+    return path.resolve()

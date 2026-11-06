@@ -3,8 +3,14 @@
 from pathlib import Path
 
 import pytest
+from tests.support.git_support import add_worktree, git, init_repo, isolate_git
 
-from noesis.core.git_root import find_git_root
+from noesis.core.git_root import (
+    find_common_dir,
+    find_git_root,
+    find_main_repository,
+    repository_name,
+)
 
 pytestmark = pytest.mark.unit
 
@@ -33,3 +39,69 @@ def test_the_nearest_root_wins(tmp_path: Path) -> None:
 
 def test_outside_a_repository_there_is_no_root(tmp_path: Path) -> None:
     assert find_git_root(tmp_path) is None
+
+
+# --- repository identity across main checkouts, linked worktrees, bare repos and submodules ---
+
+
+@pytest.fixture
+def git_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    isolate_git(monkeypatch)
+
+
+def test_a_main_checkout_is_its_own_main_repository(tmp_path: Path, git_env: None) -> None:
+    main = init_repo(tmp_path / "billing")
+
+    assert find_common_dir(main) == main / ".git"
+    assert find_main_repository(main) == main
+    assert repository_name(main / ".git") == "billing"
+
+
+def test_a_linked_worktree_resolves_to_the_main_checkout(tmp_path: Path, git_env: None) -> None:
+    main = init_repo(tmp_path / "billing")
+    linked = add_worktree(main, tmp_path / "billing-feature", "feat/x")
+    nested = linked / "pkg"
+    nested.mkdir()
+
+    assert find_common_dir(nested) == main / ".git"
+    assert find_main_repository(nested) == main
+    assert repository_name(find_common_dir(linked) or linked) == "billing"
+
+
+def test_a_bare_repository_is_its_own_identity(tmp_path: Path, git_env: None) -> None:
+    bare = init_repo(tmp_path / "origin.git", bare=True)
+
+    assert find_common_dir(bare) == bare
+    assert find_main_repository(bare) == bare
+    assert repository_name(bare) == "origin.git"
+
+
+def test_a_submodule_is_named_after_its_module_not_the_parent(
+    tmp_path: Path, git_env: None
+) -> None:
+    inner = init_repo(tmp_path / "inner")
+    outer = init_repo(tmp_path / "outer")
+    git(outer, "-c", "protocol.file.allow=always", "submodule", "add", "-q", str(inner), "lib")
+
+    common = find_common_dir(outer / "lib")
+
+    assert common == outer / ".git" / "modules" / "lib"
+    assert repository_name(common) == "lib"
+    assert find_main_repository(outer / "lib") == outer / "lib"
+
+
+def test_outside_any_repository_there_is_no_identity(tmp_path: Path) -> None:
+    assert find_common_dir(tmp_path) is None
+    assert find_main_repository(tmp_path) is None
+
+
+@pytest.mark.parametrize(
+    ("common_dir", "expected"),
+    [
+        ("/w/billing/.git", "billing"),
+        ("/w/billing/.git/modules/lib", "lib"),
+        ("/srv/origin.git", "origin.git"),
+    ],
+)
+def test_the_naming_rule(common_dir: str, expected: str) -> None:
+    assert repository_name(Path(common_dir)) == expected
