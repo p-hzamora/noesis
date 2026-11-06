@@ -8,7 +8,13 @@ from .base import (
     InfrastructureException,
     InterfaceException,
 )
-from .capture_errors import CaptureNotEnabledError, CaptureStateError, InvalidSessionIdError
+from .capture_errors import (
+    CaptureNotEnabledError,
+    CaptureSessionNotFoundError,
+    CaptureStateError,
+    InvalidSessionIdError,
+    SessionIdentityMissingError,
+)
 from .core_errors import (
     ConfigFileExistsError,
     ConfigTemplateMissingError,
@@ -23,7 +29,13 @@ from .integration_errors import (
     ObsidianMcpToolError,
     SkillGuideNotFoundError,
 )
-from .interface_errors import InvalidWorkBriefError, NotInGitRepositoryError
+from .interface_errors import (
+    BlankSessionIdError,
+    EmptyRecallTaskError,
+    InvalidWorkBriefError,
+    NotInGitRepositoryError,
+    SelfParentSessionError,
+)
 from .notes_errors import (
     ApplyFailedError,
     CurationFailedError,
@@ -42,7 +54,9 @@ __all__ = [
     "ApplyFailedError",
     "AppException",
     "ApplicationException",
+    "BlankSessionIdError",
     "CaptureNotEnabledError",
+    "CaptureSessionNotFoundError",
     "CaptureStateError",
     "ConfigFileExistsError",
     "ConfigTemplateMissingError",
@@ -51,6 +65,7 @@ __all__ = [
     "CuratorFailedError",
     "CuratorPromptUnreadableError",
     "DomainException",
+    "EmptyRecallTaskError",
     "ExitCodeEnum",
     "InfrastructureException",
     "InterfaceException",
@@ -67,6 +82,8 @@ __all__ = [
     "ObsidianMcpError",
     "ObsidianMcpToolError",
     "ParkedCurationNotFoundError",
+    "SelfParentSessionError",
+    "SessionIdentityMissingError",
     "SkillGuideNotFoundError",
     "VaultNotConfiguredError",
 ]

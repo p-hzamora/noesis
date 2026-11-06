@@ -29,8 +29,9 @@ from noesis.bounded_context.notes.domain.value_objects.work_brief import SHORT_S
 from noesis.bounded_context.notes.infrastructure.outbound.curation.apply_input_schema import (
     parse_decisions_strict,
 )
-from noesis.core.git_root import find_git_root
+from noesis.core.git_root import find_common_dir, repository_name
 from noesis.exceptions import (
+    EmptyRecallTaskError,
     InvalidWorkBriefError,
     NotInGitRepositoryError,
 )
@@ -123,19 +124,19 @@ def curate(
 
 
 def _repository_area() -> NoteArea:
-    """The area of the git repository the command runs in.
+    """The area of the git repository the command runs in (a linked worktree uses its main repository).
 
     Raises:
         NotInGitRepositoryError: The working directory is outside any git repository.
     """
-    root: Path | None = find_git_root(Path.cwd())
-    if root is None:
+    common_dir: Path | None = find_common_dir(Path.cwd())
+    if common_dir is None:
         raise NotInGitRepositoryError(
             f"{Path.cwd()} is not inside a git repository.",
             {"cwd": str(Path.cwd())},
             next_steps=["Run the command from inside the repository the notes belong to."],
         )
-    return NoteArea.for_repository(root.name)
+    return NoteArea.for_repository(repository_name(common_dir))
 
 
 def _read_payload(source: str) -> tuple[str, RejectedEntryDto | None]:
@@ -256,7 +257,12 @@ def recall(
 ) -> None:
     """List the notes worth reading before a task: kind, title, path, date and a snippet."""
     if not task.strip():
-        raise typer.BadParameter("The task must not be empty.", param_hint="TASK")
+        raise EmptyRecallTaskError(
+            "The task must not be empty.",
+            next_steps=[
+                'Pass one sentence about the task, for example: noesis notes recall "fix the login cache".'
+            ],
+        )
     scope: str | None = _area(area, repo)
     query = RecallNotesQuery(
         task=task,

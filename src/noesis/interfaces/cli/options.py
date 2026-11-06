@@ -23,11 +23,11 @@ EnvFileOption = Annotated[
     ),
 ]
 SessionOption = Annotated[
-    str,
+    str | None,
     typer.Option(
         "--session",
-        envvar="NOESIS_SESSION_ID",
-        help="Agent session id (in Claude Code skills: ${CLAUDE_SESSION_ID}).",
-        show_envvar=True,
+        help="Agent session id (in Claude Code skills: ${CLAUDE_SESSION_ID}). Omit it when the "
+        "harness exposes its own (NOESIS_SESSION_ID, Codex); `capture on` then prints the id "
+        "to pass back.",
     ),
 ]

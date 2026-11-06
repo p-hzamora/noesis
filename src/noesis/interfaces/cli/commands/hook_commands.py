@@ -12,6 +12,7 @@ import typer
 from pydantic import ValidationError
 
 from noesis.bounded_context.capture.application.handlers.commands import RecordCommitCommand
+from noesis.bounded_context.capture.application.handlers.queries import ResolveSessionIdentityQuery
 from noesis.bounded_context.capture.infrastructure.inbound.claude_code import (
     CaptureCommand,
     ClaudeCodeHookPayload,
@@ -33,7 +34,12 @@ hook_app: typer.Typer = typer.Typer(
 )
 
 
-async def _dispatch(handlers: CaptureHandlers, command: CaptureCommand) -> None:
+async def _dispatch(handlers: CaptureHandlers, command: CaptureCommand, cwd: Path) -> None:
+    """Resolve the session the payload's id stands for in `cwd`'s repository, then run it."""
+    identity = await handlers.resolve.handle(
+        ResolveSessionIdentityQuery(hint=command.session_id, cwd=cwd)
+    )
+    command = command.model_copy(update={"session_id": identity.session_id})
     if isinstance(command, RecordCommitCommand):
         await handlers.record_commit.handle(command)
     else:
@@ -66,7 +72,7 @@ def claude_code(context: typer.Context) -> None:
         if command is None:
             return
         environment = cli_state(context).environment()
-        asyncio.run(_dispatch(build_capture(environment), command))
+        asyncio.run(_dispatch(build_capture(environment), command, payload.cwd))
     except json.JSONDecodeError, ValidationError:
         return  # not a payload we understand: ignore silently
     except Exception as error:

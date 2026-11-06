@@ -7,6 +7,8 @@ from .capture_outcome_dto import CaptureOutcomeDto, CaptureOutcomeEnum
 from .capture_run_dto import CaptureRunDto, CaptureRunListDto
 from .capture_status_dto import CaptureStatusDto
 from .publication_dto import PublicationDto
+from .repository_location_dto import RepositoryLocationDto
+from .resolved_identity_dto import ResolvedIdentityDto
 from .transcript_snapshot_dto import TranscriptSnapshotDto
 
 __all__ = [
@@ -19,5 +21,7 @@ __all__ = [
     "CaptureRunListDto",
     "CaptureStatusDto",
     "PublicationDto",
+    "RepositoryLocationDto",
+    "ResolvedIdentityDto",
     "TranscriptSnapshotDto",
 ]

@@ -38,6 +38,8 @@ class WorkBriefContract(FrozenObject):
         diff_stat: Capped `git show --stat` lines (names and counts only).
         goal: The session's first real prompt.
         session_excerpt: User prompts and assistant prose since the last hand-over.
+        session_label: Short, human-facing label of the session for note provenance. Optional:
+            a brief without it (older Capture) falls back to the start of `session_id`.
     """
 
     contract_version: Literal[1] = WORK_BRIEF_CONTRACT_VERSION
@@ -50,3 +52,4 @@ class WorkBriefContract(FrozenObject):
     diff_stat: tuple[str, ...] = ()
     goal: str = ""
     session_excerpt: str = ""
+    session_label: str = ""

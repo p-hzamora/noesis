@@ -94,3 +94,12 @@ def emit_error(error: AppException) -> None:
             lines.append(f"  {key}: {value}")
     lines += [f"  next: {step}" for step in error.next_steps]
     sys.stderr.write("\n".join(lines) + "\n")
+
+
+def warn(message: str) -> None:
+    """Print a warning on stderr, which never breaks the JSON on stdout.
+
+    Args:
+        message: One line telling the caller what to double-check.
+    """
+    sys.stderr.write(f"warning: {message}\n")

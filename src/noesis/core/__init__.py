@@ -3,6 +3,7 @@
 from .env import (
     ClaudeCodeSettings,
     Environment,
+    SessionIdentitySettings,
     default_state_dir,
     load_claude_code_settings,
     load_environment,
@@ -13,6 +14,7 @@ from .repo_config import resolve_env_file
 __all__ = [
     "ClaudeCodeSettings",
     "Environment",
+    "SessionIdentitySettings",
     "default_state_dir",
     "env_example_text",
     "load_claude_code_settings",

@@ -26,4 +26,5 @@ class WorkBriefMapper:
             diff_stat=contract.diff_stat,
             goal=contract.goal,
             session_excerpt=contract.session_excerpt,
+            session_label=contract.session_label,
         )

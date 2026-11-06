@@ -15,6 +15,7 @@ from noesis.bounded_context.capture.application.ports.transcript import ITranscr
 from noesis.bounded_context.capture.application.ports.vcs import IVcsReader
 from noesis.bounded_context.capture.application.services.journaling import CaptureJournalRecorder
 from noesis.bounded_context.capture.domain.entities import CaptureSession
+from noesis.bounded_context.capture.domain.services import SessionIdGenerator
 from noesis.bounded_context.capture.domain.specifications import (
     FlushCandidate,
     OutsideDebounceSpecification,
@@ -68,6 +69,7 @@ class FlushCaptureHandler(IHandler[FlushCaptureCommand, CaptureOutcomeDto]):
         self._pending: PendingWorkSpecification = PendingWorkSpecification()
         self._debounce: OutsideDebounceSpecification = debounce
         self._significance: SignificantChangeSpecification = significance
+        self._generator: SessionIdGenerator = SessionIdGenerator()
 
     async def handle(self, action: FlushCaptureCommand) -> CaptureOutcomeDto:
         """Hand over, or say which rule held the work back."""
@@ -132,14 +134,20 @@ class FlushCaptureHandler(IHandler[FlushCaptureCommand, CaptureOutcomeDto]):
     async def _brief(
         self, session: CaptureSession, snapshot: TranscriptSnapshotDto
     ) -> WorkBriefContract:
-        """Assemble the work brief of the pending commits."""
+        """Assemble the work brief of the pending commits.
+
+        The repository (its main folder name, whatever worktree committed), its path and the
+        branch come from what was recorded with the commits, not from where flush runs.
+        """
         root = Path(session.repository_path or ".")
         shas: list[str] = [commit.sha for commit in session.pending]
+        branch: str = session.pending[-1].branch or await self._vcs.branch(root)
         return WorkBriefContract(
             session_id=session.id.value,
+            session_label=self._generator.label(session.id),
             repository=root.name,
             repository_path=str(root),
-            branch=await self._vcs.branch(root),
+            branch=branch,
             head=shas[-1],
             commits=tuple(CommitRefContract(sha=c.sha, subject=c.subject) for c in session.pending),
             diff_stat=tuple(await self._vcs.stat_lines(root, shas, limit=MAX_STAT_LINES)),

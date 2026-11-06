@@ -1,6 +1,7 @@
 """Errors of the Capture context."""
 
 from .base import ApplicationException, DomainException, InfrastructureException
+from .exit_code_enum import ExitCodeEnum
 
 
 class InvalidSessionIdError(DomainException):
@@ -25,3 +26,14 @@ class CaptureSessionNotFoundError(ApplicationException):
     """No capture state exists for the session."""
 
     __error_code__ = "CAPTURE_201_SESSION_NOT_FOUND"
+
+
+class SessionIdentityMissingError(ApplicationException):
+    """No session id was given and the harness exposes none.
+
+    A missing `--session` is something the caller fixes on the command line, so it ends as a
+    usage error (exit 2) like the other flag errors, while keeping its capture code.
+    """
+
+    __error_code__ = "CAPTURE_202_SESSION_ID_MISSING"
+    __exit_code__ = ExitCodeEnum.USAGE
