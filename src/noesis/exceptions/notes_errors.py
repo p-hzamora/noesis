@@ -55,3 +55,9 @@ class ApplyFailedError(ApplicationException):
     """An apply was rejected or could not be stored; the payload was kept for a second try."""
 
     __error_code__ = "NOTES_203_APPLY_FAILED"
+
+
+class NoRecallTermsError(ApplicationException):
+    """A recall task has no keywords left once short words and stopwords are removed."""
+
+    __error_code__ = "NOTES_204_NO_RECALL_TERMS"

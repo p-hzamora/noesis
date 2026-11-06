@@ -32,6 +32,7 @@ from .notes_errors import (
     InvalidNoteLocationError,
     InvalidNoteSlugError,
     ManualNoteProtectedError,
+    NoRecallTermsError,
     NoteStorageError,
     ParkedCurationNotFoundError,
 )
@@ -60,6 +61,7 @@ __all__ = [
     "InvalidSessionIdError",
     "InvalidWorkBriefError",
     "ManualNoteProtectedError",
+    "NoRecallTermsError",
     "NoteStorageError",
     "NotInGitRepositoryError",
     "ObsidianMcpError",
