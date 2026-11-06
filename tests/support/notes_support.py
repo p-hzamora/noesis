@@ -117,14 +117,16 @@ class InMemoryNotesUnitOfWork(INotesUnitOfWork):
 
 
 class InMemoryNoteReadRepository(INoteReadRepository):
-    """Returns preset summaries and records the queries it received."""
+    """Returns preset summaries and records the queries and limits it received."""
 
     def __init__(self, notes: Sequence[NoteSummaryDto] = ()) -> None:
         self.notes: list[NoteSummaryDto] = list(notes)
         self.queries: list[str] = []
+        self.limits: list[int] = []
 
     async def search(self, text: str, *, area: NoteArea | None, limit: int) -> NoteSearchResultDto:
         self.queries.append(text)
+        self.limits.append(limit)
         return NoteSearchResultDto(
             notes=tuple(self.notes[:limit]), backend=SearchEngineEnum.FILESYSTEM
         )
