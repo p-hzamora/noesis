@@ -106,7 +106,8 @@ validation do not change.
 
 ```text
 Claude Code hook JSON ─► infrastructure/inbound/claude_code (ACL: payload -> command)
-   PostToolUse git commit ─► RecordCommitHandler   (lock session, git HEAD, mark pending)
+   PostToolUse git commit ─► RecordCommitHandler   (lock session, scan worktree HEADs, mark pending)
+   every capture command  ─► ResolveSessionIdentityHandler (stored id; a pure query, the repo is registered by enable and record-commit) first
    Stop / SessionEnd      ─► FlushCaptureHandler   (lock session, rules, brief, publish)
 
 FlushCaptureHandler, cheapest check first:
@@ -119,7 +120,8 @@ FlushCaptureHandler, cheapest check first:
 | Piece | Where | Notes |
 |---|---|---|
 | `CaptureSession` aggregate | `domain/entities/` | Opt-in + mode, pending commits (one repository per batch), transcript cursor, failed hand-overs (retry once, then abandon; abandon at once at session end). |
-| Specifications | `domain/specifications/` | `PendingWork`, `OutsideDebounce` (ignored by the final flush), `SignificantChange` (summed size; type irrelevant). |
+| Specifications | `domain/specifications/` | `PendingWork`, `OutsideDebounce` (ignored by the final flush), `SignificantChange` (summed size; type irrelevant), `NewCommitCandidate` (a worktree HEAD that moved since the baseline, committed within 120 s). |
+| Identity | `domain/value_objects/`, `domain/services/` | `RepoId` (`<main folder>-<8 hex>`), `SessionIdGenerator` (idempotent, repo-salted sha256), `WorktreeHead`. `IVcsReader.common_dir/worktrees`, `ISessionIdentitySource` (chain: harness sources, then `NOESIS_SESSION_ID`, else a fresh uuid4), write-only `IRepoRegistry` (`repos.json`), `ICaptureSessionTreeReader` (parent links). The repository naming rule has one owner, `core/git_root.py`, injected into the git adapter. |
 | Unit of work | `infrastructure/outbound/persistence/` | One JSON file per session, held under an `flock` while open, so concurrent hooks of a session take turns. |
 | Transcript reader | `infrastructure/outbound/transcript/` | Claude Code JSONL: real work = Edit/Write or `git commit` (quote-aware); excerpt = prompts and prose only, 4 KB. |
 | Publishers | `infrastructure/outbound/publishing/` | Live spawns the curator with `os.posix_spawn(setsid=True)` and returns at once; the child writes `<brief>.result.json`. |
