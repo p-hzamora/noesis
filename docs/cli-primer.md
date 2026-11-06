@@ -67,7 +67,8 @@ A setting can come from several places. The usual order, highest wins:
 command-line option  >  environment variable  >  config file  >  built-in default
 ```
 
-noesis: `--env-file` / `--session` on the command line, then `NOESIS_*` variables, then
+noesis: `--env-file` / `--session` on the command line, then `NOESIS_*` variables (`NOESIS_SESSION_ID` is
+read when `--session` is left out), then
 `~/.config/noesis/.env`, then defaults in `core/configurations/*_settings.py`.
 `noesis config show` prints the effective values, so you never have to guess.
 

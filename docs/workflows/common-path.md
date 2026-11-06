@@ -20,6 +20,7 @@ sequenceDiagram
     Cmd->>Boot: build_CONTEXT(environment) (settings loaded lazily here)
     Boot-->>Cmd: wired handlers (adapters chosen here only)
     Cmd->>H: asyncio.run(handler.handle(action))
+    Note over Cmd,H: capture commands first resolve the stored session id (ResolveSessionIdentityHandler)
     H-->>Cmd: DTO
     Cmd->>Out: XResponse.model_validate(dto)
     Out-->>Caller: stdout: text, or {"ok": true, "result": ...}

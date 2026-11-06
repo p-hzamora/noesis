@@ -19,8 +19,8 @@ sequenceDiagram
     CC->>Cap: EnableCapture -> session S enabled
     Dev->>CC: work, then git commit
     CC->>Hook: PostToolUse (Bash git commit) JSON on stdin
-    Hook->>Cap: RecordCommit(S, cwd)
-    Cap->>State: HEAD sha, subject, size added to pending
+    Hook->>Cap: RecordCommit(S, cwd, worktree hint)
+    Cap->>State: HEAD sha, subject, size, branch of the worktree that committed, added to pending
     CC->>Hook: Stop (end of turn) JSON on stdin
     Hook->>Cap: FlushCapture(S, transcript, final=false)
     Cap->>Cap: gates: enabled, pending, debounce, size, transcript, real work

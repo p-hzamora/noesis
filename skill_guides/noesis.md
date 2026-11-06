@@ -9,7 +9,9 @@ installed noesis version. Use `noesis <command> --help` for anything not covered
 - Always add `--json`. Parse the envelope: `{"ok": true, "result": ...}` or
   `{"ok": false, "error": {"code", "message", "next_steps"}}`. Branch on `error.code`;
   follow `next_steps` when the user agrees.
-- Exit codes: 0 ok, 1 the operation failed, 2 invalid command line.
+- Exit codes: 0 ok, 1 the operation failed, 2 invalid command line (a flag you can fix: a blank
+  `--session` or `--parent`, a missing `--session`, `--parent` equal to the session, running
+  outside a git repository).
 - Never guess commands or flags. If something is not in this guide, run `--help`.
 - Never edit files under a vault's `auto/` folders by hand. To record a note yourself, use
   `notes apply` (below); noesis picks the path. Read the notes freely.
@@ -23,7 +25,10 @@ and the capture thresholds. noesis picks it from the repository, so no flag is n
 
 1. Look for `<repo>/.noesis-config` (the nearest one, up to the git root). It holds one line,
    `profile = <name>`. The profile file is
-   `~/.config/noesis/profiles/<repo folder name>/<name>.env`.
+   `~/.config/noesis/profiles/<main repo folder name>/<name>.env`. In a linked git worktree
+   the file is usually missing (it is gitignored), so noesis reads the main checkout's
+   `.noesis-config` and uses the main checkout's folder name: a worktree and its main
+   checkout share one profile.
 2. If it exists, run noesis from inside that repo and do not pass any env flag. Every
    command, the Claude Code hooks included, then reads the same profile.
 3. If there is no `.noesis-config`, noesis uses `~/.config/noesis/.env`. Tell the user the
@@ -47,12 +52,64 @@ noesis [--env-file <path>] capture runs --session <SESSION_ID> --json          #
 noesis [--env-file <path>] capture off --session <SESSION_ID> --json
 ```
 
+### The session id
+
+noesis stores the session under its own id, `<repo>-<12 hex>`, derived from the id you give it
+and from the repository, so the CLI and the hooks always agree. `result.session_id` of every
+capture command is that stored id; passing it back as `--session` is stable.
+
+- Claude Code: pass `${CLAUDE_SESSION_ID}`, as in the examples.
+- Codex: leave `--session` out. noesis reads the Codex thread id (`CODEX_THREAD_ID`, then
+  `CODEX_SESSION_ID`), which stays the same after `codex resume`, so every command finds the
+  same session.
+- A harness with no session id of its own: leave `--session` out of `capture on`. If
+  `NOESIS_SESSION_ID` is exported noesis uses it; otherwise it starts a fresh session and prints
+  its id in `result.session_id`. Pass that id as `--session` to every later command (`status`,
+  `runs`, `off`); without one they fail with `CAPTURE_202_SESSION_ID_MISSING` (exit 2).
+- `result.generated` is `true` when noesis had to choose the id itself (nothing was given and
+  nothing was in the environment); it also prints a `warning:` on stderr. No hook can match a
+  generated id, because the hooks only know the agent's own session id: the session would never
+  be captured. Do not report success; run `capture on --session <the agent's session id>`
+  instead (in Claude Code: `${CLAUDE_SESSION_ID}`). Use a generated id only on a harness that
+  gives hooks nothing to match, and say so to the user.
+- A blank value is never an id. `--session ""` or `--session "  "` (and a blank `--parent`)
+  fails with `INTERFACE_003_BLANK_SESSION_ID` (exit 2) before anything is read or written; it is
+  not replaced by the environment. A blank `NOESIS_SESSION_ID` or Codex variable counts as not
+  set. Only a hook payload with a blank id reaches `CAPTURE_001_INVALID_SESSION_ID`, and hooks
+  never fail the session.
+- Capture commands work only inside a git repository: outside one they fail with
+  `INTERFACE_002_NOT_IN_GIT_REPOSITORY` (exit 2), because the session is stored per repository.
+- `capture on` is idempotent: a repeat call keeps the pending commits and the transcript
+  cursor, keeps the mode unless you pass `--mode`, and changes nothing.
+- A sub-agent gets its own session with `capture on --parent <PARENT_SESSION_ID> --json`. It
+  keeps its own pending commits, inherits the parent's mode, and is never given the parent's
+  id. `capture runs --session <PARENT_SESSION_ID> --children --json` merges its runs in; each
+  run carries its `session_id`. The parent must be switched on (`CAPTURE_201_SESSION_NOT_FOUND`,
+  exit 1, if not), must not be blank, and must not be the sub-agent's own session
+  (`INTERFACE_004_SELF_PARENT_SESSION`, exit 2); the harness' own id is never used as the parent.
+- After upgrading from a noesis that derived ids differently, run `capture on` again in each
+  session you want captured; sessions switched on by the older version are not found under the
+  new ids (their old state and notes stay where they are).
+
+### Worktrees
+
+Every worktree of a repository is one repository: commits made in a linked worktree are
+captured (even when the hook reports the main checkout as the working directory), the brief
+records the branch the commit was made on, and the notes go to the main repository's area,
+`repos/<main repo folder name>/`. If two worktrees committed within two minutes and the command
+does not say which one, noesis records neither and `capture runs` shows `ambiguous_worktree`:
+tell the user, and have them commit again.
+
 After `capture on`, always verify before you report success:
 
 1. Run `capture status` with the same `--env-file` (or none, if you used none).
 2. Check that `result.enabled` is `true`. If it is not, say that capture is not on and
    stop. Do not tell the user that capture is on.
-3. Tell the user which env file, state dir and vault were used. `capture on` and
+3. Check `result.generated` of the `capture on` call you made (every capture command has the
+   field; `status` reports `false` because it never generates one). If it is `true`, the id was
+   invented, no hook can match it, and capture will not happen: say so, then run `capture on`
+   again with the agent's own `--session`. Do not tell the user that capture is on.
+4. Tell the user which env file, state dir and vault were used. `capture on` and
    `capture status` include them as `env_file`, `state_dir` and `vault_dir`.
 
 Once on, nothing else is needed. After each `git commit` and at the end of each turn, the
@@ -87,7 +144,8 @@ noesis notes recall "<one sentence on the task>" --repo <repo> --json
 ```
 
 - Pass one sentence about the task, not a pasted prompt. noesis keeps its keywords (3+ letters,
-  no stopwords); a sentence with none fails with `NOTES_204_NO_RECALL_TERMS` (exit 1).
+  no stopwords); a sentence with none fails with `NOTES_204_NO_RECALL_TERMS` (exit 1), and a
+  blank task with `INTERFACE_005_EMPTY_RECALL_TASK` (exit 2).
 - Without `--repo` or `--area` the repository you are in is used; outside a git repository it
   fails with `INTERFACE_002_NOT_IN_GIT_REPOSITORY`.
 - The result has `entries` (`kind`, `title`, `path`, `date`, `snippet`), best first, plus
@@ -173,8 +231,15 @@ are not included. To inspect a project file, pass
 `integrate claude-code status --settings <repo>/.claude/settings.json`.
 
 Common error codes: `CORE_002_VAULT_NOT_CONFIGURED` (run `config init`),
-`CAPTURE_001_INVALID_SESSION_ID`, `NOTES_201_CURATION_FAILED` (curation or storage failed; see `notes parked`),
+`INTERFACE_003_BLANK_SESSION_ID` (a blank `--session` or `--parent`; exit 2),
+`INTERFACE_004_SELF_PARENT_SESSION` (`--parent` is the session itself; exit 2),
+`INTERFACE_005_EMPTY_RECALL_TASK` (`notes recall` got a blank task; exit 2),
+`CAPTURE_001_INVALID_SESSION_ID` (a blank id that reached the domain, in practice a hook payload),
+`CAPTURE_202_SESSION_ID_MISSING` (no `--session` and none in the environment, exit 2; run
+`capture on` and pass back `result.session_id`),
+`CAPTURE_201_SESSION_NOT_FOUND` (`--parent` names a session that was never switched on),
+`NOTES_201_CURATION_FAILED` (curation or storage failed; see `notes parked`),
 `NOTES_203_APPLY_FAILED` (`notes apply` rejected an entry or could not store; the payload was kept),
-`INTERFACE_002_NOT_IN_GIT_REPOSITORY` (run `notes apply` from inside the repository),
+`INTERFACE_002_NOT_IN_GIT_REPOSITORY` (run `capture`, `notes apply` and `notes recall` from inside the repository),
 `NOTES_204_NO_RECALL_TERMS` (`notes recall` task has no usable keyword),
 `INTEGRATION_101_AGENT_SETTINGS_INVALID` (the settings file is not valid JSON).
