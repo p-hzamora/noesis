@@ -33,6 +33,12 @@ class CuratorFailedError(InfrastructureException):
     __error_code__ = "NOTES_101_CURATOR_FAILED"
 
 
+class RecallAgentFailedError(InfrastructureException):
+    """The recall agent could not produce a briefing: missing, failed, timed out or unusable."""
+
+    __error_code__ = "NOTES_103_RECALL_AGENT_FAILED"
+
+
 class NoteStorageError(InfrastructureException):
     """Notes could not be read from or written to the vault."""
 

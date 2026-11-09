@@ -47,6 +47,7 @@ from .notes_errors import (
     NoRecallTermsError,
     NoteStorageError,
     ParkedCurationNotFoundError,
+    RecallAgentFailedError,
 )
 
 __all__ = [
@@ -82,6 +83,7 @@ __all__ = [
     "ObsidianMcpError",
     "ObsidianMcpToolError",
     "ParkedCurationNotFoundError",
+    "RecallAgentFailedError",
     "SelfParentSessionError",
     "SessionIdentityMissingError",
     "SkillGuideNotFoundError",
