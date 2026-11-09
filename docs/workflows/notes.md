@@ -1,7 +1,8 @@
 # `notes retry | parked | search | list`
 
-To pick the few notes worth reading before a task, see [`notes recall`](notes-recall.md): it
-reuses the same search and adds ranking and a size budget.
+To prepare for a task from the notes, see [`notes recall`](notes-recall.md): it searches by
+keyword, reads the best notes and has an agent write a grounded briefing (`--no-synthesis` for the
+ranked list only).
 
 ```mermaid
 flowchart LR

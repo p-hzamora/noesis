@@ -56,7 +56,7 @@ noesis notes curate --brief-file FILE [--dry-run]   # the curator judges a work 
 noesis notes apply --decisions-file FILE|- [--dry-run] # store note drafts you wrote, no curator
 noesis notes parked | retry TICKET      # failed curations
 noesis notes search TEXT [--repo R]     # find notes
-noesis notes recall TASK [--repo R]     # the few notes worth reading before a task ([details](docs/workflows/notes-recall.md))
+noesis notes recall TASK [--repo R] [--no-synthesis]  # briefing for a task, grounded in notes ([details](docs/workflows/notes-recall.md))
 noesis notes list [--repo R] [--origin manual|auto]
 noesis capture on|off|status|runs [--session ID] [--mode live|dry-run] [--parent ID] [--children]
 noesis hook claude-code                     # stdin: Claude Code hook JSON (always exits 0)

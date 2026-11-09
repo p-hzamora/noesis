@@ -143,19 +143,32 @@ design choice, an unfamiliar area). Do not run it for trivial edits.
 noesis notes recall "<one sentence on the task>" --repo <repo> --json
 ```
 
-- Pass one sentence about the task, not a pasted prompt. noesis keeps its keywords (3+ letters,
-  no stopwords); a sentence with none fails with `NOTES_204_NO_RECALL_TERMS` (exit 1), and a
-  blank task with `INTERFACE_005_EMPTY_RECALL_TASK` (exit 2).
+It searches the notes, reads the best ones in full and has an agent write a briefing for the
+task. It takes up to about a minute and calls a model, so run it once.
+
+- Pass one sentence about the task, not a pasted prompt. A sentence with no usable keyword fails
+  with `NOTES_204_NO_RECALL_TERMS` (exit 1), a blank task with `INTERFACE_005_EMPTY_RECALL_TASK`
+  (exit 2).
 - Without `--repo` or `--area` the repository you are in is used; outside a git repository it
   fails with `INTERFACE_002_NOT_IN_GIT_REPOSITORY`.
-- The result has `entries` (`kind`, `title`, `path`, `date`, `snippet`), best first, plus
-  `considered` and `omitted`. `--limit` (1..20, default 5) and `--budget-tokens` (default 1000,
-  `0` is unlimited) bound it. Bodies are never included.
-- Read only the entries that look relevant, by `path`, under the vault folder. Do not open them all.
-- Tell the user which notes you used (their paths) and why. If `entries` is empty (exit 0,
-  text `no relevant notes`), say so and go on without them.
-- Do not loop: one recall per task. Do not retry with other wording when it is empty. If the
-  result has `notice`, Obsidian was unreachable and files were searched; tell the user, do not retry.
+- Read `result.synthesis`:
+  - `briefing`: use `result.briefing`. `constraints`, `decisions`, `gotchas` and `context` each
+    carry `sources` (note paths) that were read and checked. `inferences` are the agent's own
+    reasoning, not facts from the notes; `unsupported` are statements dropped for lacking a valid
+    citation; `not_covered` is what the notes do not say. `briefing.markdown` is the whole thing
+    as a document you can show the user.
+  - `no_evidence`: nothing in the vault matched. Say so and go on. Do not retry with other wording.
+  - `digest`: only with `--no-synthesis`; `entries` are pointers and snippets, no model ran.
+- Tell the user which notes you relied on (their `sources`) and keep inferences labelled as such.
+  Check `result.warnings` (notes unreadable, text cut, secrets masked) and `notice` (Obsidian was
+  unreachable and files were searched); mention them, do not retry.
+- `--limit` (1..20, default 5) is how many notes are read; `--budget-tokens` (default 1000, `0`
+  none) is the length asked of the briefing. `--no-synthesis` lists the best notes only, with no
+  model and no cost.
+- `NOTES_103_RECALL_AGENT_FAILED` (exit 1): the briefing could not be written (agent missing,
+  model rejected, timeout, unusable answer). `error.metadata.candidates` lists the notes that
+  would have been read; rerun with `--no-synthesis` or read them yourself. Do not report the
+  recall as done.
 
 ## Record a note yourself
 
@@ -242,4 +255,5 @@ Common error codes: `CORE_002_VAULT_NOT_CONFIGURED` (run `config init`),
 `NOTES_203_APPLY_FAILED` (`notes apply` rejected an entry or could not store; the payload was kept),
 `INTERFACE_002_NOT_IN_GIT_REPOSITORY` (run `capture`, `notes apply` and `notes recall` from inside the repository),
 `NOTES_204_NO_RECALL_TERMS` (`notes recall` task has no usable keyword),
+`NOTES_103_RECALL_AGENT_FAILED` (`notes recall` could not write the briefing; `--no-synthesis` still works),
 `INTEGRATION_101_AGENT_SETTINGS_INVALID` (the settings file is not valid JSON).

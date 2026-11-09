@@ -61,6 +61,20 @@ origin (manual or auto).
 A note written by noesis without a person in the loop. Lives only under
 `<area>/auto/`, carries `origin: auto`, and never edits a manual note.
 
+**Recall**:
+Preparing for a task from the notes: search by keyword, read the best notes in full, and have the
+recall agent write a briefing. Read-only.
+
+**Recall agent**:
+The LLM that writes the briefing from notes noesis hands it (`IRecallAgent.brief`). It has no
+tools and no access to the vault. Its runtime (`NOESIS_RECALL_RUNTIME`, the program that runs it)
+and its model (`NOESIS_RECALL_MODEL`) are separate.
+
+**Briefing**:
+What recall returns: a summary plus constraints, decisions, gotchas, context, open questions,
+inferences and gaps, each statement citing the notes it rests on. Not the same as the agent's
+instructions (`recall_system.md`) and not a work brief.
+
 **Vault**:
 The folder that stores notes (`NOESIS_VAULT_DIR`). An Obsidian vault is one kind of vault.
 
