@@ -13,7 +13,7 @@ from noesis.bounded_context.notes.infrastructure.outbound.storage import (
     ObsidianMcpNoteReadRepositoryAdapter,
 )
 from noesis.bounded_context.notes.infrastructure.outbound.storage.mappers import NoteMapper
-from noesis.exceptions import ObsidianMcpError
+from noesis.exceptions import NoteStorageError, ObsidianMcpError
 from noesis.shared_kernel.infrastructure.outbound.mcp import ObsidianMcpClient
 
 pytestmark = pytest.mark.integration
@@ -181,3 +181,65 @@ async def test_an_unusable_answer_is_reported_as_such_not_as_unreachable(vault: 
         mcp_repo, _ = _adapters(vault, server.url)
         with pytest.raises(ObsidianMcpError, match="not JSON"):
             await mcp_repo.search("ttl", area=None, limit=1)
+
+
+async def test_read_note_returns_the_whole_note_inside_the_area(vault: Path) -> None:
+    with fake_obsidian_mcp(vault) as server:
+        obsidian, _ = _adapters(vault, server.url)
+
+        note = await obsidian.read_note(
+            "repos/demo/auto/decisions/use-ttl-cache.md", area=NoteArea(value="repos/demo")
+        )
+
+    assert (note.title, note.kind, note.origin, note.updated) == (
+        "Use a TTL cache", "decision", "auto", "2026-10-02",
+    )  # fmt: skip
+    assert note.content == TTL
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "repos/other/decisions/use-ttl-cache.md",
+        "repos/demo/../other/decisions/use-ttl-cache.md",
+        "../secret.md",
+        "repos/demo/.obsidian/workspace.md",
+        "repos/demo/auto/decisions/use-ttl-cache.txt",
+    ],
+)
+async def test_read_note_refuses_paths_outside_the_scope_without_calling_obsidian(
+    vault: Path, path: str
+) -> None:
+    with fake_obsidian_mcp(vault) as server:
+        obsidian, _ = _adapters(vault, server.url)
+
+        with pytest.raises(NoteStorageError):
+            await obsidian.read_note(path, area=NoteArea(value="repos/demo"))
+
+    assert server.calls == []
+
+
+async def test_read_note_falls_back_to_files_when_obsidian_is_down(vault: Path) -> None:
+    obsidian, files = _adapters(vault, f"http://127.0.0.1:{free_port()}/mcp/")
+    notices: list[ObsidianMcpError] = []
+    repository = FallbackNoteReadRepositoryAdapter(obsidian, files, on_fallback=notices.append)
+
+    note = await repository.read_note(
+        "repos/demo/auto/decisions/use-ttl-cache.md", area=NoteArea(value="repos/demo")
+    )
+
+    assert note.content == TTL
+    assert len(notices) == 1
+
+
+async def test_a_search_for_a_whole_sentence_finds_nothing_but_keywords_do(vault: Path) -> None:
+    """Obsidian's search wants every word: this is why recall searches keyword by keyword."""
+    with fake_obsidian_mcp(vault, all_words=True) as server:
+        obsidian, _ = _adapters(vault, server.url)
+        area = NoteArea(value="repos/demo")
+
+        sentence = await obsidian.search("use a ttl cache for lookups quickly", area=area, limit=5)
+        keyword = await obsidian.search("ttl", area=area, limit=5)
+
+    assert sentence.notes == ()
+    assert [note.path for note in keyword.notes] == ["repos/demo/auto/decisions/use-ttl-cache.md"]

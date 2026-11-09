@@ -80,6 +80,10 @@ def test_the_env_example_template_documents_every_setting() -> None:
         "NOESIS_CURATOR_MODEL",
         "NOESIS_CURATOR_RETRY_SECONDS",
         "NOESIS_CURATOR_SYSTEM_PROMPT_FILE",
+        "NOESIS_RECALL_RUNTIME",
+        "NOESIS_RECALL_MODEL=claude-haiku-5-5",
+        "NOESIS_RECALL_EFFORT=low",
+        "NOESIS_RECALL_MAX_INPUT_CHARS",
     ):
         assert variable in template
 
@@ -146,3 +150,27 @@ def test_ambient_session_ids_are_read_from_the_process_environment(
         "thread-1",
         None,
     )
+
+
+def test_recall_settings_default_to_the_runtime_defaults_and_read_the_model_and_effort(
+    tmp_path: Path,
+) -> None:
+    default = load_environment(tmp_path / "missing.env").recall
+    assert (default.runtime.value, default.model, default.effort) == ("claude-cli", "", "")
+
+    env_file: Path = tmp_path / "noesis.env"
+    env_file.write_text(
+        "NOESIS_RECALL_MODEL=claude-haiku-5-5\nNOESIS_RECALL_EFFORT=low\n", encoding="utf-8"
+    )
+    configured = load_environment(env_file).recall
+    assert (configured.model, configured.effort) == ("claude-haiku-5-5", "low")
+
+
+def test_an_unknown_recall_runtime_is_rejected(tmp_path: Path) -> None:
+    env_file: Path = tmp_path / "noesis.env"
+    env_file.write_text("NOESIS_RECALL_RUNTIME=carrier-pigeon\n", encoding="utf-8")
+
+    with pytest.raises(InvalidConfigurationError) as raised:
+        load_environment(env_file)
+
+    assert "NOESIS_RECALL_RUNTIME" in str(raised.value.metadata["problems"])

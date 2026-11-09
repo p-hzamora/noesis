@@ -17,6 +17,7 @@ from noesis.bounded_context.notes.infrastructure.outbound.storage import (
     FilesystemNotesUnitOfWorkAdapter,
 )
 from noesis.bounded_context.notes.infrastructure.outbound.storage.mappers import NoteMapper
+from noesis.exceptions import NoteStorageError
 
 pytestmark = pytest.mark.integration
 
@@ -136,3 +137,56 @@ def test_frontmatter_errors_are_tolerated(mapper: NoteMapper) -> None:
 
     assert parsed.frontmatter == {}
     assert parsed.title == "Title"
+
+
+async def test_read_note_returns_the_whole_file_inside_the_area(
+    tmp_path: Path, mapper: NoteMapper
+) -> None:
+    (tmp_path / "repos/demo/gotchas").mkdir(parents=True)
+    (tmp_path / "repos/demo/gotchas/clock-skew.md").write_text(MANUAL_NOTE, encoding="utf-8")
+    reader = FilesystemNoteReadRepositoryAdapter(tmp_path, mapper)
+
+    note = await reader.read_note(
+        "repos/demo/gotchas/clock-skew.md", area=NoteArea(value="repos/demo")
+    )
+
+    assert (note.title, note.kind, note.origin, note.updated) == (
+        "Clock skew breaks tokens", "gotcha", "manual", "2026-01-05",
+    )  # fmt: skip
+    assert note.content == MANUAL_NOTE
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "repos/other/gotchas/x.md",
+        "repos/demo/../../outside.md",
+        "/etc/passwd",
+        "repos/demo/.hidden/x.md",
+        "repos/demo/gotchas/clock-skew.txt",
+        "repos/demo/gotchas/missing.md",
+    ],
+)
+async def test_read_note_refuses_anything_outside_the_scope_or_unreadable(
+    tmp_path: Path, mapper: NoteMapper, path: str
+) -> None:
+    (tmp_path / "repos/demo/gotchas").mkdir(parents=True)
+    (tmp_path / "repos/demo/gotchas/clock-skew.txt").write_text("x", encoding="utf-8")
+    (tmp_path.parent / "outside.md").write_text("secret", encoding="utf-8")
+    reader = FilesystemNoteReadRepositoryAdapter(tmp_path, mapper)
+
+    with pytest.raises(NoteStorageError):
+        await reader.read_note(path, area=NoteArea(value="repos/demo"))
+
+
+async def test_read_note_refuses_a_symlink_that_leaves_the_vault(
+    tmp_path: Path, mapper: NoteMapper
+) -> None:
+    vault: Path = tmp_path / "vault"
+    (vault / "repos/demo").mkdir(parents=True)
+    (tmp_path / "outside.md").write_text("secret", encoding="utf-8")
+    (vault / "repos/demo/link.md").symlink_to(tmp_path / "outside.md")
+    reader = FilesystemNoteReadRepositoryAdapter(vault, mapper)
+
+    with pytest.raises(NoteStorageError):
+        await reader.read_note("repos/demo/link.md", area=NoteArea(value="repos/demo"))

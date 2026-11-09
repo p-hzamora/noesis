@@ -63,7 +63,12 @@ def _paths(envelope: JsonObject) -> list[str]:
 def test_recall_returns_a_ranked_digest_without_bodies(
     vault: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    assert run(["notes", "recall", "fix the login cache", "--repo", "demo", "--json"]) == 0
+    assert (
+        run(
+            ["notes", "recall", "fix the login cache", "--repo", "demo", "--json", "--no-synthesis"]
+        )
+        == 0
+    )
 
     envelope: JsonObject = _json(capsys)
     result: JsonObject = envelope["result"]  # type: ignore[assignment]
@@ -83,7 +88,7 @@ def test_recall_returns_a_ranked_digest_without_bodies(
 def test_text_output_lists_entries_with_a_path_to_read(
     vault: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    assert run(["notes", "recall", "login cache", "--repo", "demo"]) == 0
+    assert run(["notes", "recall", "login cache", "--repo", "demo", "--no-synthesis"]) == 0
 
     text: str = capsys.readouterr().out
     assert GOTCHA in text
@@ -92,7 +97,10 @@ def test_text_output_lists_entries_with_a_path_to_read(
 
 
 def test_area_option_restricts_the_search(vault: Path, capsys: pytest.CaptureFixture[str]) -> None:
-    assert run(["notes", "recall", "login cache", "--area", "repos/other", "--json"]) == 0
+    assert (
+        run(["notes", "recall", "login cache", "--area", "repos/other", "--json", "--no-synthesis"])
+        == 0
+    )
 
     assert _paths(_json(capsys)) == [OTHER]
 
@@ -100,7 +108,7 @@ def test_area_option_restricts_the_search(vault: Path, capsys: pytest.CaptureFix
 def test_without_repo_or_area_the_working_repository_is_used(
     vault: Path, repo: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    assert run(["notes", "recall", "login cache", "--json"]) == 0
+    assert run(["notes", "recall", "login cache", "--json", "--no-synthesis"]) == 0
 
     assert _paths(_json(capsys)) == [GOTCHA, RUN]
 
@@ -119,13 +127,40 @@ def test_without_repo_or_area_outside_a_git_repository_it_fails_typed(
 
 
 def test_limit_and_budget_bound_the_digest(vault: Path, capsys: pytest.CaptureFixture[str]) -> None:
-    assert run(["notes", "recall", "login cache", "--repo", "demo", "--limit", "1", "--json"]) == 0
+    assert (
+        run(
+            [
+                "notes",
+                "recall",
+                "login cache",
+                "--repo",
+                "demo",
+                "--limit",
+                "1",
+                "--json",
+                "--no-synthesis",
+            ]
+        )
+        == 0
+    )
     one: JsonObject = _json(capsys)
     assert _paths(one) == [GOTCHA]
     assert one["result"]["omitted"] == 1  # type: ignore[index]
 
     assert (
-        run(["notes", "recall", "login cache", "--repo", "demo", "--budget-tokens", "1", "--json"])
+        run(
+            [
+                "notes",
+                "recall",
+                "login cache",
+                "--repo",
+                "demo",
+                "--budget-tokens",
+                "1",
+                "--json",
+                "--no-synthesis",
+            ]
+        )
         == 0
     )
     tiny: JsonObject = _json(capsys)
@@ -136,10 +171,15 @@ def test_limit_and_budget_bound_the_digest(vault: Path, capsys: pytest.CaptureFi
 def test_an_empty_result_is_exit_zero_with_an_explicit_notice(
     vault: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    assert run(["notes", "recall", "kubernetes operator", "--repo", "demo", "--json"]) == 0
+    assert (
+        run(
+            ["notes", "recall", "kubernetes operator", "--repo", "demo", "--json", "--no-synthesis"]
+        )
+        == 0
+    )
     assert _json(capsys)["result"]["entries"] == []  # type: ignore[index]
 
-    assert run(["notes", "recall", "kubernetes operator", "--repo", "demo"]) == 0
+    assert run(["notes", "recall", "kubernetes operator", "--repo", "demo", "--no-synthesis"]) == 0
     assert "no relevant notes" in capsys.readouterr().out
 
 
@@ -194,12 +234,14 @@ def test_with_obsidian_closed_recall_falls_back_to_files_and_says_so(
     monkeypatch.setenv("NOESIS_OBSIDIAN_MCP_URL", f"http://127.0.0.1:{free_port()}/mcp/")
     monkeypatch.setenv("NOESIS_OBSIDIAN_MCP_TIMEOUT_SECONDS", "2")
 
-    assert run(["notes", "recall", "login cache", "--repo", "demo", "--json"]) == 0
+    assert (
+        run(["notes", "recall", "login cache", "--repo", "demo", "--json", "--no-synthesis"]) == 0
+    )
     envelope: JsonObject = _json(capsys)
     assert _paths(envelope) == [GOTCHA, RUN]
     assert envelope["result"]["notice"] == FALLBACK_NOTICE  # type: ignore[index]
     assert envelope["result"]["backend"] == "filesystem"  # type: ignore[index]
 
-    assert run(["notes", "recall", "login cache", "--repo", "demo"]) == 0
+    assert run(["notes", "recall", "login cache", "--repo", "demo", "--no-synthesis"]) == 0
     text: str = capsys.readouterr().out
     assert text.count(FALLBACK_NOTICE) == 1

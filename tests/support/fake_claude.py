@@ -19,7 +19,7 @@ def write_fake_claude(
     """Create an executable that records its stdin and argv, then prints `envelope` (or `raw`).
 
     Args:
-        folder: Where to create the script (`claude`) and its records (`stdin.txt`, `argv.txt`).
+        folder: Where to create the script (`claude`) and its records (`stdin.txt`, `argv.txt`, `env.json`).
         envelope: JSON to print, mimicking `claude -p --output-format json`.
         raw: Text to print instead of JSON.
         exit_code: Exit status of the fake.
@@ -32,9 +32,10 @@ def write_fake_claude(
     script: Path = folder / "claude"
     script.write_text(
         "#!/usr/bin/env python3\n"
-        "import pathlib, sys, time\n"
+        "import json, os, pathlib, sys, time\n"
         f"pathlib.Path({str(folder / 'stdin.txt')!r}).write_text(sys.stdin.read())\n"
         f"pathlib.Path({str(folder / 'argv.txt')!r}).write_text('\\n'.join(sys.argv[1:]))\n"
+        f"pathlib.Path({str(folder / 'env.json')!r}).write_text(json.dumps(dict(os.environ)))\n"
         f"time.sleep({sleep_seconds})\n"
         f"sys.stdout.write({output!r})\n"
         f"sys.exit({exit_code})\n",
@@ -68,3 +69,16 @@ TTL_DECISION: JsonObject = {
         {"heading": "Rationale", "body": "Single instance."},
     ],
 }
+
+
+def briefing_envelope(briefing: JsonObject, *, model: str = "claude-haiku-5-5") -> JsonObject:
+    """What a successful recall run prints: the briefing as `structured_output`."""
+    return {
+        "type": "result",
+        "subtype": "success",
+        "is_error": False,
+        "result": "",
+        "structured_output": briefing,
+        "modelUsage": {model: {"costUSD": 0.001}},
+        "total_cost_usd": 0.001,
+    }

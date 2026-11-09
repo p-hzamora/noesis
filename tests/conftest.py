@@ -19,6 +19,8 @@ def isolated_environment(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Pat
     monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(home / ".claude"))
     for name in [name for name in os.environ if name.startswith("NOESIS_")]:
         monkeypatch.delenv(name)
+    # a test that forgets to fake the recall agent fails fast instead of calling a real model
+    monkeypatch.setenv("NOESIS_RECALL_CLAUDE_BIN", str(tmp_path / "no-claude-here"))
     return home
 
 

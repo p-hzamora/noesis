@@ -50,8 +50,10 @@ class FakeObsidianMcp:
         fail_write_after: int | None = None,
         reject_writes: bool = False,
         read_without_content: bool = False,
+        all_words: bool = False,
         port: int | None = None,
     ) -> None:
+        self.all_words: bool = all_words  # like Obsidian: a note must contain EVERY query word
         self.fail_write_after: int | None = fail_write_after  # the (N+1)-th write is a tool error
         self.reject_writes: bool = reject_writes  # every write is a tool error
         self.read_without_content: bool = read_without_content  # `vault_read` omits `content`
@@ -98,7 +100,7 @@ class FakeObsidianMcp:
             for path in sorted(self.vault.rglob("*.md")):
                 text: str = path.read_text(encoding="utf-8").lower()
                 score: int = sum(text.count(word) for word in words)
-                if score:
+                if score and (not self.all_words or all(word in text for word in words)):
                     hits.append(
                         {
                             "filename": path.relative_to(self.vault).as_posix(),
@@ -191,6 +193,7 @@ def fake_obsidian_mcp(
     fail_write_after: int | None = None,
     reject_writes: bool = False,
     read_without_content: bool = False,
+    all_words: bool = False,
     port: int | None = None,
 ) -> Iterator[FakeObsidianMcp]:
     """Run a fake server for the duration of the block (on `port`, to bring a server back)."""
@@ -203,6 +206,7 @@ def fake_obsidian_mcp(
         fail_write_after=fail_write_after,
         reject_writes=reject_writes,
         read_without_content=read_without_content,
+        all_words=all_words,
         port=port,
     )
     fake.start()

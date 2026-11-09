@@ -7,14 +7,17 @@ from typing import Self
 
 from noesis.bounded_context.notes.application.dtos import (
     ApplyFailureRecordDto,
+    NoteContentDto,
     NoteSearchResultDto,
     NoteSummaryDto,
     ParkedCurationDto,
+    RecallBriefingDto,
 )
 from noesis.bounded_context.notes.application.ports.curation import ICurator
 from noesis.bounded_context.notes.application.ports.failures import IApplyFailureLog
 from noesis.bounded_context.notes.application.ports.queue import IParkedCurationQueue
 from noesis.bounded_context.notes.application.ports.read_repositories import INoteReadRepository
+from noesis.bounded_context.notes.application.ports.recall import IRecallAgent
 from noesis.bounded_context.notes.application.ports.uow import INotesUnitOfWork
 from noesis.bounded_context.notes.domain.entities import Note
 from noesis.bounded_context.notes.domain.repositories import INoteRepository
@@ -33,6 +36,7 @@ from noesis.bounded_context.notes.domain.value_objects import (
 from noesis.exceptions import (
     CuratorFailedError,
     NoteStorageError,
+    RecallAgentFailedError,
 )
 from noesis.shared_kernel.application.ports.clock import IClock
 from noesis.shared_kernel.contracts import CommitRefContract, WorkBriefContract
@@ -117,18 +121,53 @@ class InMemoryNotesUnitOfWork(INotesUnitOfWork):
 
 
 class InMemoryNoteReadRepository(INoteReadRepository):
-    """Returns preset summaries and records the queries and limits it received."""
+    """Returns preset summaries and records the queries and limits it received.
 
-    def __init__(self, notes: Sequence[NoteSummaryDto] = ()) -> None:
+    A search returns every note whose title or snippet contains one of the query's words, or
+    every note when `match_all` (the default, as before). `bodies` gives `read_note` its text
+    (default: the snippet); `unreadable` lists paths whose read fails.
+    """
+
+    def __init__(
+        self,
+        notes: Sequence[NoteSummaryDto] = (),
+        *,
+        bodies: dict[str, str] | None = None,
+        unreadable: Sequence[str] = (),
+        match_all: bool = True,
+    ) -> None:
         self.notes: list[NoteSummaryDto] = list(notes)
         self.queries: list[str] = []
         self.limits: list[int] = []
+        self.read_paths: list[str] = []
+        self.bodies: dict[str, str] = bodies or {}
+        self.unreadable: tuple[str, ...] = tuple(unreadable)
+        self.match_all: bool = match_all
 
     async def search(self, text: str, *, area: NoteArea | None, limit: int) -> NoteSearchResultDto:
         self.queries.append(text)
         self.limits.append(limit)
-        return NoteSearchResultDto(
-            notes=tuple(self.notes[:limit]), backend=SearchEngineEnum.FILESYSTEM
+        words: list[str] = text.lower().split()
+        hits: list[NoteSummaryDto] = [
+            note
+            for note in self.notes
+            if self.match_all
+            or any(word in f"{note.title} {note.snippet} {note.path}".lower() for word in words)
+        ]
+        return NoteSearchResultDto(notes=tuple(hits[:limit]), backend=SearchEngineEnum.FILESYSTEM)
+
+    async def read_note(self, path: str, *, area: NoteArea | None) -> NoteContentDto:
+        self.read_paths.append(path)
+        if path in self.unreadable:
+            raise NoteStorageError(f"Cannot read the note {path}.", {"path": path})
+        note: NoteSummaryDto = next(note for note in self.notes if note.path == path)
+        return NoteContentDto(
+            path=note.path,
+            title=note.title,
+            kind=note.kind,
+            origin=note.origin,
+            updated=note.updated,
+            content=self.bodies.get(path, note.snippet),
         )
 
     async def list_notes(
@@ -156,6 +195,22 @@ class ScriptedCurator(ICurator):
         if isinstance(step, str):
             raise CuratorFailedError(step)
         return step
+
+
+class ScriptedRecallAgent(IRecallAgent):
+    """Answers with a preset briefing, or raises when given an error message."""
+
+    def __init__(self, answer: RecallBriefingDto | str) -> None:
+        self._answer: RecallBriefingDto | str = answer
+        self.calls: list[tuple[str, tuple[NoteContentDto, ...], int]] = []
+
+    async def brief(
+        self, task: str, notes: Sequence[NoteContentDto], *, target_tokens: int
+    ) -> RecallBriefingDto:
+        self.calls.append((task, tuple(notes), target_tokens))
+        if isinstance(self._answer, str):
+            raise RecallAgentFailedError(self._answer)
+        return self._answer
 
 
 class InMemoryParkedQueue(IParkedCurationQueue):
