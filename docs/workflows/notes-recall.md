@@ -16,8 +16,8 @@ sequenceDiagram
     participant M as SecretRedactor / BriefingGrounder (services)
     participant A as IRecallAgent<br/>(NOESIS_RECALL_RUNTIME)
 
-    Cmd->>Cmd: area from --repo/--area, else the cwd git repository (INTERFACE_002 outside one)
-    Cmd->>H: RecallNotesQuery(task, area, limit, budget_tokens, synthesize)
+    Cmd->>Cmd: area from --repo/--area; else the whole vault, preferring the cwd git repository's notes
+    Cmd->>H: RecallNotesQuery(task, area, prefer_area, limit, budget_tokens, synthesize)
     H->>Q: task
     Q-->>H: one query per keyword (else NoRecallTermsError NOTES_204, exit 1)
     loop each query
@@ -103,9 +103,11 @@ Ties break by merged rank, then path. A note is only down-weighted, never droppe
   project settings, no hooks, no saved session and a spend cap (`--tools ""`,
   `--strict-mcp-config`, `--setting-sources ""`, `--no-session-persistence`,
   `--max-budget-usd`). It cannot search, read or write anything else.
-- **Scope.** Only notes under the `--repo`/`--area` folder are read; `read_note` refuses `..`,
-  absolute paths, hidden folders, non-Markdown files, anything outside the area, and a symlink
-  that leaves the vault.
+- **Scope.** With `--repo`/`--area`, only notes under that folder are read. Without them the whole
+  vault is searched and notes under the cwd repository rank first (outside a git repository there
+  is no preference); a scoped search that finds nothing says which folder it searched in
+  `warnings`. `read_note` refuses `..`, absolute paths, hidden folders, non-Markdown files,
+  anything outside the area when one is set, and a symlink that leaves the vault.
 - **Secrets.** Private-key blocks, well-known token shapes (`sk-…`, `ghp_…`, `AKIA…`, `xox…`),
   bearer tokens and `password|secret|token|api_key = value` assignments become `[REDACTED]` before
   sending, and the count is reported as a warning. This is a safety net, not a guarantee: a secret
@@ -182,7 +184,6 @@ only passes it on. The model the CLI reports is shown as `briefing.model`.
 | no keywords left in the task | `NOTES_204_NO_RECALL_TERMS`, exit 1 |
 | blank task, `--limit` or `--budget-tokens` out of range | usage error, exit 2 |
 | vault not configured | `CORE_002_VAULT_NOT_CONFIGURED`, exit 1 |
-| no `--repo`/`--area` outside a git repository | `INTERFACE_002_NOT_IN_GIT_REPOSITORY` |
 | Obsidian unreachable, vault set | files searched and read, exit 0, `Obsidian MCP unreachable, searched files instead` as `notice` |
 | Obsidian unreachable, no vault | `INTEGRATION_102_OBSIDIAN_MCP_FAILED`, exit 1 (never `no_evidence`) |
 | agent missing, failed, timed out, wrong model or effort, or unusable answer | `NOTES_103_RECALL_AGENT_FAILED`, exit 1, `metadata.candidates` lists the notes that would have been read, next step `--no-synthesis` |
