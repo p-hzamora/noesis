@@ -110,6 +110,17 @@ def test_an_old_run_is_down_weighted_but_never_dropped() -> None:
     assert ranked == ("decision", "run")
 
 
+def test_a_note_outside_the_preferred_area_is_down_weighted_but_kept() -> None:
+    inside: RecallCandidate = _candidate("repos/a/inside.md", rank=1)
+    outside: RecallCandidate = _candidate("repos/b/outside.md", rank=0).model_copy(
+        update={"preferred": False}
+    )
+
+    ranked = RecallRankingPolicy(RecallWeights()).rank([outside, inside], today=TODAY)
+
+    assert ranked == ("repos/a/inside.md", "repos/b/outside.md")
+
+
 def test_every_candidate_comes_back() -> None:
     candidates = [
         _candidate(f"p{i}", rank=i, kind=NoteKindEnum.RUN, updated=None, origin=NoteOriginEnum.AUTO)

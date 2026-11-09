@@ -132,6 +132,17 @@ async def test_no_matches_is_an_empty_digest() -> None:
     assert (digest.entries, digest.considered, digest.omitted) == ((), 0, 0)
 
 
+async def test_a_preferred_area_ranks_first_without_hiding_the_rest() -> None:
+    mine = _note("a").model_copy(update={"path": "repos/mine/a.md"})
+    handler, _ = _handler(_note("b"), mine)
+
+    digest = await handler.handle(
+        RecallNotesQuery(synthesize=False, task="login cache", prefer_area="repos/mine")
+    )
+
+    assert [entry.path for entry in digest.entries] == ["repos/mine/a.md", "repos/demo/b.md"]
+
+
 async def test_entries_carry_kind_title_path_date_and_snippet() -> None:
     handler, _ = _handler(_note("a", snippet="Keep tokens in memory."))
 

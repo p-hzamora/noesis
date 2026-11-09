@@ -105,33 +105,26 @@ def test_area_option_restricts_the_search(vault: Path, capsys: pytest.CaptureFix
     assert _paths(_json(capsys)) == [OTHER]
 
 
-def test_without_repo_or_area_the_working_repository_is_used(
+def test_without_repo_or_area_the_whole_vault_is_searched_with_the_working_repository_first(
     vault: Path, repo: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     assert run(["notes", "recall", "login cache", "--json", "--no-synthesis"]) == 0
 
-    assert _paths(_json(capsys)) == [GOTCHA, RUN]
+    paths: list[str] = _paths(_json(capsys))
+    assert paths[0] == GOTCHA
+    assert set(paths) == {GOTCHA, RUN, OTHER}
 
 
-def test_an_empty_area_searches_the_whole_vault(
-    vault: Path, repo: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
-    assert run(["notes", "recall", "login cache", "--area", "", "--json", "--no-synthesis"]) == 0
-
-    assert OTHER in _paths(_json(capsys))
-
-
-def test_without_repo_or_area_outside_a_git_repository_it_fails_typed(
+def test_without_repo_or_area_outside_a_git_repository_the_whole_vault_is_searched(
     vault: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     outside: Path = tmp_path / "outside"
     outside.mkdir()
     monkeypatch.chdir(outside)
 
-    assert run(["notes", "recall", "login cache", "--json"]) == 2
+    assert run(["notes", "recall", "login cache", "--json", "--no-synthesis"]) == 0
 
-    error: JsonObject = _json(capsys)["error"]  # type: ignore[assignment]
-    assert error["code"] == "INTERFACE_002_NOT_IN_GIT_REPOSITORY"
+    assert set(_paths(_json(capsys))) == {GOTCHA, RUN, OTHER}
 
 
 def test_limit_and_budget_bound_the_digest(vault: Path, capsys: pytest.CaptureFixture[str]) -> None:
