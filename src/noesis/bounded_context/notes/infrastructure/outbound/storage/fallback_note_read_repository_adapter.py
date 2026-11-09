@@ -2,7 +2,11 @@
 
 from collections.abc import Callable
 
-from noesis.bounded_context.notes.application.dtos import NoteSearchResultDto, NoteSummaryDto
+from noesis.bounded_context.notes.application.dtos import (
+    NoteContentDto,
+    NoteSearchResultDto,
+    NoteSummaryDto,
+)
 from noesis.bounded_context.notes.application.ports.read_repositories import INoteReadRepository
 from noesis.bounded_context.notes.domain.value_objects import NoteArea, NoteOriginEnum
 from noesis.exceptions import ObsidianMcpError
@@ -45,3 +49,13 @@ class FallbackNoteReadRepositoryAdapter(INoteReadRepository):
     ) -> list[NoteSummaryDto]:
         """Always the fallback: listing never goes through Obsidian."""
         return await self._fallback.list_notes(area=area, origin=origin)
+
+    async def read_note(self, path: str, *, area: NoteArea | None) -> NoteContentDto:
+        """The preferred repository's note, or the fallback's when it is unavailable."""
+        if not self._degraded:
+            try:
+                return await self._preferred.read_note(path, area=area)
+            except ObsidianMcpError as error:
+                self._degraded = True
+                self._on_fallback(error)
+        return await self._fallback.read_note(path, area=area)

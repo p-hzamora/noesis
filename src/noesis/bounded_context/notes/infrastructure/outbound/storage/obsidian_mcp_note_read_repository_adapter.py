@@ -13,7 +13,11 @@ Tools used (names and shapes of the `obsidian` MCP server):
 
 from typing import Final
 
-from noesis.bounded_context.notes.application.dtos import NoteSearchResultDto, NoteSummaryDto
+from noesis.bounded_context.notes.application.dtos import (
+    NoteContentDto,
+    NoteSearchResultDto,
+    NoteSummaryDto,
+)
 from noesis.bounded_context.notes.application.ports.read_repositories import INoteReadRepository
 from noesis.bounded_context.notes.domain.value_objects import (
     NoteArea,
@@ -26,6 +30,7 @@ from noesis.shared_kernel.enums import SearchEngineEnum
 from noesis.shared_kernel.infrastructure.outbound.mcp import ObsidianMcpClient, ObsidianMcpSession
 
 from .mappers import NoteMapper, ParsedMarkdown
+from .note_paths import checked_note_path
 
 NOTE_SUFFIX: Final[str] = ".md"
 
@@ -100,7 +105,18 @@ class ObsidianMcpNoteReadRepositoryAdapter(INoteReadRepository):
         """Delegated to the filesystem repository."""
         return await self._listing.list_notes(area=area, origin=origin)
 
-    async def _summary(self, session: ObsidianMcpSession, path: str) -> NoteSummaryDto:
+    async def read_note(self, path: str, *, area: NoteArea | None) -> NoteContentDto:
+        """The note through `vault_read`, refused when it is outside `area`.
+
+        Raises:
+            NoteStorageError: The path is outside the allowed scope.
+            ObsidianMcpError: Obsidian is unreachable or answered something unusable.
+        """
+        clean: str = checked_note_path(path, area)
+        async with self._client.session() as session:
+            return await self._content(session, clean)
+
+    async def _content(self, session: ObsidianMcpSession, path: str) -> NoteContentDto:
         answer: JsonValue = await session.call("vault_read", {"path": path})
         content: JsonValue = answer.get("content") if isinstance(answer, dict) else None
         if not isinstance(content, str):
@@ -112,11 +128,23 @@ class ObsidianMcpNoteReadRepositoryAdapter(INoteReadRepository):
         except DomainException:
             location = None
         stem: str = path.rsplit("/", 1)[-1].removesuffix(NOTE_SUFFIX)
-        return NoteSummaryDto(
+        return NoteContentDto(
             path=path,
             title=parsed.title or (location.slug.value if location else stem),
             kind=location.kind.value if location else None,
             origin=location.origin.value if location else NoteOriginEnum.MANUAL.value,
             updated=str(updated) if updated else None,
+            content=content,
+        )
+
+    async def _summary(self, session: ObsidianMcpSession, path: str) -> NoteSummaryDto:
+        note: NoteContentDto = await self._content(session, path)
+        parsed: ParsedMarkdown = self._mapper.parse(note.content)
+        return NoteSummaryDto(
+            path=note.path,
+            title=note.title,
+            kind=note.kind,
+            origin=note.origin,
+            updated=note.updated,
             snippet=self._mapper.snippet(parsed),
         )

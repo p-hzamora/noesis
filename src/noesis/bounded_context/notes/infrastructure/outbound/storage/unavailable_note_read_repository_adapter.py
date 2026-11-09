@@ -2,7 +2,11 @@
 
 from collections.abc import Callable
 
-from noesis.bounded_context.notes.application.dtos import NoteSearchResultDto, NoteSummaryDto
+from noesis.bounded_context.notes.application.dtos import (
+    NoteContentDto,
+    NoteSearchResultDto,
+    NoteSummaryDto,
+)
 from noesis.bounded_context.notes.application.ports.read_repositories import INoteReadRepository
 from noesis.bounded_context.notes.domain.value_objects import NoteArea, NoteOriginEnum
 
@@ -19,4 +23,7 @@ class UnavailableNoteReadRepositoryAdapter(INoteReadRepository):
     async def list_notes(
         self, *, area: NoteArea | None, origin: NoteOriginEnum | None
     ) -> list[NoteSummaryDto]:
+        raise self._error()
+
+    async def read_note(self, path: str, *, area: NoteArea | None) -> NoteContentDto:
         raise self._error()
