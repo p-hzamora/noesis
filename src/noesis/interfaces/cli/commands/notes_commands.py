@@ -250,12 +250,22 @@ def recall(
     budget_tokens: Annotated[
         int,
         typer.Option(
-            "--budget-tokens", min=0, help="Rough size cap of the digest; 0 is unlimited."
+            "--budget-tokens",
+            min=0,
+            help="Rough size of the briefing (or digest); 0 is unlimited.",
         ),
     ] = 1000,
+    synthesize: Annotated[
+        bool,
+        typer.Option(
+            "--synthesis/--no-synthesis",
+            help="Have an agent read the notes and write a briefing; --no-synthesis lists "
+            "the best notes only and calls no model.",
+        ),
+    ] = True,
     as_json: JsonOption = False,
 ) -> None:
-    """List the notes worth reading before a task: kind, title, path, date and a snippet."""
+    """Brief a task from the notes: search, read the best ones and write what matters, with sources."""
     if not task.strip():
         raise EmptyRecallTaskError(
             "The task must not be empty.",
@@ -269,6 +279,7 @@ def recall(
         area=scope if scope else _repository_area().value,
         limit=limit,
         budget_tokens=budget_tokens,
+        synthesize=synthesize,
     )
     handlers = _handlers(context)
     digest = RecallResponse.model_validate(asyncio.run(handlers.recall.handle(query)))
@@ -276,15 +287,7 @@ def recall(
         output.emit(digest)
         return
     notice: str = handlers.notices[0]
-    output.emit(
-        RecallFallbackResponse(
-            entries=digest.entries,
-            considered=digest.considered,
-            omitted=digest.omitted,
-            backend=digest.backend,
-            notice=notice,
-        )
-    )
+    output.emit(RecallFallbackResponse(**dict(digest), notice=notice))
 
 
 @notes_app.command("list")

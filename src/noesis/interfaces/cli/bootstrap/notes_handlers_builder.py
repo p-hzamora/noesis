@@ -1,10 +1,11 @@
 """Wires the Notes context's handlers."""
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import assert_never
 
+from noesis.bounded_context.notes.application.dtos import NoteContentDto, RecallBriefingDto
 from noesis.bounded_context.notes.application.handlers.commands import (
     ApplyCurationHandler,
     CurateWorkBriefHandler,
@@ -18,6 +19,7 @@ from noesis.bounded_context.notes.application.handlers.queries import (
 )
 from noesis.bounded_context.notes.application.ports.curation import ICurator
 from noesis.bounded_context.notes.application.ports.read_repositories import INoteReadRepository
+from noesis.bounded_context.notes.application.ports.recall import IRecallAgent
 from noesis.bounded_context.notes.application.ports.uow import INotesUnitOfWork
 from noesis.bounded_context.notes.domain.policies import AutoCurationPolicy
 from noesis.bounded_context.notes.infrastructure.outbound.curation import (
@@ -30,6 +32,9 @@ from noesis.bounded_context.notes.infrastructure.outbound.failures import (
 from noesis.bounded_context.notes.infrastructure.outbound.queue import (
     JsonFileParkedCurationQueueAdapter,
 )
+from noesis.bounded_context.notes.infrastructure.outbound.recall import (
+    ClaudeCliRecallAgentAdapter,
+)
 from noesis.bounded_context.notes.infrastructure.outbound.storage import (
     FallbackNoteReadRepositoryAdapter,
     FilesystemNoteReadRepositoryAdapter,
@@ -41,8 +46,12 @@ from noesis.bounded_context.notes.infrastructure.outbound.storage import (
     UnavailableNoteReadRepositoryAdapter,
 )
 from noesis.bounded_context.notes.infrastructure.outbound.storage.mappers import NoteMapper
-from noesis.core import Environment
-from noesis.exceptions import CuratorPromptUnreadableError, VaultNotConfiguredError
+from noesis.core import Environment, RecallRuntimeEnum
+from noesis.exceptions import (
+    CuratorPromptUnreadableError,
+    InvalidConfigurationError,
+    VaultNotConfiguredError,
+)
 from noesis.shared_kernel.enums import SearchEngineEnum, WriterBackendEnum
 from noesis.shared_kernel.infrastructure.outbound.clock import SystemClockAdapter
 
@@ -50,6 +59,7 @@ from .obsidian_mcp_client_builder import build_obsidian_mcp_client
 
 PARKED_FOLDER: tuple[str, ...] = ("notes", "parked")
 APPLY_FAILED_FOLDER: tuple[str, ...] = ("notes", "apply-failed")
+CLAUDE_EFFORT_LEVELS: tuple[str, ...] = ("low", "medium", "high", "xhigh", "max")  # `claude --help`
 MCP_FALLBACK_NOTICE: str = "Obsidian MCP unreachable, searched files instead"
 
 
@@ -61,7 +71,7 @@ class NotesHandlers:
         curate: Curate a work brief.
         retry: Retry a parked curation.
         search: Free-text note search.
-        recall: Ranked digest of the notes worth reading for a task.
+        recall: Briefing (or ranked digest) of what the notes say about a task.
         list_notes: List notes.
         list_parked: List parked curations.
         notices: Messages the adapters raised while the handlers ran (e.g. the search fell
@@ -146,6 +156,53 @@ def build_curator(environment: Environment) -> ICurator:
         timeout_seconds=environment.curator.timeout_seconds,
         system_prompt=curator_system_prompt(environment),
     )
+
+
+def build_recall_agent(environment: Environment) -> IRecallAgent:
+    """The recall agent for `NOESIS_RECALL_RUNTIME`, asked for `NOESIS_RECALL_MODEL`.
+
+    The runtime (the program that runs the agent) and the model (what it is asked to use) are
+    separate settings; the model is passed through untouched.
+    """
+    settings = environment.recall
+    match settings.runtime:
+        case RecallRuntimeEnum.CLAUDE_CLI:
+            if settings.effort and settings.effort not in CLAUDE_EFFORT_LEVELS:
+                # the CLI itself accepts any text here and ignores it, so a typo would pass silently
+                raise InvalidConfigurationError(
+                    f"NOESIS_RECALL_EFFORT={settings.effort!r} is not an effort level of claude-cli.",
+                    {"setting": "NOESIS_RECALL_EFFORT", "accepted": list(CLAUDE_EFFORT_LEVELS)},
+                    next_steps=[
+                        f"Use one of {', '.join(CLAUDE_EFFORT_LEVELS)}, or leave it empty."
+                    ],
+                )
+            return ClaudeCliRecallAgentAdapter(
+                claude_bin=settings.claude_bin,
+                model=settings.model,
+                effort=settings.effort,
+                max_budget_usd=settings.max_budget_usd,
+                timeout_seconds=settings.timeout_seconds,
+            )
+        case _ as unhandled:
+            assert_never(unhandled)
+
+
+class _LazyRecallAgent(IRecallAgent):
+    """Builds the real agent on first use, so recall settings only matter when a briefing runs.
+
+    A typo in `NOESIS_RECALL_EFFORT` must not break `notes curate` or `notes recall --no-synthesis`.
+    """
+
+    def __init__(self, build: Callable[[], IRecallAgent]) -> None:
+        self._build: Callable[[], IRecallAgent] = build
+        self._agent: IRecallAgent | None = None
+
+    async def brief(
+        self, task: str, notes: Sequence[NoteContentDto], *, target_tokens: int
+    ) -> RecallBriefingDto:
+        if self._agent is None:
+            self._agent = self._build()
+        return await self._agent.brief(task, notes, target_tokens=target_tokens)
 
 
 def build_read_repository(
@@ -267,7 +324,12 @@ def build_notes(environment: Environment, *, curator: ICurator | None = None) ->
         curate=curate,
         retry=RetryParkedCurationHandler(queue=queue, curate=curate),
         search=SearchNotesHandler(read_repository=read_repository),
-        recall=RecallNotesHandler(read_repository=read_repository, clock=SystemClockAdapter()),
+        recall=RecallNotesHandler(
+            read_repository=read_repository,
+            clock=SystemClockAdapter(),
+            agent=_LazyRecallAgent(lambda: build_recall_agent(environment)),
+            max_input_chars=environment.recall.max_input_chars,
+        ),
         list_notes=ListNotesHandler(read_repository=read_repository),
         list_parked=ListParkedCurationsHandler(queue=queue),
         notices=notices,
