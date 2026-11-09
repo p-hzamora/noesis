@@ -7,7 +7,8 @@ hit instead of a scan of every file. Read-only: writes keep going through the fi
 Tools used (names and shapes of the `obsidian` MCP server):
 
 * `search_simple {query}` -> a JSON list of hits with `filename` (vault-relative path) and
-  an optional `score`.
+  an optional `score`. The score is negative and the LOWER the better (a note named after the
+  query scores far below one that mentions it once), and the list comes worst first.
 * `vault_read {path}` -> JSON with the file's `content`.
 """
 
@@ -92,7 +93,7 @@ class ObsidianMcpNoteReadRepositoryAdapter(INoteReadRepository):
                 if path is None or (area is not None and not path.startswith(f"{area.value}/")):
                     continue
                 ranked.append((_hit_score(hit), path))
-            ranked.sort(key=lambda item: -item[0])  # stable: equal scores keep Obsidian's order
+            ranked.sort(key=lambda item: item[0])  # lowest score is best; stable on ties
             return self._result([await self._summary(session, path) for _, path in ranked[:limit]])
 
     @staticmethod
