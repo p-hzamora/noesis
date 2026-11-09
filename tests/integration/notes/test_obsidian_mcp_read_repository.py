@@ -110,12 +110,12 @@ async def test_notes_outside_the_noesis_layout_are_found_without_a_kind(vault: P
     ]
 
 
-async def test_hits_are_ranked_by_score_and_cut_at_the_limit(vault: Path) -> None:
+async def test_the_lowest_score_is_the_best_hit_and_survives_the_limit(vault: Path) -> None:
     canned: list[tuple[str, float]] = [
-        ("repos/other/decisions/use-ttl-cache.md", 1),
-        (".obsidian/workspace.json", 99),
-        ("repos/demo/auto/decisions/use-ttl-cache.md", 7),
-        ("os/linux/ttl-trick.md", 3),
+        ("repos/other/decisions/use-ttl-cache.md", -1),
+        (".obsidian/workspace.json", -99),
+        ("repos/demo/auto/decisions/use-ttl-cache.md", -7),
+        ("os/linux/ttl-trick.md", -3),
     ]
     with fake_obsidian_mcp(vault, canned=canned) as server:
         mcp_repo, _ = _adapters(vault, server.url)

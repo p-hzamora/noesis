@@ -32,7 +32,8 @@ def free_port() -> int:
 
 
 class FakeObsidianMcp:
-    """Serves `vault`; `canned` replaces the search with fixed `(path, score)` hits.
+    """Serves `vault`; `canned` replaces the search with fixed `(path, score)` hits. Scores
+    are negative and the lowest is the best match, as Obsidian answers.
 
     Attributes:
         calls: `(tool, arguments)` of every call, in order.
@@ -104,7 +105,7 @@ class FakeObsidianMcp:
                     hits.append(
                         {
                             "filename": path.relative_to(self.vault).as_posix(),
-                            "score": score,
+                            "score": -score,
                             "matches": [],
                         }
                     )
