@@ -4,8 +4,13 @@ from pathlib import Path
 
 import pytest
 from tests.support.fake_obsidian_mcp import fake_obsidian_mcp, free_port
+from tests.support.notes_support import FixedClock
 
 from noesis.bounded_context.notes.application.dtos import NoteSummaryDto
+from noesis.bounded_context.notes.application.handlers.queries import (
+    RecallNotesHandler,
+    RecallNotesQuery,
+)
 from noesis.bounded_context.notes.domain.value_objects import NoteArea
 from noesis.bounded_context.notes.infrastructure.outbound.storage import (
     FallbackNoteReadRepositoryAdapter,
@@ -14,6 +19,7 @@ from noesis.bounded_context.notes.infrastructure.outbound.storage import (
 )
 from noesis.bounded_context.notes.infrastructure.outbound.storage.mappers import NoteMapper
 from noesis.exceptions import NoteStorageError, ObsidianMcpError
+from noesis.shared_kernel.enums import SearchEngineEnum
 from noesis.shared_kernel.infrastructure.outbound.mcp import ObsidianMcpClient
 
 pytestmark = pytest.mark.integration
@@ -243,3 +249,24 @@ async def test_a_search_for_a_whole_sentence_finds_nothing_but_keywords_do(vault
 
     assert sentence.notes == ()
     assert [note.path for note in keyword.notes] == ["repos/demo/auto/decisions/use-ttl-cache.md"]
+
+
+async def test_recall_digest_finds_a_task_sentence_through_obsidian_within_the_area(
+    vault: Path,
+) -> None:
+    """Recall searches keyword by keyword, so a task sentence still finds the area's notes."""
+    with fake_obsidian_mcp(vault, all_words=True) as server:
+        obsidian, _ = _adapters(vault, server.url)
+        handler = RecallNotesHandler(read_repository=obsidian, clock=FixedClock())
+
+        digest = await handler.handle(
+            RecallNotesQuery(
+                task="summarize the ttl cache repo", area="repos/demo", synthesize=False
+            )
+        )
+
+    assert [entry.path for entry in digest.entries] == [
+        "repos/demo/auto/decisions/use-ttl-cache.md"
+    ]
+    assert digest.considered == 1
+    assert digest.backend is SearchEngineEnum.OBSIDIAN_MCP
