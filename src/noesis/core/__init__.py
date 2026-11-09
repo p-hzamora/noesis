@@ -3,6 +3,7 @@
 from .env import (
     ClaudeCodeSettings,
     Environment,
+    RecallRuntimeEnum,
     SessionIdentitySettings,
     default_state_dir,
     load_claude_code_settings,
@@ -14,6 +15,7 @@ from .repo_config import resolve_env_file
 __all__ = [
     "ClaudeCodeSettings",
     "Environment",
+    "RecallRuntimeEnum",
     "SessionIdentitySettings",
     "default_state_dir",
     "env_example_text",

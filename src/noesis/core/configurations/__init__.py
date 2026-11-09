@@ -9,6 +9,7 @@ from .claude_code_settings import ClaudeCodeSettings
 from .curator_settings import CuratorSettings
 from .notes_settings import NotesSettings
 from .paths import default_config_dir, default_env_file, default_state_dir
+from .recall_settings import RecallRuntimeEnum, RecallSettings
 from .runtime_settings import LogLevelEnum, RuntimeSettings
 from .session_identity_settings import SessionIdentitySettings
 
@@ -18,6 +19,8 @@ __all__ = [
     "ClaudeCodeSettings",
     "CuratorSettings",
     "NotesSettings",
+    "RecallRuntimeEnum",
+    "RecallSettings",
     "LogLevelEnum",
     "RuntimeSettings",
     "SessionIdentitySettings",

@@ -24,6 +24,8 @@ from .configurations import (
     ClaudeCodeSettings,
     CuratorSettings,
     NotesSettings,
+    RecallRuntimeEnum,
+    RecallSettings,
     RuntimeSettings,
     SessionIdentitySettings,
     default_env_file,
@@ -41,6 +43,7 @@ class Environment:
         notes: Where notes are stored.
         capture: Capture thresholds.
         curator: Curator run settings.
+        recall: Recall agent settings (`notes recall` briefings).
         identity: Session ids found in the process environment (never in the `.env` file).
     """
 
@@ -49,6 +52,7 @@ class Environment:
     notes: NotesSettings
     capture: CaptureSettings
     curator: CuratorSettings
+    recall: RecallSettings
     identity: SessionIdentitySettings
 
 
@@ -72,7 +76,8 @@ def load_environment(env_file: Path | None = None) -> Environment:
     notes: NotesSettings | None = _load(NotesSettings, path, problems)
     capture: CaptureSettings | None = _load(CaptureSettings, path, problems)
     curator: CuratorSettings | None = _load(CuratorSettings, path, problems)
-    if runtime is None or notes is None or capture is None or curator is None:
+    recall: RecallSettings | None = _load(RecallSettings, path, problems)
+    if runtime is None or notes is None or capture is None or curator is None or recall is None:
         raise InvalidConfigurationError(
             f"Invalid configuration in {path} or the environment.",
             {"env_file": str(path), "problems": problems},
@@ -84,6 +89,7 @@ def load_environment(env_file: Path | None = None) -> Environment:
         notes=notes,
         capture=capture,
         curator=curator,
+        recall=recall,
         identity=SessionIdentitySettings(),
     )
 
@@ -115,6 +121,7 @@ def _load[S: AppBaseSettings](
 __all__ = [
     "ClaudeCodeSettings",
     "Environment",
+    "RecallRuntimeEnum",
     "SessionIdentitySettings",
     "default_env_file",
     "default_state_dir",
