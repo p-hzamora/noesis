@@ -120,6 +120,23 @@ async def test_no_evidence_means_no_agent_call_and_an_explicit_status() -> None:
     assert repository.read_paths == []
 
 
+async def test_no_evidence_in_an_area_warns_which_folder_was_searched() -> None:
+    handler, _, _ = _handler(notes=())
+
+    digest = await handler.handle(RecallNotesQuery(task=TASK, area="repos/noesis"))
+
+    assert len(digest.warnings) == 1
+    assert "repos/noesis/" in digest.warnings[0]
+
+
+async def test_no_evidence_without_an_area_has_no_scope_warning() -> None:
+    handler, _, _ = _handler(notes=())
+
+    digest = await handler.handle(RecallNotesQuery(task=TASK))
+
+    assert digest.warnings == ()
+
+
 async def test_without_synthesis_no_note_is_read_and_no_agent_runs() -> None:
     handler, repository, agent = _handler()
 

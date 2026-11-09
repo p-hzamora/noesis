@@ -113,6 +113,14 @@ def test_without_repo_or_area_the_working_repository_is_used(
     assert _paths(_json(capsys)) == [GOTCHA, RUN]
 
 
+def test_an_empty_area_searches_the_whole_vault(
+    vault: Path, repo: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    assert run(["notes", "recall", "login cache", "--area", "", "--json", "--no-synthesis"]) == 0
+
+    assert OTHER in _paths(_json(capsys))
+
+
 def test_without_repo_or_area_outside_a_git_repository_it_fails_typed(
     vault: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
