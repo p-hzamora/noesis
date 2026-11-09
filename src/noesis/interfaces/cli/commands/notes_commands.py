@@ -139,6 +139,14 @@ def _repository_area() -> NoteArea:
     return NoteArea.for_repository(repository_name(common_dir))
 
 
+def _working_area() -> str | None:
+    """The area of the repository the command runs in, or None outside any git repository."""
+    try:
+        return _repository_area().value
+    except NotInGitRepositoryError:
+        return None
+
+
 def _read_payload(source: str) -> tuple[str, RejectedEntryDto | None]:
     """The decisions text from a file or stdin (`-`), or why it cannot be read."""
     if source == "-":
@@ -273,10 +281,11 @@ def recall(
                 'Pass one sentence about the task, for example: noesis notes recall "fix the login cache".'
             ],
         )
-    scope: str | None = _area(area, repo)  # "" widens recall to the whole vault
+    scope: str | None = _area(area, repo)
     query = RecallNotesQuery(
         task=task,
-        area=_repository_area().value if scope is None else scope or None,
+        area=scope,
+        prefer_area=None if scope else _working_area(),
         limit=limit,
         budget_tokens=budget_tokens,
         synthesize=synthesize,

@@ -52,6 +52,8 @@ class RecallNotesQuery(FrozenObject):
     Attributes:
         task: One sentence on what is about to be done.
         area: Restrict to one area (e.g. `repos/noesis`); None searches everything.
+        prefer_area: Rank notes under this area first without hiding the others; ignored when
+            `area` is set.
         limit: Maximum number of notes (read for the briefing, or listed in the digest).
         budget_tokens: Rough size of the output (4 characters per token); 0 is unlimited. A
             digest is trimmed to it; a briefing is asked to aim for it.
@@ -61,6 +63,7 @@ class RecallNotesQuery(FrozenObject):
 
     task: str = Field(min_length=1)
     area: str | None = None
+    prefer_area: str | None = None
     limit: int = Field(default=5, ge=1, le=20)
     budget_tokens: int = Field(default=1000, ge=0)
     synthesize: bool = True
@@ -103,7 +106,8 @@ class RecallNotesHandler(IHandler[RecallNotesQuery, RecallDigestDto]):
         area: NoteArea | None = NoteArea(value=action.area) if action.area else None
         by_path, backend = await self._search(queries, area, action.limit)
         candidates: list[RecallCandidate] = [
-            self._candidate(note, rank) for rank, note in enumerate(by_path.values())
+            self._candidate(note, rank, action.prefer_area)
+            for rank, note in enumerate(by_path.values())
         ]
         ranked: tuple[str, ...] = self._policy.rank(candidates, today=self._clock.now().date())
         if not action.synthesize:
@@ -234,11 +238,11 @@ class RecallNotesHandler(IHandler[RecallNotesQuery, RecallDigestDto]):
             return ()
         return (
             f"Searched only {area.value}/; notes elsewhere in the vault were not considered. "
-            "Use --repo/--area to pick another folder, or --area '' to search the whole vault.",
+            "Drop --repo/--area to search the whole vault.",
         )
 
     @staticmethod
-    def _candidate(note: NoteSummaryDto, rank: int) -> RecallCandidate:
+    def _candidate(note: NoteSummaryDto, rank: int, prefer_area: str | None) -> RecallCandidate:
         """The note as ranking sees it; values noesis does not know become neutral."""
         try:
             kind: NoteKindEnum | None = NoteKindEnum(note.kind) if note.kind else None
@@ -252,7 +256,14 @@ class RecallNotesHandler(IHandler[RecallNotesQuery, RecallDigestDto]):
             updated: date | None = date.fromisoformat(note.updated[:10]) if note.updated else None
         except ValueError:
             updated = None
-        return RecallCandidate(path=note.path, kind=kind, origin=origin, updated=updated, rank=rank)
+        return RecallCandidate(
+            path=note.path,
+            kind=kind,
+            origin=origin,
+            updated=updated,
+            rank=rank,
+            preferred=prefer_area is None or note.path.startswith(f"{prefer_area}/"),
+        )
 
     @staticmethod
     def _entry(note: NoteSummaryDto) -> RecallEntryDto:

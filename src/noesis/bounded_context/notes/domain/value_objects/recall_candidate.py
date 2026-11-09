@@ -21,6 +21,7 @@ class RecallCandidate(ValueObject):
         origin: Who wrote the note.
         updated: Last update date; None when unknown.
         rank: Position in the engine's answer, 0 is the best match.
+        preferred: False when an area is preferred and the note is outside it.
     """
 
     path: str
@@ -28,3 +29,4 @@ class RecallCandidate(ValueObject):
     origin: NoteOriginEnum
     updated: date | None
     rank: int = Field(ge=0)
+    preferred: bool = True

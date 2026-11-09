@@ -14,7 +14,8 @@ class RecallWeights(ValueObject):
     Kinds weigh gotcha = decision > glossary > run. A note of unknown kind gets
     `neutral_kind` instead. Recency halves every `recency_half_life_days` but never goes
     below `recency_floor`, so an old note is down-weighted, never dropped. A manual note
-    outweighs an auto one.
+    outweighs an auto one. A note outside the preferred area (the repository the work is in) is
+    down-weighted by `elsewhere`, so the repository's own notes come first without hiding the rest.
 
     Attributes:
         gotcha: Weight of a gotcha.
@@ -26,6 +27,7 @@ class RecallWeights(ValueObject):
         recency_floor: Lowest recency factor; also used when the date is unknown.
         manual: Weight of a manual note.
         auto: Weight of an auto note.
+        elsewhere: Weight of a note outside the preferred area; unused when no area is preferred.
         rank_decay: How fast the engine position loses weight: `1 / (1 + rank_decay * rank)`.
     """
 
@@ -38,6 +40,7 @@ class RecallWeights(ValueObject):
     recency_floor: float = Field(default=0.3, gt=0, le=1)
     manual: float = Field(default=1.0, gt=0, le=1)
     auto: float = Field(default=0.8, gt=0, le=1)
+    elsewhere: float = Field(default=0.7, gt=0, le=1)
     rank_decay: float = Field(default=0.15, ge=0)
 
     def kind_weight(self, kind: NoteKindEnum | None) -> float:
