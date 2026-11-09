@@ -1,6 +1,6 @@
 [project]
 name = "noesis"
-version = "0.1.0"
+version = "0.1.1"
 description = "Capture finished agent work, curate what is worth keeping, and store it as notes."
 readme = "README.md"
 license = "MIT"
