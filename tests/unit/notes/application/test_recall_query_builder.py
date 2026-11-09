@@ -16,6 +16,14 @@ def test_drops_short_tokens_and_stopwords() -> None:
     assert RecallQueryBuilder.terms("how to add a TTL to the cache") == "add ttl cache"
 
 
+def test_request_words_do_not_become_queries() -> None:
+    assert RecallQueryBuilder.queries("give me a summary about the dotfiles project") == (
+        "dotfiles",
+        "project",
+    )
+    assert RecallQueryBuilder.queries("explain how to create a CLI theory") == ("cli", "theory")
+
+
 def test_removes_duplicates_keeping_the_first() -> None:
     assert RecallQueryBuilder.terms("cache Cache CACHE login cache") == "cache login"
 
