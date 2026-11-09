@@ -117,10 +117,16 @@ class RecallNotesHandler(IHandler[RecallNotesQuery, RecallDigestDto]):
                 omitted=len(by_path) - len(fitted),
                 backend=backend,
                 synthesis="digest",
+                warnings=self._scope_warning(area) if not fitted else (),
             )
         if not ranked:
             return RecallDigestDto(
-                entries=(), considered=0, omitted=0, backend=backend, synthesis="no_evidence"
+                entries=(),
+                considered=0,
+                omitted=0,
+                backend=backend,
+                synthesis="no_evidence",
+                warnings=self._scope_warning(area),
             )
         return await self._brief(action, area, by_path, ranked[: action.limit], backend)
 
@@ -220,6 +226,16 @@ class RecallNotesHandler(IHandler[RecallNotesQuery, RecallDigestDto]):
                 f"Masked {masked} possible secrets before sending the notes to the agent."
             )
         return notes
+
+    @staticmethod
+    def _scope_warning(area: NoteArea | None) -> tuple[str, ...]:
+        """Why an empty result may be a scope problem: notes of other areas are never searched."""
+        if area is None:
+            return ()
+        return (
+            f"Searched only {area.value}/; notes elsewhere in the vault were not considered. "
+            "Use --repo/--area to pick another folder, or --area '' to search the whole vault.",
+        )
 
     @staticmethod
     def _candidate(note: NoteSummaryDto, rank: int) -> RecallCandidate:

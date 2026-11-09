@@ -273,10 +273,10 @@ def recall(
                 'Pass one sentence about the task, for example: noesis notes recall "fix the login cache".'
             ],
         )
-    scope: str | None = _area(area, repo)
+    scope: str | None = _area(area, repo)  # "" widens recall to the whole vault
     query = RecallNotesQuery(
         task=task,
-        area=scope if scope else _repository_area().value,
+        area=_repository_area().value if scope is None else scope or None,
         limit=limit,
         budget_tokens=budget_tokens,
         synthesize=synthesize,
