@@ -17,9 +17,20 @@
       "program": "${workspaceFolder}/.venv/bin/noesis",
       "args": "${input:cliArgs}",
       "console": "integratedTerminal"
+    },
+    {
+      "name": "noesis CLI (any command)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/scripts/debug_cli.py",
+      "args": ["${input:commandLine}"],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": false
     }
   ],
   "inputs": [
-    { "id": "cliArgs", "type": "promptString", "description": "noesis args" }
+    { "id": "cliArgs", "type": "promptString", "description": "noesis args" },
+    { "id": "commandLine", "type": "promptString", "description": "full command, e.g. notes recall \"create a python CLI app\" --json", "default": "notes recall \"create a python CLI app\" --json" }
   ]
 }
