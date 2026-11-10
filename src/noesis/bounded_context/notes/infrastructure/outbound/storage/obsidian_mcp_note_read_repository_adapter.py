@@ -88,6 +88,7 @@ class ObsidianMcpNoteReadRepositoryAdapter(INoteReadRepository):
         async with self._client.session() as session:
             answer: JsonValue = await session.call("search_simple", {"query": text})
             ranked: list[tuple[float, str]] = []
+            # Check whether we can use Binary Tree to store the whole information to be able to sorte it faster
             for hit in _hits(answer):
                 path: str | None = _hit_path(hit)
                 if path is None or (area is not None and not path.startswith(f"{area.value}/")):
