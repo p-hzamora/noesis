@@ -21,6 +21,12 @@ from noesis.bounded_context.notes.application.ports.curation import ICurator
 from noesis.bounded_context.notes.application.ports.read_repositories import INoteReadRepository
 from noesis.bounded_context.notes.application.ports.recall import IRecallAgent
 from noesis.bounded_context.notes.application.ports.uow import INotesUnitOfWork
+from noesis.bounded_context.notes.application.services.manifest import (
+    Manifest,
+    SourceRoleEnum,
+    SourceSpec,
+    SourceTypeEnum,
+)
 from noesis.bounded_context.notes.domain.policies import AutoCurationPolicy
 from noesis.bounded_context.notes.infrastructure.outbound.curation import (
     ClaudeCliCuratorAdapter,
@@ -28,6 +34,13 @@ from noesis.bounded_context.notes.infrastructure.outbound.curation import (
 )
 from noesis.bounded_context.notes.infrastructure.outbound.failures import (
     JsonFileApplyFailureLogAdapter,
+)
+from noesis.bounded_context.notes.infrastructure.outbound.frontmatter import (
+    YamlFrontmatterCodecAdapter,
+)
+from noesis.bounded_context.notes.infrastructure.outbound.ids import UlidNoteIdGeneratorAdapter
+from noesis.bounded_context.notes.infrastructure.outbound.manifest import (
+    YamlManifestProviderAdapter,
 )
 from noesis.bounded_context.notes.infrastructure.outbound.queue import (
     JsonFileParkedCurationQueueAdapter,
@@ -42,10 +55,13 @@ from noesis.bounded_context.notes.infrastructure.outbound.storage import (
     FilesystemNotesUnitOfWorkAdapter,
     McpNoteRepositoryAdapter,
     McpNotesUnitOfWorkAdapter,
+    MultiSourceNoteReadRepositoryAdapter,
     ObsidianMcpNoteReadRepositoryAdapter,
+    SourceReader,
     UnavailableNoteReadRepositoryAdapter,
 )
 from noesis.bounded_context.notes.infrastructure.outbound.storage.mappers import NoteMapper
+from noesis.bounded_context.notes.infrastructure.outbound.vector import StubVectorSearchAdapter
 from noesis.core import Environment, RecallRuntimeEnum
 from noesis.exceptions import (
     CuratorPromptUnreadableError,
@@ -244,6 +260,47 @@ def build_read_repository(
             assert_never(unhandled)
 
 
+def build_manifest_provider(vault: Path | None) -> YamlManifestProviderAdapter:
+    """The manifest loader: the packaged default merged with `<vault>/noesis.yaml`."""
+    return YamlManifestProviderAdapter(vault)
+
+
+def build_note_mapper() -> NoteMapper:
+    """The mapper between notes and Markdown, with its frontmatter codec."""
+    return NoteMapper(YamlFrontmatterCodecAdapter())
+
+
+def with_declared_sources(
+    primary: INoteReadRepository,
+    manifest: Manifest,
+    vault: Path | None,
+    mapper: NoteMapper,
+) -> INoteReadRepository:
+    """`primary` alone, or merged with the manifest's `read` sources and `index`.
+
+    The primary keeps following the environment (`NOESIS_SEARCH_BACKEND`). Extra sources are
+    read from their `path` (relative to the vault) as files. A `vector` source is the stub
+    until a real index adapter exists. Without a vault only the primary can be read.
+    """
+    readers: list[SourceReader] = [SourceReader(manifest.primary(), primary)]
+    index: StubVectorSearchAdapter | None = None
+    for spec in manifest.sources:
+        if spec.role is SourceRoleEnum.INDEX or spec.type is SourceTypeEnum.VECTOR:
+            index = StubVectorSearchAdapter()
+        elif spec.role is SourceRoleEnum.READ and vault is not None and spec.path:
+            readers.append(SourceReader(spec, _file_reader(vault, spec, mapper)))
+    if len(readers) == 1 and index is None:
+        return primary
+    return MultiSourceNoteReadRepositoryAdapter(readers, index=index)
+
+
+def _file_reader(vault: Path, spec: SourceSpec, mapper: NoteMapper) -> INoteReadRepository:
+    folder: Path = Path(spec.path or ".").expanduser()
+    return FilesystemNoteReadRepositoryAdapter(
+        folder if folder.is_absolute() else vault / folder, mapper
+    )
+
+
 def build_unit_of_work_factory(
     environment: Environment, mapper: NoteMapper
 ) -> Callable[[], INotesUnitOfWork]:
@@ -278,12 +335,16 @@ def build_apply(environment: Environment) -> ApplyCurationHandler:
     Returns:
         The handler behind `noesis notes apply`.
     """
-    if needs_vault(environment):
-        require_vault(environment)
+    vault: Path | None = require_vault(environment) if needs_vault(environment) else None
+    mapper: NoteMapper = build_note_mapper()
+    clock = SystemClockAdapter()
     return ApplyCurationHandler(
-        uow_factory=build_unit_of_work_factory(environment, NoteMapper()),
-        clock=SystemClockAdapter(),
+        uow_factory=build_unit_of_work_factory(environment, mapper),
+        clock=clock,
         policy=AutoCurationPolicy(),
+        manifest=build_manifest_provider(vault),
+        ids=UlidNoteIdGeneratorAdapter(clock),
+        read_repository=build_read_repository(environment, vault, mapper, []),
         failures=JsonFileApplyFailureLogAdapter(
             environment.runtime.state_dir.joinpath(*APPLY_FAILED_FOLDER)
         ),
@@ -301,9 +362,16 @@ def build_notes(environment: Environment, *, curator: ICurator | None = None) ->
         The wired handlers.
     """
     vault: Path | None = require_vault(environment) if needs_vault(environment) else None
-    mapper = NoteMapper()
+    mapper: NoteMapper = build_note_mapper()
     notices: list[str] = []
-    read_repository = build_read_repository(environment, vault, mapper, notices)
+    clock = SystemClockAdapter()
+    manifest: YamlManifestProviderAdapter = build_manifest_provider(vault)
+    read_repository: INoteReadRepository = with_declared_sources(
+        build_read_repository(environment, vault, mapper, notices),
+        manifest.load_now(),
+        vault,
+        mapper,
+    )
     queue = JsonFileParkedCurationQueueAdapter(
         environment.runtime.state_dir.joinpath(*PARKED_FOLDER)
     )
@@ -311,10 +379,14 @@ def build_notes(environment: Environment, *, curator: ICurator | None = None) ->
     curate = CurateWorkBriefHandler(
         apply=ApplyCurationHandler(
             uow_factory=build_unit_of_work_factory(environment, mapper),
-            clock=SystemClockAdapter(),
+            clock=clock,
             policy=AutoCurationPolicy(),
+            manifest=manifest,
+            ids=UlidNoteIdGeneratorAdapter(clock),
+            read_repository=read_repository,
         ),
         read_repository=read_repository,
+        manifest=manifest,
         curator=curator or build_curator(environment),
         queue=queue,
         clock=SystemClockAdapter(),
@@ -326,7 +398,8 @@ def build_notes(environment: Environment, *, curator: ICurator | None = None) ->
         search=SearchNotesHandler(read_repository=read_repository),
         recall=RecallNotesHandler(
             read_repository=read_repository,
-            clock=SystemClockAdapter(),
+            manifest=manifest,
+            clock=clock,
             agent=_LazyRecallAgent(lambda: build_recall_agent(environment)),
             max_input_chars=environment.recall.max_input_chars,
         ),

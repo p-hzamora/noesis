@@ -10,17 +10,21 @@ class NoteResponse(FrozenObject):
     """A note as listed by `noesis notes list|search`.
 
     Attributes:
-        path: Vault-relative path.
+        id: Stable note id (ULID), unchanged when the file moves.
+        scope: `repo:<name>` or `topic:<name>`.
+        path: Source-relative path.
         title: Note title.
-        kind: Note kind value; None for a note outside the noesis layout (found by Obsidian search).
+        kind: Note kind name.
         origin: `manual` or `auto`.
         updated: Last update date (ISO), when known.
         snippet: Start of the first section, for context.
     """
 
+    id: str
+    scope: str
     path: str
     title: str
-    kind: str | None
+    kind: str
     origin: str
     updated: str | None
     snippet: str
@@ -39,8 +43,7 @@ class NoteListResponse(IRenderableResponse):
         if not self.notes:
             return "no notes"
         return "\n".join(
-            f"{note.path}  [{note.origin} {note.kind or 'note'}]  {note.title}"
-            for note in self.notes
+            f"{note.path}  [{note.origin} {note.kind}]  {note.title}" for note in self.notes
         )
 
 

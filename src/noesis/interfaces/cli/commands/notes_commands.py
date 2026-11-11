@@ -22,8 +22,8 @@ from noesis.bounded_context.notes.application.handlers.queries import (
 )
 from noesis.bounded_context.notes.domain.value_objects import (
     CurationDecision,
-    NoteArea,
     NoteOriginEnum,
+    NoteScope,
 )
 from noesis.bounded_context.notes.domain.value_objects.work_brief import SHORT_SESSION_LENGTH
 from noesis.bounded_context.notes.infrastructure.outbound.curation.apply_input_schema import (
@@ -58,16 +58,18 @@ notes_app: typer.Typer = typer.Typer(
     no_args_is_help=True,
 )
 
-AreaOption = Annotated[str | None, typer.Option("--area", help="Vault folder, e.g. repos/noesis.")]
-RepoOption = Annotated[str | None, typer.Option("--repo", help="Shortcut for --area repos/<repo>.")]
+ScopeOption = Annotated[
+    str | None, typer.Option("--scope", help="Note scope, e.g. repo:noesis or topic:rust.")
+]
+RepoOption = Annotated[str | None, typer.Option("--repo", help="Shortcut for --scope repo:<repo>.")]
 
 
 def _handlers(context: typer.Context) -> NotesHandlers:
     return build_notes(cli_state(context).environment())
 
 
-def _area(area: str | None, repo: str | None) -> str | None:
-    return NoteArea.for_repository(repo).value if repo else area
+def _scope(scope: str | None, repo: str | None) -> str | None:
+    return NoteScope.for_repository(repo).value if repo else scope
 
 
 def _warn(handlers: NotesHandlers) -> None:
@@ -123,8 +125,8 @@ def curate(
     )
 
 
-def _repository_area() -> NoteArea:
-    """The area of the git repository the command runs in (a linked worktree uses its main repository).
+def _repository_scope() -> NoteScope:
+    """The scope of the git repository the command runs in (a linked worktree uses its main repository).
 
     Raises:
         NotInGitRepositoryError: The working directory is outside any git repository.
@@ -136,13 +138,13 @@ def _repository_area() -> NoteArea:
             {"cwd": str(Path.cwd())},
             next_steps=["Run the command from inside the repository the notes belong to."],
         )
-    return NoteArea.for_repository(repository_name(common_dir))
+    return NoteScope.for_repository(repository_name(common_dir))
 
 
-def _working_area() -> str | None:
-    """The area of the repository the command runs in, or None outside any git repository."""
+def _working_scope() -> str | None:
+    """The scope of the repository the command runs in, or None outside any git repository."""
     try:
-        return _repository_area().value
+        return _repository_scope().value
     except NotInGitRepositoryError:
         return None
 
@@ -181,14 +183,14 @@ def apply(
     as_json: JsonOption = False,
 ) -> None:
     """Store note drafts you wrote as auto notes, without calling the curator."""
-    area: NoteArea = _repository_area()
+    scope: NoteScope = _repository_scope()
     raw_payload, unreadable = _read_payload(decisions_file)
     decisions: tuple[CurationDecision, ...] = ()
     rejected: tuple[RejectedEntryDto, ...] = (unreadable,) if unreadable else ()
     if unreadable is None:
         decisions, rejected = parse_decisions_strict(raw_payload)
     command = ApplyCurationCommand(
-        area=area,
+        scope=scope,
         decisions=decisions,
         rejected=rejected,
         raw_payload=raw_payload,
@@ -232,13 +234,13 @@ def parked(context: typer.Context, as_json: JsonOption = False) -> None:
 def search(
     context: typer.Context,
     text: Annotated[str, typer.Argument(help="Words to look for.")],
-    area: AreaOption = None,
+    scope: ScopeOption = None,
     repo: RepoOption = None,
     limit: Annotated[int, typer.Option("--limit", min=1, max=100)] = 10,
     as_json: JsonOption = False,
 ) -> None:
     """Find notes by free text, best match first."""
-    query = SearchNotesQuery(text=text, area=_area(area, repo), limit=limit)
+    query = SearchNotesQuery(text=text, scope=_scope(scope, repo), limit=limit)
     handlers = _handlers(context)
     found = NoteSearchResponse.model_validate(asyncio.run(handlers.search.handle(query)))
     if not handlers.notices:
@@ -252,7 +254,7 @@ def search(
 def recall(
     context: typer.Context,
     task: Annotated[str, typer.Argument(help="One sentence on what you are about to do.")],
-    area: AreaOption = None,
+    scope: ScopeOption = None,
     repo: RepoOption = None,
     limit: Annotated[int, typer.Option("--limit", min=1, max=20, help="Most entries.")] = 5,
     budget_tokens: Annotated[
@@ -281,11 +283,11 @@ def recall(
                 'Pass one sentence about the task, for example: noesis notes recall "fix the login cache".'
             ],
         )
-    scope: str | None = _area(area, repo)
+    chosen: str | None = _scope(scope, repo)
     query = RecallNotesQuery(
         task=task,
-        area=scope,
-        prefer_area=None if scope else _working_area(),
+        scope=chosen,
+        prefer_scope=None if chosen else _working_scope(),
         limit=limit,
         budget_tokens=budget_tokens,
         synthesize=synthesize,
@@ -302,15 +304,15 @@ def recall(
 @notes_app.command("list")
 def list_notes(
     context: typer.Context,
-    area: AreaOption = None,
+    scope: ScopeOption = None,
     repo: RepoOption = None,
     origin: Annotated[
         NoteOriginEnum | None, typer.Option("--origin", help="Only manual or auto notes.")
     ] = None,
     as_json: JsonOption = False,
 ) -> None:
-    """List notes, optionally of one area and one origin."""
-    query = ListNotesQuery(area=_area(area, repo), origin=origin)
+    """List notes, optionally of one scope and one origin."""
+    query = ListNotesQuery(scope=_scope(scope, repo), origin=origin)
     result = NoteListResponse.model_validate(
         asyncio.run(_handlers(context).list_notes.handle(query))
     )
