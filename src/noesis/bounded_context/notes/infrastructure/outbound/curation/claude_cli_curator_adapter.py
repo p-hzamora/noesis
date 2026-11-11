@@ -15,13 +15,14 @@ from pydantic import ValidationError
 
 from noesis.bounded_context.notes.application.dtos import NoteSummaryDto
 from noesis.bounded_context.notes.application.ports.curation import ICurator
+from noesis.bounded_context.notes.application.services.manifest import KindCatalog
 from noesis.bounded_context.notes.domain.value_objects import CurationDecision, WorkBrief
 from noesis.exceptions import (
     CuratorFailedError,
 )
 
 from . import prompts
-from .curator_response_schema import RESPONSE_JSON_SCHEMA, CuratorResponseModel
+from .curator_response_schema import CuratorResponseModel, response_json_schema
 
 SYSTEM_PROMPT_RESOURCE: str = "curator_system.md"
 RECURSION_GUARD: Mapping[str, str] = {"NOESIS_HOOK": "1"}
@@ -33,17 +34,25 @@ def default_system_prompt() -> str:
     return files(prompts).joinpath(SYSTEM_PROMPT_RESOURCE).read_text(encoding="utf-8")
 
 
-def render_user_prompt(brief: WorkBrief, related: Sequence[NoteSummaryDto]) -> str:
-    """The per-run message: the brief as JSON plus the related notes.
+def render_user_prompt(
+    brief: WorkBrief, related: Sequence[NoteSummaryDto], catalog: KindCatalog
+) -> str:
+    """The per-run message: the kinds, the brief as JSON and the related notes.
 
     Args:
         brief: The finished work.
         related: Existing notes on similar topics.
+        catalog: The kinds the curator may use.
 
     Returns:
         The prompt text sent on stdin.
     """
-    lines: list[str] = [
+    lines: list[str] = ["Note kinds (use these exact names and headings):"]
+    for spec in catalog.kinds:
+        sections: str = ", ".join(spec.sections) or "free sections"
+        lines.append(f"- {spec.name}: {spec.description} Sections: {sections}.")
+    lines += [
+        "",
         "Work brief (JSON):",
         json.dumps(brief.model_dump(mode="json"), indent=2),
         "",
@@ -51,7 +60,7 @@ def render_user_prompt(brief: WorkBrief, related: Sequence[NoteSummaryDto]) -> s
     if related:
         lines.append("Related existing notes:")
         lines += [
-            f"- {note.path} ({note.origin} {note.kind or 'note'}): {note.title} -- {note.snippet}"
+            f"- {note.path} ({note.origin} {note.kind}): {note.title} -- {note.snippet}"
             for note in related
         ]
     else:
@@ -81,12 +90,12 @@ class ClaudeCliCuratorAdapter(ICurator):
             environment if environment is not None else os.environ
         )
 
-    def command(self) -> list[str]:
+    def command(self, catalog: KindCatalog) -> list[str]:
         """The argument vector of one curator run (the prompt goes on stdin)."""
         arguments: list[str] = [
             self._claude_bin, "-p",
             "--output-format", "json",
-            "--json-schema", RESPONSE_JSON_SCHEMA,
+            "--json-schema", response_json_schema(catalog),
             "--system-prompt", self._system_prompt,
             "--tools", "",
             "--setting-sources", "",
@@ -96,7 +105,7 @@ class ClaudeCliCuratorAdapter(ICurator):
         return [*arguments, "--model", self._model] if self._model else arguments
 
     async def judge(
-        self, brief: WorkBrief, related: Sequence[NoteSummaryDto]
+        self, brief: WorkBrief, related: Sequence[NoteSummaryDto], catalog: KindCatalog
     ) -> tuple[CurationDecision, ...]:
         """Run the curator once.
 
@@ -104,7 +113,9 @@ class ClaudeCliCuratorAdapter(ICurator):
             CuratorFailedError: The CLI is missing, timed out, failed, or answered without a valid
                 structured output.
         """
-        stdout: bytes = await self._run(render_user_prompt(brief, related).encode("utf-8"))
+        stdout: bytes = await self._run(
+            render_user_prompt(brief, related, catalog).encode("utf-8"), catalog
+        )
         try:
             envelope: object = json.loads(stdout)
         except json.JSONDecodeError as error:
@@ -132,11 +143,11 @@ class ClaudeCliCuratorAdapter(ICurator):
             ) from error
         return response.to_decisions()
 
-    async def _run(self, prompt: bytes) -> bytes:
+    async def _run(self, prompt: bytes, catalog: KindCatalog) -> bytes:
         """Start the CLI, feed the prompt, and return stdout of a successful exit."""
         try:
             process: asyncio.subprocess.Process = await asyncio.create_subprocess_exec(
-                *self.command(),
+                *self.command(catalog),
                 stdin=asyncio.subprocess.PIPE,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,

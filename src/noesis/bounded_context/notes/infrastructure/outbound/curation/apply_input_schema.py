@@ -13,7 +13,7 @@ from noesis.bounded_context.notes.domain.value_objects import (
     CurationActionEnum,
     CurationDecision,
     NoteDraft,
-    NoteKindEnum,
+    NoteKind,
     NoteSection,
     NoteSlug,
 )
@@ -80,8 +80,12 @@ def _read_entry(entry: object) -> CurationDecision | str:
         slug = NoteSlug(value=model.slug) if model.slug else NoteSlug.from_title(model.title)
     except AppException as error:
         return f"invalid slug {model.slug!r}: {error.message}"
+    try:
+        kind = NoteKind(value=model.kind)
+    except AppException as error:
+        return f"invalid kind {model.kind!r}: {error.message}"
     draft = NoteDraft(
-        kind=NoteKindEnum(model.kind),
+        kind=kind,
         slug=slug,
         title=model.title,
         sections=tuple(NoteSection(heading=s.heading, body=s.body) for s in model.sections),

@@ -6,15 +6,16 @@ into `CurationDecision`s, downgrading anything malformed to a reported skip.
 """
 
 import json
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from noesis.bounded_context.notes.application.services.manifest import KindCatalog
 from noesis.bounded_context.notes.domain.value_objects import (
     CurationActionEnum,
     CurationDecision,
     NoteDraft,
-    NoteKindEnum,
+    NoteKind,
     NoteSection,
     NoteSlug,
 )
@@ -38,8 +39,8 @@ class CuratorDecisionModel(_Strict):
     action: Literal["create", "update", "skip"]
     candidate: str = Field(description="Short name of the candidate knowledge.")
     reason: str = Field(description="One sentence: why it is kept or skipped.")
-    kind: Literal["decision", "gotcha", "run", "glossary"] | None = Field(
-        default=None, description="Required for create/update."
+    kind: str | None = Field(
+        default=None, description="One of the listed kinds. Required for create/update."
     )
     slug: str | None = Field(
         default=None,
@@ -71,13 +72,21 @@ def _to_decision(model: CuratorDecisionModel) -> CurationDecision:
             reason="malformed decision: missing kind or title",
         )
     try:
+        kind: NoteKind = NoteKind(value=model.kind)
+    except DomainException:
+        return CurationDecision(
+            action=CurationActionEnum.SKIP,
+            candidate=model.candidate,
+            reason=f"malformed decision: invalid kind {model.kind!r}",
+        )
+    try:
         slug: NoteSlug = (
             NoteSlug(value=model.slug) if model.slug else NoteSlug.from_title(model.title)
         )
     except DomainException:
         slug = NoteSlug.from_title(model.slug or model.title)
     draft = NoteDraft(
-        kind=NoteKindEnum(model.kind),
+        kind=kind,
         slug=slug,
         title=model.title,
         sections=tuple(NoteSection(heading=s.heading, body=s.body) for s in model.sections),
@@ -87,5 +96,10 @@ def _to_decision(model: CuratorDecisionModel) -> CurationDecision:
     )
 
 
-RESPONSE_JSON_SCHEMA: str = json.dumps(CuratorResponseModel.model_json_schema())
-"""The schema passed to `claude --json-schema`."""
+def response_json_schema(catalog: KindCatalog) -> str:
+    """The schema passed to `claude --json-schema`, with `kind` limited to the catalog's kinds."""
+    schema: dict[str, Any] = CuratorResponseModel.model_json_schema()
+    kind: dict[str, Any] = schema["$defs"]["CuratorDecisionModel"]["properties"]["kind"]
+    kind.pop("anyOf", None)
+    kind["enum"] = [*catalog.names(), None]
+    return json.dumps(schema)

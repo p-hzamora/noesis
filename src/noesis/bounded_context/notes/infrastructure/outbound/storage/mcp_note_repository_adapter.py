@@ -17,7 +17,7 @@ import yaml
 
 from noesis.bounded_context.notes.domain.entities import Note
 from noesis.bounded_context.notes.domain.repositories import INoteRepository
-from noesis.bounded_context.notes.domain.value_objects import NoteLocation
+from noesis.bounded_context.notes.domain.value_objects import NotePath
 from noesis.exceptions import NoteStorageError, ObsidianMcpError, ObsidianMcpToolError
 from noesis.shared_kernel.domain import JsonValue
 from noesis.shared_kernel.infrastructure.outbound.mcp import ObsidianMcpClient, ObsidianMcpSession
@@ -31,6 +31,14 @@ WRITER_NEXT_STEPS: tuple[str, ...] = (
 )
 
 
+class _ExistingNoteUnreadableError(Exception):
+    """The current text of a staged note could not be read, so its header cannot be kept."""
+
+    def __init__(self, reason: str) -> None:
+        super().__init__(reason)
+        self.reason: str = reason
+
+
 class McpNoteRepositoryAdapter(INoteRepository):
     """Reads notes with `vault_read`; stages writes until `flush` sends them with `vault_write`."""
 
@@ -39,8 +47,8 @@ class McpNoteRepositoryAdapter(INoteRepository):
         self._mapper: NoteMapper = mapper
         self._staged: dict[str, Note] = {}
 
-    async def get(self, location: NoteLocation) -> Note | None:
-        """The note at `location`, preferring a staged version.
+    async def get(self, path: NotePath) -> Note | None:
+        """The note at `path`, preferring a staged version.
 
         A file the server says it does not have (a tool error, and the file is not listed in
         its folder) is `None`.
@@ -48,9 +56,16 @@ class McpNoteRepositoryAdapter(INoteRepository):
         Raises:
             NoteStorageError: The server is unreachable, or the file exists but cannot be read.
         """
-        path: str = location.relative_path
-        if path in self._staged:
-            return self._staged[path]
+        if path.value in self._staged:
+            return self._staged[path.value]
+        content: str | None = await self._read(path.value)
+        return None if content is None else self._mapper.to_entity(content, path)
+
+    async def exists(self, path: NotePath) -> bool:
+        """Whether a staged note or a file of the vault occupies `path`."""
+        return path.value in self._staged or await self._read(path.value) is not None
+
+    async def _read(self, path: str) -> str | None:
         try:
             async with self._client.session() as session:
                 try:
@@ -71,7 +86,7 @@ class McpNoteRepositoryAdapter(INoteRepository):
                 f"Cannot read {path} through the Obsidian MCP: the answer has no content.",
                 {"path": path, "backend": BACKEND},
             )
-        return self._mapper.to_entity(content, location)
+        return content
 
     @staticmethod
     async def _is_listed(session: ObsidianMcpSession, path: str) -> bool:
@@ -86,7 +101,7 @@ class McpNoteRepositoryAdapter(INoteRepository):
 
     async def save(self, note: Note) -> None:
         """Stage `note`; nothing is sent until `flush`."""
-        self._staged[note.location.relative_path] = note
+        self._staged[note.path.value] = note
 
     async def flush(self) -> None:
         """Send every staged note, one at a time, then clear the stage.
@@ -99,7 +114,14 @@ class McpNoteRepositoryAdapter(INoteRepository):
             NoteStorageError: A note cannot be rendered, or the server failed. The metadata
                 lists the `written` and `not_written` paths.
         """
-        rendered: dict[str, str] = self._render_all()
+        try:
+            rendered: dict[str, str] = await self._render_all()
+        except _ExistingNoteUnreadableError as error:
+            raise NoteStorageError(
+                f"Cannot write {len(self._staged)} note(s) through the Obsidian MCP: {error.reason}",
+                {"backend": BACKEND, "written": [], "not_written": list[JsonValue](self._staged)},
+                next_steps=WRITER_NEXT_STEPS,
+            ) from error
         paths: list[JsonValue] = list(rendered)
         written: list[JsonValue] = []
         failure: ObsidianMcpError | None = None
@@ -134,17 +156,24 @@ class McpNoteRepositoryAdapter(INoteRepository):
             ) from failure
         self._staged.clear()
 
-    def _render_all(self) -> dict[str, str]:
+    async def _render_all(self) -> dict[str, str]:
         """Markdown of every staged note, in staging order.
 
+        A note that already exists keeps the header keys that are not its `noesis:` block.
+
         Raises:
-            NoteStorageError: A note cannot be rendered or renders blank; nothing is sent.
+            NoteStorageError: A note cannot be rendered or renders blank, or an existing one
+                cannot be read; nothing is sent.
         """
         rendered: dict[str, str] = {}
         for path, note in self._staged.items():
             reason: str | None = None
             try:
-                markdown: str = self._mapper.to_markdown(note)
+                existing: str | None = await self._read(path)
+            except NoteStorageError as error:
+                raise _ExistingNoteUnreadableError(error.message) from error
+            try:
+                markdown: str = self._mapper.to_markdown(note, existing)
             except (yaml.YAMLError, ValueError, TypeError) as error:
                 reason = str(error) or type(error).__name__
             else:

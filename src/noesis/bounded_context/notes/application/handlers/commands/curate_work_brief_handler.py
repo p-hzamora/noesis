@@ -10,8 +10,10 @@ from noesis.bounded_context.notes.application.dtos import (
 )
 from noesis.bounded_context.notes.application.mappers import WorkBriefMapper
 from noesis.bounded_context.notes.application.ports.curation import ICurator
+from noesis.bounded_context.notes.application.ports.manifest import IManifestProvider
 from noesis.bounded_context.notes.application.ports.queue import IParkedCurationQueue
 from noesis.bounded_context.notes.application.ports.read_repositories import INoteReadRepository
+from noesis.bounded_context.notes.application.services.manifest import KindCatalog
 from noesis.bounded_context.notes.domain.value_objects import CurationDecision, WorkBrief
 from noesis.exceptions import (
     CurationFailedError,
@@ -54,6 +56,7 @@ class CurateWorkBriefHandler(IHandler[CurateWorkBriefCommand, CurationResultDto]
         *,
         apply: ApplyCurationHandler,
         read_repository: INoteReadRepository,
+        manifest: IManifestProvider,
         curator: ICurator,
         queue: IParkedCurationQueue,
         clock: IClock,
@@ -62,6 +65,7 @@ class CurateWorkBriefHandler(IHandler[CurateWorkBriefCommand, CurationResultDto]
     ) -> None:
         self._apply: ApplyCurationHandler = apply
         self._read_repository: INoteReadRepository = read_repository
+        self._manifest: IManifestProvider = manifest
         self._curator: ICurator = curator
         self._queue: IParkedCurationQueue = queue
         self._clock: IClock = clock
@@ -78,14 +82,15 @@ class CurateWorkBriefHandler(IHandler[CurateWorkBriefCommand, CurationResultDto]
         """
         brief: WorkBrief = WorkBriefMapper.to_domain(action.brief)
         found: NoteSearchResultDto = await self._read_repository.search(
-            brief.search_text(), area=brief.area, limit=RELATED_NOTES_LIMIT
+            brief.search_text(), scope=brief.scope, limit=RELATED_NOTES_LIMIT
         )
         related: list[NoteSummaryDto] = list(found.notes)
-        decisions: tuple[CurationDecision, ...] = await self._judge(action, brief, related)
+        catalog: KindCatalog = (await self._manifest.load()).catalog()
+        decisions: tuple[CurationDecision, ...] = await self._judge(action, brief, related, catalog)
         try:
             return await self._apply.handle(
                 ApplyCurationCommand(
-                    area=brief.area,
+                    scope=brief.scope,
                     decisions=decisions,
                     commits=brief.commit_shas(),
                     session=brief.short_session(),
@@ -108,7 +113,11 @@ class CurateWorkBriefHandler(IHandler[CurateWorkBriefCommand, CurationResultDto]
             ) from error
 
     async def _judge(
-        self, action: CurateWorkBriefCommand, brief: WorkBrief, related: list[NoteSummaryDto]
+        self,
+        action: CurateWorkBriefCommand,
+        brief: WorkBrief,
+        related: list[NoteSummaryDto],
+        catalog: KindCatalog,
     ) -> tuple[CurationDecision, ...]:
         """Run the curator, retrying after a pause; park and raise when it keeps failing.
 
@@ -118,7 +127,7 @@ class CurateWorkBriefHandler(IHandler[CurateWorkBriefCommand, CurationResultDto]
         last_error: CuratorFailedError | None = None
         for attempt in range(1, action.max_attempts + 1):
             try:
-                return await self._curator.judge(brief, related)
+                return await self._curator.judge(brief, related, catalog)
             except CuratorFailedError as error:
                 last_error = error
                 if attempt < action.max_attempts:

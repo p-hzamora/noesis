@@ -6,6 +6,10 @@ from .filesystem_note_repository_adapter import FilesystemNoteRepositoryAdapter
 from .filesystem_notes_unit_of_work_adapter import FilesystemNotesUnitOfWorkAdapter
 from .mcp_note_repository_adapter import McpNoteRepositoryAdapter
 from .mcp_notes_unit_of_work_adapter import McpNotesUnitOfWorkAdapter
+from .multi_source_note_read_repository_adapter import (
+    MultiSourceNoteReadRepositoryAdapter,
+    SourceReader,
+)
 from .obsidian_mcp_note_read_repository_adapter import ObsidianMcpNoteReadRepositoryAdapter
 from .unavailable_note_read_repository_adapter import UnavailableNoteReadRepositoryAdapter
 
@@ -15,7 +19,9 @@ __all__ = [
     "FilesystemNoteReadRepositoryAdapter",
     "FilesystemNoteRepositoryAdapter",
     "McpNotesUnitOfWorkAdapter",
+    "MultiSourceNoteReadRepositoryAdapter",
     "McpNoteRepositoryAdapter",
     "ObsidianMcpNoteReadRepositoryAdapter",
+    "SourceReader",
     "UnavailableNoteReadRepositoryAdapter",
 ]

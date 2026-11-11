@@ -1,4 +1,8 @@
-"""`INoteReadRepository` that scans Markdown files under the vault folder."""
+"""`INoteReadRepository` that scans Markdown files under the vault folder.
+
+A note is any `.md` file with a valid `noesis:` block, wherever it sits; every other file
+(indexes, attachments' notes, plain documents) is not a note and never shows up.
+"""
 
 import re
 from collections.abc import Iterator
@@ -12,14 +16,15 @@ from noesis.bounded_context.notes.application.dtos import (
 )
 from noesis.bounded_context.notes.application.ports.read_repositories import INoteReadRepository
 from noesis.bounded_context.notes.domain.value_objects import (
-    NoteArea,
-    NoteLocation,
+    NoteId,
+    NoteKind,
     NoteOriginEnum,
+    NoteScope,
 )
-from noesis.exceptions import DomainException, NoteStorageError
+from noesis.exceptions import NoteStorageError
 from noesis.shared_kernel.enums import SearchEngineEnum
 
-from .mappers import NoteMapper, ParsedMarkdown
+from .mappers import NoteMapper
 from .note_paths import checked_note_path
 
 TOKEN_PATTERN: re.Pattern[str] = re.compile(r"[a-z0-9]{3,}")
@@ -39,40 +44,31 @@ class FilesystemNoteReadRepositoryAdapter(INoteReadRepository):
         self._vault_dir: Path = vault_dir
         self._mapper: NoteMapper = mapper
 
-    def _notes(self, area: NoteArea | None) -> Iterator[_IndexedNote]:
-        root: Path = self._vault_dir / area.value if area else self._vault_dir
-        if not root.is_dir():
+    def _notes(self, scope: NoteScope | None) -> Iterator[_IndexedNote]:
+        if not self._vault_dir.is_dir():
             return
-        for path in sorted(root.rglob("*.md")):
+        for path in sorted(self._vault_dir.rglob("*.md")):
             relative: Path = path.relative_to(self._vault_dir)
-            if any(part.startswith(".") for part in relative.parts):
+            if any(part.startswith(".") for part in relative.parts) or not path.is_file():
                 continue
             try:
-                location = NoteLocation.parse(relative.as_posix())
                 text: str = path.read_text(encoding="utf-8")
-            except DomainException, OSError:
-                continue  # index files, attachments notes and unreadable files are not notes
-            parsed: ParsedMarkdown = self._mapper.parse(text)
-            updated: object = parsed.frontmatter.get("updated") or parsed.frontmatter.get("date")
-            yield _IndexedNote(
-                summary=NoteSummaryDto(
-                    path=location.relative_path,
-                    title=parsed.title or location.slug.value,
-                    kind=location.kind.value,
-                    origin=location.origin.value,
-                    updated=str(updated) if updated else None,
-                    snippet=self._mapper.snippet(parsed),
-                ),
-                text=text.lower(),
-            )
+            except OSError, UnicodeDecodeError:
+                continue  # unreadable files are not notes
+            summary: NoteSummaryDto | None = self._mapper.to_summary(relative.as_posix(), text)
+            if summary is None or (scope is not None and summary.scope != scope.value):
+                continue  # not a noesis note, or another scope
+            yield _IndexedNote(summary=summary, text=text.lower())
 
-    async def search(self, text: str, *, area: NoteArea | None, limit: int) -> NoteSearchResultDto:
+    async def search(
+        self, text: str, *, scope: NoteScope | None, limit: int
+    ) -> NoteSearchResultDto:
         """Notes ranked by how often the query's words occur (title words count triple)."""
         tokens: set[str] = set(TOKEN_PATTERN.findall(text.lower()))
         if not tokens:
             return self._result([])
         scored: list[tuple[int, str, NoteSummaryDto]] = []
-        for note in self._notes(area):
+        for note in self._notes(scope):
             title: str = note.summary.title.lower()
             score: int = sum(
                 note.text.count(token) + TITLE_WEIGHT * title.count(token) for token in tokens
@@ -86,18 +82,28 @@ class FilesystemNoteReadRepositoryAdapter(INoteReadRepository):
         return NoteSearchResultDto(notes=tuple(notes), backend=SearchEngineEnum.FILESYSTEM)
 
     async def list_notes(
-        self, *, area: NoteArea | None, origin: NoteOriginEnum | None
+        self, *, scope: NoteScope | None, origin: NoteOriginEnum | None
     ) -> list[NoteSummaryDto]:
-        """Every note under `area`, optionally only one origin, sorted by path."""
+        """Every note of `scope`, optionally only one origin, sorted by path."""
         return [
             note.summary
-            for note in self._notes(area)
+            for note in self._notes(scope)
             if origin is None or note.summary.origin == origin.value
         ]
 
-    async def read_note(self, path: str, *, area: NoteArea | None) -> NoteContentDto:
-        """The note's file, refused when it is outside `area` or the vault."""
-        relative: str = checked_note_path(path, area)
+    async def find_active(self, scope: NoteScope, kind: NoteKind) -> list[NoteSummaryDto]:
+        """The notes of `scope` and `kind`, sorted by path."""
+        return [note.summary for note in self._notes(scope) if note.summary.kind == kind.value]
+
+    async def find_by_id(self, note_id: NoteId) -> NoteSummaryDto | None:
+        """The note with this id, wherever its file is."""
+        return next(
+            (note.summary for note in self._notes(None) if note.summary.id == note_id.value), None
+        )
+
+    async def read_note(self, path: str, *, scope: NoteScope | None) -> NoteContentDto:
+        """The note's file, refused when it escapes the vault or is not a note of `scope`."""
+        relative: str = checked_note_path(path)
         file: Path = (self._vault_dir / relative).resolve()
         if not file.is_relative_to(self._vault_dir.resolve()):
             raise NoteStorageError(f"Refusing to read {path!r}: outside the vault.", {"path": path})
@@ -107,17 +113,10 @@ class FilesystemNoteReadRepositoryAdapter(INoteReadRepository):
             raise NoteStorageError(
                 f"Cannot read the note {relative}: {error}", {"path": relative}
             ) from error
-        parsed: ParsedMarkdown = self._mapper.parse(text)
-        updated: object = parsed.frontmatter.get("updated") or parsed.frontmatter.get("date")
-        try:
-            location = NoteLocation.parse(relative)
-        except DomainException:
-            location = None
-        return NoteContentDto(
-            path=relative,
-            title=parsed.title or (location.slug.value if location else file.stem),
-            kind=location.kind.value if location else None,
-            origin=location.origin.value if location else NoteOriginEnum.MANUAL.value,
-            updated=str(updated) if updated else None,
-            content=text,
-        )
+        note: NoteContentDto | None = self._mapper.to_content(relative, text)
+        if note is None or (scope is not None and note.scope != scope.value):
+            raise NoteStorageError(
+                f"Refusing to read {path!r}: not a note of the allowed scope.",
+                {"path": path, "scope": scope.value if scope else None},
+            )
+        return note

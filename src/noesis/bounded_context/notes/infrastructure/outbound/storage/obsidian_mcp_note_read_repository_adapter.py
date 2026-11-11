@@ -1,6 +1,6 @@
 """`INoteReadRepository` that searches through Obsidian's MCP server.
 
-Obsidian indexes the whole vault (manual notes, `learning/<topic>/`, other know-how folders),
+Obsidian indexes the whole vault (manual notes, topics, other know-how folders),
 ranks by relevance and is always up to date, so a search is one MCP call plus one read per
 hit instead of a scan of every file. Read-only: writes keep going through the filesystem.
 
@@ -21,16 +21,17 @@ from noesis.bounded_context.notes.application.dtos import (
 )
 from noesis.bounded_context.notes.application.ports.read_repositories import INoteReadRepository
 from noesis.bounded_context.notes.domain.value_objects import (
-    NoteArea,
-    NoteLocation,
+    NoteId,
+    NoteKind,
     NoteOriginEnum,
+    NoteScope,
 )
-from noesis.exceptions import DomainException, ObsidianMcpError
+from noesis.exceptions import NoteStorageError, ObsidianMcpError
 from noesis.shared_kernel.domain import JsonValue
 from noesis.shared_kernel.enums import SearchEngineEnum
 from noesis.shared_kernel.infrastructure.outbound.mcp import ObsidianMcpClient, ObsidianMcpSession
 
-from .mappers import NoteMapper, ParsedMarkdown
+from .mappers import NoteMapper
 from .note_paths import checked_note_path
 
 NOTE_SUFFIX: Final[str] = ".md"
@@ -74,11 +75,12 @@ class ObsidianMcpNoteReadRepositoryAdapter(INoteReadRepository):
         self._mapper: NoteMapper = mapper
         self._listing: INoteReadRepository = listing
 
-    async def search(self, text: str, *, area: NoteArea | None, limit: int) -> NoteSearchResultDto:
-        """Obsidian's best matches, restricted to `area`'s folder when given.
+    async def search(
+        self, text: str, *, scope: NoteScope | None, limit: int
+    ) -> NoteSearchResultDto:
+        """Obsidian's best matches that are noesis notes of `scope`.
 
-        Hits outside the noesis layout are kept (kind None, origin manual), because Obsidian
-        also knows the notes noesis did not write.
+        Files without a `noesis:` block are not notes and are dropped, as are other scopes.
 
         Raises:
             ObsidianMcpError: Obsidian is unreachable or answered something unusable.
@@ -88,65 +90,62 @@ class ObsidianMcpNoteReadRepositoryAdapter(INoteReadRepository):
         async with self._client.session() as session:
             answer: JsonValue = await session.call("search_simple", {"query": text})
             ranked: list[tuple[float, str]] = []
-            # Check whether we can use Binary Tree to store the whole information to be able to sorte it faster
             for hit in _hits(answer):
                 path: str | None = _hit_path(hit)
-                if path is None or (area is not None and not path.startswith(f"{area.value}/")):
-                    continue
-                ranked.append((_hit_score(hit), path))
+                if path is not None:
+                    ranked.append((_hit_score(hit), path))
             ranked.sort(key=lambda item: item[0])  # lowest score is best; stable on ties
-            return self._result([await self._summary(session, path) for _, path in ranked[:limit]])
+            notes: list[NoteSummaryDto] = []
+            for _, path in ranked:
+                if len(notes) >= limit:
+                    break
+                summary: NoteSummaryDto | None = self._mapper.to_summary(
+                    path, await self._text(session, path)
+                )
+                if summary is not None and (scope is None or summary.scope == scope.value):
+                    notes.append(summary)
+            return self._result(notes)
 
     @staticmethod
     def _result(notes: list[NoteSummaryDto]) -> NoteSearchResultDto:
         return NoteSearchResultDto(notes=tuple(notes), backend=SearchEngineEnum.OBSIDIAN_MCP)
 
     async def list_notes(
-        self, *, area: NoteArea | None, origin: NoteOriginEnum | None
+        self, *, scope: NoteScope | None, origin: NoteOriginEnum | None
     ) -> list[NoteSummaryDto]:
         """Delegated to the filesystem repository."""
-        return await self._listing.list_notes(area=area, origin=origin)
+        return await self._listing.list_notes(scope=scope, origin=origin)
 
-    async def read_note(self, path: str, *, area: NoteArea | None) -> NoteContentDto:
-        """The note through `vault_read`, refused when it is outside `area`.
+    async def find_active(self, scope: NoteScope, kind: NoteKind) -> list[NoteSummaryDto]:
+        """Delegated to the filesystem repository."""
+        return await self._listing.find_active(scope, kind)
+
+    async def find_by_id(self, note_id: NoteId) -> NoteSummaryDto | None:
+        """Delegated to the filesystem repository."""
+        return await self._listing.find_by_id(note_id)
+
+    async def read_note(self, path: str, *, scope: NoteScope | None) -> NoteContentDto:
+        """The note through `vault_read`, refused when it is not a note of `scope`.
 
         Raises:
-            NoteStorageError: The path is outside the allowed scope.
+            NoteStorageError: The path is outside the vault or the file is not an allowed note.
             ObsidianMcpError: Obsidian is unreachable or answered something unusable.
         """
-        clean: str = checked_note_path(path, area)
+        clean: str = checked_note_path(path)
         async with self._client.session() as session:
-            return await self._content(session, clean)
+            text: str = await self._text(session, clean)
+        note: NoteContentDto | None = self._mapper.to_content(clean, text)
+        if note is None or (scope is not None and note.scope != scope.value):
+            raise NoteStorageError(
+                f"Refusing to read {path!r}: not a note of the allowed scope.",
+                {"path": path, "scope": scope.value if scope else None},
+            )
+        return note
 
-    async def _content(self, session: ObsidianMcpSession, path: str) -> NoteContentDto:
+    @staticmethod
+    async def _text(session: ObsidianMcpSession, path: str) -> str:
         answer: JsonValue = await session.call("vault_read", {"path": path})
         content: JsonValue = answer.get("content") if isinstance(answer, dict) else None
         if not isinstance(content, str):
             raise ObsidianMcpError(f"Obsidian MCP `vault_read` gave no content for {path}.")
-        parsed: ParsedMarkdown = self._mapper.parse(content)
-        updated: object = parsed.frontmatter.get("updated") or parsed.frontmatter.get("date")
-        try:
-            location = NoteLocation.parse(path)
-        except DomainException:
-            location = None
-        stem: str = path.rsplit("/", 1)[-1].removesuffix(NOTE_SUFFIX)
-        return NoteContentDto(
-            path=path,
-            title=parsed.title or (location.slug.value if location else stem),
-            kind=location.kind.value if location else None,
-            origin=location.origin.value if location else NoteOriginEnum.MANUAL.value,
-            updated=str(updated) if updated else None,
-            content=content,
-        )
-
-    async def _summary(self, session: ObsidianMcpSession, path: str) -> NoteSummaryDto:
-        note: NoteContentDto = await self._content(session, path)
-        parsed: ParsedMarkdown = self._mapper.parse(note.content)
-        return NoteSummaryDto(
-            path=note.path,
-            title=note.title,
-            kind=note.kind,
-            origin=note.origin,
-            updated=note.updated,
-            snippet=self._mapper.snippet(parsed),
-        )
+        return content

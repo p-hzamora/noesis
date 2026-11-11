@@ -8,7 +8,7 @@ from uuid import uuid4
 
 from noesis.bounded_context.notes.application.dtos import ApplyFailureRecordDto
 from noesis.bounded_context.notes.application.ports.failures import IApplyFailureLog
-from noesis.bounded_context.notes.domain.value_objects import NoteArea
+from noesis.bounded_context.notes.domain.value_objects import NoteScope
 from noesis.exceptions import NoteStorageError
 from noesis.shared_kernel.infrastructure.outbound.persistence import (
     write_json_atomic,
@@ -32,7 +32,7 @@ class JsonFileApplyFailureLogAdapter(IApplyFailureLog):
         self,
         *,
         raw_payload: str,
-        area: NoteArea,
+        scope: NoteScope,
         commits: tuple[str, ...],
         session: str | None,
         errors: Sequence[str],
@@ -49,7 +49,7 @@ class JsonFileApplyFailureLogAdapter(IApplyFailureLog):
                 {
                     "ticket": ticket,
                     "recorded_at": now.isoformat(),
-                    "area": area.value,
+                    "scope": scope.value,
                     "commits": list(commits),
                     "session": session,
                     "errors": list(errors),

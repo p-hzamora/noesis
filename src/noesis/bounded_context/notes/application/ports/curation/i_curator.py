@@ -4,6 +4,7 @@ import abc
 from collections.abc import Sequence
 
 from noesis.bounded_context.notes.application.dtos import NoteSummaryDto
+from noesis.bounded_context.notes.application.services.manifest import KindCatalog
 from noesis.bounded_context.notes.domain.value_objects import CurationDecision, WorkBrief
 
 
@@ -12,13 +13,14 @@ class ICurator(abc.ABC):
 
     @abc.abstractmethod
     async def judge(
-        self, brief: WorkBrief, related: Sequence[NoteSummaryDto]
+        self, brief: WorkBrief, related: Sequence[NoteSummaryDto], catalog: KindCatalog
     ) -> tuple[CurationDecision, ...]:
         """Decide what in `brief` is worth keeping.
 
         Args:
             brief: The finished work.
             related: Existing notes on similar topics, so it can update instead of duplicate.
+            catalog: The kinds it may choose from, with their descriptions and sections.
 
         Returns:
             One decision per candidate; an empty tuple is a valid answer.

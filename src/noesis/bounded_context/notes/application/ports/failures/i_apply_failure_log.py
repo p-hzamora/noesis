@@ -5,7 +5,7 @@ from collections.abc import Sequence
 from datetime import datetime
 
 from noesis.bounded_context.notes.application.dtos import ApplyFailureRecordDto
-from noesis.bounded_context.notes.domain.value_objects import NoteArea
+from noesis.bounded_context.notes.domain.value_objects import NoteScope
 
 
 class IApplyFailureLog(abc.ABC):
@@ -16,7 +16,7 @@ class IApplyFailureLog(abc.ABC):
         self,
         *,
         raw_payload: str,
-        area: NoteArea,
+        scope: NoteScope,
         commits: tuple[str, ...],
         session: str | None,
         errors: Sequence[str],

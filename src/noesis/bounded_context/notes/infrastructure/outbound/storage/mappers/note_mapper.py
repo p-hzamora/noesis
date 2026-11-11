@@ -1,11 +1,15 @@
-"""`Note` <-> Markdown with YAML frontmatter.
+"""`Note` <-> Markdown with a `noesis:` frontmatter block.
 
 Layout of a file::
 
     ---
-    type: decision
-    id: auto-decision-use-ttl-cache
-    ...
+    noesis:
+      id: 01ARZ3NDEKTSV4RRFFQ69G5FAV
+      scope: repo:demo
+      kind: decision
+      origin: auto
+      sources: [commit:8e6d3b5f]
+      updated: 2026-11-11
     ---
 
     # Title
@@ -15,23 +19,23 @@ Layout of a file::
     Body.
 """
 
-import re
 from dataclasses import dataclass
-from datetime import UTC, date, datetime
-from typing import Any
+from datetime import UTC, datetime
 
-import yaml
-
+from noesis.bounded_context.notes.application.dtos import (
+    NoteContentDto,
+    NoteSummaryDto,
+    ParsedDocumentDto,
+)
+from noesis.bounded_context.notes.application.ports.frontmatter import IFrontmatterCodec
 from noesis.bounded_context.notes.domain.entities import Note
 from noesis.bounded_context.notes.domain.value_objects import (
-    NoteLocation,
-    NoteOriginEnum,
+    NoteFrontmatter,
+    NotePath,
     NoteSection,
 )
+from noesis.shared_kernel.domain import JsonValue
 
-FRONTMATTER_PATTERN: re.Pattern[str] = re.compile(
-    r"\A---\n(?P<yaml>.*?)\n---\n?(?P<body>.*)\Z", re.DOTALL
-)
 SNIPPET_LENGTH: int = 200
 
 
@@ -40,57 +44,30 @@ class ParsedMarkdown:
     """A Markdown note split into its parts.
 
     Attributes:
-        frontmatter: Decoded YAML frontmatter (empty when absent or invalid).
-        title: The `#` heading, or the frontmatter `title`, or None.
+        frontmatter: The `noesis:` block; None for a file that is not a noesis note.
+        title: The `#` heading, or None.
         sections: `##` sections in order.
     """
 
-    frontmatter: dict[str, Any]
+    frontmatter: NoteFrontmatter | None
     title: str | None
     sections: tuple[NoteSection, ...]
 
 
-def _as_datetime(value: object) -> datetime | None:
-    """Frontmatter dates (YAML `date` or ISO text) as UTC datetimes."""
-    if isinstance(value, datetime):
-        return value if value.tzinfo else value.replace(tzinfo=UTC)
-    if isinstance(value, date):
-        return datetime(value.year, value.month, value.day, tzinfo=UTC)
-    if isinstance(value, str):
-        try:
-            return _as_datetime(date.fromisoformat(value[:10]))
-        except ValueError:
-            return None
-    return None
-
-
-def _strings(value: object) -> tuple[str, ...]:
-    """A YAML list (or a single scalar) as a tuple of strings."""
-    if isinstance(value, list):
-        return tuple(str(item) for item in value)
-    return (str(value),) if value not in (None, "") else ()
-
-
 class NoteMapper:
-    """Maps the Note aggregate to Markdown (`to_markdown`) and back (`to_entity`)."""
+    """Maps the Note aggregate to Markdown (`to_markdown`) and back (`to_entity`), and files to DTOs."""
+
+    def __init__(self, codec: IFrontmatterCodec) -> None:
+        self._codec: IFrontmatterCodec = codec
 
     def parse(self, text: str) -> ParsedMarkdown:
         """Split Markdown into frontmatter, title and sections, tolerating hand-written notes."""
-        frontmatter: dict[str, Any] = {}
-        body: str = text
-        match: re.Match[str] | None = FRONTMATTER_PATTERN.match(text)
-        if match:
-            try:
-                loaded: object = yaml.safe_load(match.group("yaml"))
-            except yaml.YAMLError:
-                loaded = None
-            frontmatter = loaded if isinstance(loaded, dict) else {}
-            body = match.group("body")
+        document: ParsedDocumentDto = self._codec.parse(text)
         title: str | None = None
         sections: list[NoteSection] = []
         heading: str | None = None
         lines: list[str] = []
-        for line in body.splitlines():
+        for line in document.body.splitlines():
             if line.startswith("# ") and title is None and heading is None:
                 title = line[2:].strip()
             elif line.startswith("## "):
@@ -101,63 +78,87 @@ class NoteMapper:
                 lines.append(line)
         if heading is not None:
             sections.append(NoteSection(heading=heading, body="\n".join(lines).strip()))
-        fallback_title: object = frontmatter.get("title")
         return ParsedMarkdown(
-            frontmatter=frontmatter,
-            title=title or (str(fallback_title) if fallback_title else None),
-            sections=tuple(sections),
+            frontmatter=document.frontmatter, title=title, sections=tuple(sections)
         )
 
-    def to_entity(self, text: str, location: NoteLocation) -> Note:
+    def to_entity(self, text: str, path: NotePath) -> Note | None:
         """Rebuild a stored note (no creation rules apply: hand-written notes may be partial).
 
         Args:
             text: File content.
-            location: Where the file was found.
+            path: Where the file was found.
 
         Returns:
-            The reconstituted note.
+            The reconstituted note, or None when the file has no valid `noesis:` block.
         """
         parsed: ParsedMarkdown = self.parse(text)
-        created: datetime | None = _as_datetime(parsed.frontmatter.get("date"))
-        updated: datetime | None = _as_datetime(parsed.frontmatter.get("updated")) or created
-        session: object = parsed.frontmatter.get("session")
-        note = Note(
-            location=location,
-            title=parsed.title or location.slug.value,
-            sections=parsed.sections,
-            tags=_strings(parsed.frontmatter.get("tags")),
-            commits=_strings(parsed.frontmatter.get("commits")),
-            session=str(session) if session else None,
+        frontmatter: NoteFrontmatter | None = parsed.frontmatter
+        if frontmatter is None:
+            return None
+        updated: datetime = datetime(
+            frontmatter.updated.year, frontmatter.updated.month, frontmatter.updated.day, tzinfo=UTC
         )
-        if created:
-            note.created_at = created
-        if updated:
-            note.updated_at = updated
-        return note
+        return Note(
+            id=frontmatter.id,
+            scope=frontmatter.scope,
+            kind=frontmatter.kind,
+            origin=frontmatter.origin,
+            path=path,
+            title=parsed.title or path.stem,
+            sections=parsed.sections,
+            sources=frontmatter.sources,
+            created_at=updated,
+            updated_at=updated,
+        )
 
-    def to_markdown(self, note: Note) -> str:
-        """Render a note as Markdown with frontmatter."""
-        frontmatter: dict[str, Any] = {"type": note.location.kind.value, "id": note.id}
-        if note.location.area.repository:
-            frontmatter["repo"] = note.location.area.repository
-        frontmatter["area"] = note.location.area.value
-        if note.location.origin is NoteOriginEnum.AUTO:
-            frontmatter["origin"] = NoteOriginEnum.AUTO.value
-        frontmatter["title"] = note.title
-        frontmatter["date"] = note.created_at.date()
-        frontmatter["updated"] = note.updated_at.date()
-        if note.session:
-            frontmatter["session"] = note.session
-        if note.commits:
-            frontmatter["commits"] = list(note.commits)
-        frontmatter["tags"] = list(note.tags)
-        header: str = yaml.safe_dump(frontmatter, sort_keys=False, allow_unicode=True).strip()
-        blocks: list[str] = [f"---\n{header}\n---", f"# {note.title}"]
+    def to_markdown(self, note: Note, existing: str | None = None) -> str:
+        """Render a note as Markdown with frontmatter.
+
+        Args:
+            note: The note to render.
+            existing: The file's current text when it is being updated; its keys other than
+                `noesis` are kept in the new header.
+        """
+        kept: dict[str, JsonValue] = {} if existing is None else self._codec.parse(existing).header
+        blocks: list[str] = [f"# {note.title}"]
         blocks += [f"## {section.heading}\n\n{section.body.strip()}" for section in note.sections]
-        return "\n\n".join(blocks) + "\n"
+        return self._codec.render(note.frontmatter, "\n" + "\n\n".join(blocks) + "\n", kept)
 
     def snippet(self, parsed: ParsedMarkdown) -> str:
         """Start of the first non-empty section, collapsed to one line."""
         body: str = next((section.body for section in parsed.sections if section.body), "")
         return " ".join(body.split())[:SNIPPET_LENGTH]
+
+    def to_summary(self, path: str, text: str) -> NoteSummaryDto | None:
+        """The listing entry of a file, or None when it is not a noesis note."""
+        parsed: ParsedMarkdown = self.parse(text)
+        frontmatter: NoteFrontmatter | None = parsed.frontmatter
+        if frontmatter is None:
+            return None
+        return NoteSummaryDto(
+            id=frontmatter.id.value,
+            scope=frontmatter.scope.value,
+            path=path,
+            title=parsed.title or path.rsplit("/", 1)[-1].removesuffix(".md"),
+            kind=frontmatter.kind.value,
+            origin=frontmatter.origin.value,
+            updated=frontmatter.updated.isoformat(),
+            snippet=self.snippet(parsed),
+        )
+
+    def to_content(self, path: str, text: str) -> NoteContentDto | None:
+        """The full note of a file, or None when it is not a noesis note."""
+        summary: NoteSummaryDto | None = self.to_summary(path, text)
+        if summary is None:
+            return None
+        return NoteContentDto(
+            id=summary.id,
+            scope=summary.scope,
+            path=path,
+            title=summary.title,
+            kind=summary.kind,
+            origin=summary.origin,
+            updated=summary.updated,
+            content=text,
+        )

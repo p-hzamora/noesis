@@ -12,25 +12,28 @@ from noesis.bounded_context.notes.application.dtos import (
     RecallDigestDto,
     RecallEntryDto,
 )
+from noesis.bounded_context.notes.application.ports.manifest import IManifestProvider
 from noesis.bounded_context.notes.application.ports.read_repositories import INoteReadRepository
 from noesis.bounded_context.notes.application.ports.recall import IRecallAgent
 from noesis.bounded_context.notes.application.services.recall import (
     CHARS_PER_TOKEN,
     OVERFETCH_FACTOR,
     PER_QUERY_CAP,
+    RANK_FUSION_OFFSET,
     BriefingGrounder,
     RecallQueryBuilder,
     SecretRedactor,
 )
 from noesis.bounded_context.notes.domain.policies import RecallRankingPolicy
 from noesis.bounded_context.notes.domain.value_objects import (
-    NoteArea,
-    NoteKindEnum,
+    NoteKind,
     NoteOriginEnum,
+    NoteScope,
     RecallCandidate,
     RecallWeights,
 )
 from noesis.exceptions import (
+    DomainException,
     NoteStorageError,
     ObsidianMcpError,
     RecallAgentFailedError,
@@ -41,7 +44,6 @@ from noesis.shared_kernel.enums import SearchEngineEnum
 from noesis.utils import FrozenObject
 
 ELLIPSIS: str = "…"
-RANK_FUSION_OFFSET: int = 60
 DEFAULT_MAX_INPUT_CHARS: int = 60_000
 CUT_MARKER: str = "\n\n[... note cut here to fit the size limit ...]"
 
@@ -51,9 +53,9 @@ class RecallNotesQuery(FrozenObject):
 
     Attributes:
         task: One sentence on what is about to be done.
-        area: Restrict to one area (e.g. `repos/noesis`); None searches everything.
-        prefer_area: Rank notes under this area first without hiding the others; ignored when
-            `area` is set.
+        scope: Restrict to one scope (e.g. `repo:noesis`); None searches everything.
+        prefer_scope: Rank notes of this scope first without hiding the others; ignored when
+            `scope` is set.
         limit: Maximum number of notes (read for the briefing, or listed in the digest).
         budget_tokens: Rough size of the output (4 characters per token); 0 is unlimited. A
             digest is trimmed to it; a briefing is asked to aim for it.
@@ -62,8 +64,8 @@ class RecallNotesQuery(FrozenObject):
     """
 
     task: str = Field(min_length=1)
-    area: str | None = None
-    prefer_area: str | None = None
+    scope: str | None = None
+    prefer_scope: str | None = None
     limit: int = Field(default=5, ge=1, le=20)
     budget_tokens: int = Field(default=1000, ge=0)
     synthesize: bool = True
@@ -81,15 +83,16 @@ class RecallNotesHandler(IHandler[RecallNotesQuery, RecallDigestDto]):
         self,
         *,
         read_repository: INoteReadRepository,
+        manifest: IManifestProvider,
         clock: IClock,
         agent: IRecallAgent | None = None,
         max_input_chars: int = DEFAULT_MAX_INPUT_CHARS,
     ) -> None:
         self._read_repository: INoteReadRepository = read_repository
+        self._manifest: IManifestProvider = manifest
         self._clock: IClock = clock
         self._agent: IRecallAgent | None = agent
         self._max_input_chars: int = max_input_chars
-        self._policy: RecallRankingPolicy = RecallRankingPolicy(RecallWeights())
 
     async def handle(self, action: RecallNotesQuery) -> RecallDigestDto:
         """The briefing for the task, or only the digest when `synthesize` is off.
@@ -103,13 +106,18 @@ class RecallNotesHandler(IHandler[RecallNotesQuery, RecallDigestDto]):
                 (`candidates` in its metadata lists the notes that would have been read).
         """
         queries: tuple[str, ...] = RecallQueryBuilder.queries(action.task)
-        area: NoteArea | None = NoteArea(value=action.area) if action.area else None
-        by_path, backend = await self._search(queries, area, action.limit)
+        scope: NoteScope | None = NoteScope.parse(action.scope) if action.scope else None
+        weights = RecallWeights(
+            kind_weights=(await self._manifest.load()).catalog().recall_weights()
+        )
+        by_path, backend = await self._search(queries, scope, action.limit)
         candidates: list[RecallCandidate] = [
-            self._candidate(note, rank, action.prefer_area)
+            self._candidate(note, rank, action.prefer_scope)
             for rank, note in enumerate(by_path.values())
         ]
-        ranked: tuple[str, ...] = self._policy.rank(candidates, today=self._clock.now().date())
+        ranked: tuple[str, ...] = RecallRankingPolicy(weights).rank(
+            candidates, today=self._clock.now().date()
+        )
         if not action.synthesize:
             entries: list[RecallEntryDto] = [
                 self._entry(by_path[path]) for path in ranked[: action.limit]
@@ -121,7 +129,7 @@ class RecallNotesHandler(IHandler[RecallNotesQuery, RecallDigestDto]):
                 omitted=len(by_path) - len(fitted),
                 backend=backend,
                 synthesis="digest",
-                warnings=self._scope_warning(area) if not fitted else (),
+                warnings=self._scope_warning(scope) if not fitted else (),
             )
         if not ranked:
             return RecallDigestDto(
@@ -130,12 +138,12 @@ class RecallNotesHandler(IHandler[RecallNotesQuery, RecallDigestDto]):
                 omitted=0,
                 backend=backend,
                 synthesis="no_evidence",
-                warnings=self._scope_warning(area),
+                warnings=self._scope_warning(scope),
             )
-        return await self._brief(action, area, by_path, ranked[: action.limit], backend)
+        return await self._brief(action, scope, by_path, ranked[: action.limit], backend)
 
     async def _search(
-        self, queries: tuple[str, ...], area: NoteArea | None, limit: int
+        self, queries: tuple[str, ...], scope: NoteScope | None, limit: int
     ) -> tuple[dict[str, NoteSummaryDto], SearchEngineEnum]:
         """Hits of every query merged by reciprocal rank: a note several keywords find rises.
 
@@ -147,7 +155,7 @@ class RecallNotesHandler(IHandler[RecallNotesQuery, RecallDigestDto]):
         answers: list[NoteSearchResultDto] = []
         for query in queries:
             found: NoteSearchResultDto = await self._read_repository.search(
-                query, area=area, limit=min(limit * OVERFETCH_FACTOR, PER_QUERY_CAP)
+                query, scope=scope, limit=min(limit * OVERFETCH_FACTOR, PER_QUERY_CAP)
             )
             answers.append(found)
             weight: float = 1 / max(len(found.notes), 1)  # a keyword few notes have says more
@@ -162,7 +170,7 @@ class RecallNotesHandler(IHandler[RecallNotesQuery, RecallDigestDto]):
     async def _brief(
         self,
         action: RecallNotesQuery,
-        area: NoteArea | None,
+        scope: NoteScope | None,
         by_path: dict[str, NoteSummaryDto],
         paths: tuple[str, ...],
         backend: SearchEngineEnum,
@@ -172,7 +180,7 @@ class RecallNotesHandler(IHandler[RecallNotesQuery, RecallDigestDto]):
                 "No recall agent is configured.", next_steps=["Use --no-synthesis."]
             )
         warnings: list[str] = []
-        notes: list[NoteContentDto] = await self._read(paths, area, warnings)
+        notes: list[NoteContentDto] = await self._read(paths, scope, warnings)
         if not notes:
             raise NoteStorageError(
                 f"Found {len(paths)} notes but could not read any of them.",
@@ -207,7 +215,7 @@ class RecallNotesHandler(IHandler[RecallNotesQuery, RecallDigestDto]):
         )
 
     async def _read(
-        self, paths: tuple[str, ...], area: NoteArea | None, warnings: list[str]
+        self, paths: tuple[str, ...], scope: NoteScope | None, warnings: list[str]
     ) -> list[NoteContentDto]:
         """The notes in full, secrets masked and each cut to its share of the input limit."""
         share: int = max(self._max_input_chars // len(paths), 1)
@@ -215,7 +223,7 @@ class RecallNotesHandler(IHandler[RecallNotesQuery, RecallDigestDto]):
         masked: int = 0
         for path in paths:
             try:
-                note: NoteContentDto = await self._read_repository.read_note(path, area=area)
+                note: NoteContentDto = await self._read_repository.read_note(path, scope=scope)
             except (NoteStorageError, ObsidianMcpError) as error:
                 warnings.append(f"Could not read {path}: {error.args[0]}")
                 continue
@@ -232,21 +240,21 @@ class RecallNotesHandler(IHandler[RecallNotesQuery, RecallDigestDto]):
         return notes
 
     @staticmethod
-    def _scope_warning(area: NoteArea | None) -> tuple[str, ...]:
-        """Why an empty result may be a scope problem: notes of other areas are never searched."""
-        if area is None:
+    def _scope_warning(scope: NoteScope | None) -> tuple[str, ...]:
+        """Why an empty result may be a scope problem: notes of other scopes are never searched."""
+        if scope is None:
             return ()
         return (
-            f"Searched only {area.value}/; notes elsewhere in the vault were not considered. "
-            "Drop --repo/--area to search the whole vault.",
+            f"Searched only the notes of {scope.value}; notes of other scopes were not considered. "
+            "Drop --repo/--scope to search every note.",
         )
 
     @staticmethod
-    def _candidate(note: NoteSummaryDto, rank: int, prefer_area: str | None) -> RecallCandidate:
+    def _candidate(note: NoteSummaryDto, rank: int, prefer_scope: str | None) -> RecallCandidate:
         """The note as ranking sees it; values noesis does not know become neutral."""
         try:
-            kind: NoteKindEnum | None = NoteKindEnum(note.kind) if note.kind else None
-        except ValueError:
+            kind: NoteKind | None = NoteKind(value=note.kind)
+        except DomainException:
             kind = None
         try:
             origin: NoteOriginEnum = NoteOriginEnum(note.origin)
@@ -262,7 +270,7 @@ class RecallNotesHandler(IHandler[RecallNotesQuery, RecallDigestDto]):
             origin=origin,
             updated=updated,
             rank=rank,
-            preferred=prefer_area is None or note.path.startswith(f"{prefer_area}/"),
+            preferred=prefer_scope is None or note.scope == prefer_scope,
         )
 
     @staticmethod

@@ -8,22 +8,36 @@ from noesis.bounded_context.notes.application.dtos import (
     NoteSummaryDto,
 )
 from noesis.bounded_context.notes.application.ports.read_repositories import INoteReadRepository
-from noesis.bounded_context.notes.domain.value_objects import NoteArea, NoteOriginEnum
+from noesis.bounded_context.notes.domain.value_objects import (
+    NoteId,
+    NoteKind,
+    NoteOriginEnum,
+    NoteScope,
+)
 
 
 class UnavailableNoteReadRepositoryAdapter(INoteReadRepository):
-    """Listing for a vault-less setup: `notes list` needs files, so it fails when asked."""
+    """Vault-less setup: search, list and read fail when asked; lookups find nothing."""
 
     def __init__(self, error: Callable[[], Exception]) -> None:
         self._error = error
 
-    async def search(self, text: str, *, area: NoteArea | None, limit: int) -> NoteSearchResultDto:
+    async def search(
+        self, text: str, *, scope: NoteScope | None, limit: int
+    ) -> NoteSearchResultDto:
         raise self._error()
 
     async def list_notes(
-        self, *, area: NoteArea | None, origin: NoteOriginEnum | None
+        self, *, scope: NoteScope | None, origin: NoteOriginEnum | None
     ) -> list[NoteSummaryDto]:
         raise self._error()
 
-    async def read_note(self, path: str, *, area: NoteArea | None) -> NoteContentDto:
+    async def find_active(self, scope: NoteScope, kind: NoteKind) -> list[NoteSummaryDto]:
+        """No files to look in, so nothing is known: curation proceeds without duplicates check."""
+        return []
+
+    async def find_by_id(self, note_id: NoteId) -> NoteSummaryDto | None:
+        return None
+
+    async def read_note(self, path: str, *, scope: NoteScope | None) -> NoteContentDto:
         raise self._error()

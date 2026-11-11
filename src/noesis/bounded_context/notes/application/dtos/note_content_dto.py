@@ -7,17 +7,21 @@ class NoteContentDto(BaseDto):
     """One note with its whole text.
 
     Attributes:
-        path: Vault-relative path.
+        id: Stable note id (ULID).
+        scope: `repo:<name>` or `topic:<name>`.
+        path: Source-relative path.
         title: Note title.
-        kind: Note kind value; None for a note outside the noesis layout.
+        kind: Note kind name.
         origin: `manual` or `auto`.
         updated: Last update date (ISO), when known.
         content: The file's text, frontmatter included.
     """
 
+    id: str
+    scope: str
     path: str
     title: str
-    kind: str | None
+    kind: str
     origin: str
     updated: str | None
     content: str
