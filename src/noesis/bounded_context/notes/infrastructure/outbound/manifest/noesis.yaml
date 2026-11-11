@@ -1,0 +1,49 @@
+# Default manifest of noesis. A `noesis.yaml` at the root of your source is merged on top:
+#   kinds   merge by name (your entry replaces the default one, new names are appended)
+#   sources are replaced as a whole list (exactly one must be `primary`)
+#   layout  merges per scope type
+# This file is the single place that knows which kinds of notes exist.
+
+sources:
+  # Relative paths are resolved against the folder that holds the manifest.
+  - name: vault
+    type: filesystem
+    path: .
+    role: primary
+
+layout:
+  # Where NEW notes go. Reading never uses these: a note is found by its frontmatter.
+  repo: "repos/{name}/{kind_folder}/{slug}.md"
+  topic: "learning/{name}/{kind_folder}/{slug}.md"
+
+kinds:
+  - name: decision
+    folder: decisions
+    description: A choice that was made, why it was made, and what was rejected.
+    sections: [Decision, Rationale, Consequences, Alternatives rejected]
+    recall_weight: 1.0
+  - name: gotcha
+    folder: gotchas
+    description: A non-obvious trap, with its symptom, its cause and the fix or workaround.
+    sections: [Symptom, Cause, Fix or workaround]
+    recall_weight: 1.0
+  - name: howto
+    folder: howtos
+    description: A procedure that is not obvious from the repository, as steps someone can follow.
+    sections: [Goal, Steps, Verification]
+    recall_weight: 0.8
+  - name: concept
+    folder: concepts
+    description: An idea or mechanism worth understanding, explained in your own words.
+    sections: [Summary, How it works]
+    recall_weight: 0.8
+  - name: run
+    folder: runs
+    description: What a larger piece of work delivered, and what remains.
+    sections: [Outcome, Delivered, Remaining work]
+    recall_weight: 0.6
+  - name: glossary
+    folder: glossary
+    description: A term the project uses with a specific meaning, and the words to avoid for it.
+    sections: [Definition, Avoid]
+    recall_weight: 0.8
