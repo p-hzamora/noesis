@@ -13,7 +13,8 @@ that matches the installed version.
 ## 1. Resolve the CLI
 
 Run `noesis --version`. If it fails with "command not found", tell the user noesis is not
-installed (`uv tool install <path-or-url-of-the-noesis-repo>`) and stop. Do not try other
+installed (`curl -LsSf https://raw.githubusercontent.com/p-hzamora/noesis/main/install.sh | sh`)
+and stop. Do not try other
 executables and do not guess commands.
 
 ## 2. Check which config the repo selects

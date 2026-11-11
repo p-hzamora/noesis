@@ -27,7 +27,8 @@ $ noesis notes search "ttl cache" --repo demo --json
 noesis = "noesis.interfaces.cli.app:main"
 ```
 
-`uv tool install` (or `make install`) creates a small `noesis` launcher in `~/.local/bin`
+Installing it (`install.sh`, `uv tool install`, `pipx install` or `make install`; see
+[install.md](install.md)) creates a small `noesis` launcher in `~/.local/bin`
 that imports and calls `main()`. During development, `uv run noesis …` (or `make run ARGS="…"`) does the same from the source tree without installing anything.
 
 ## 2. Arguments, options, flags

@@ -1,6 +1,7 @@
 # `doctor`, `config`, `skills`, `update`
 
-Setup and housekeeping. Flow: [setup](../workflows/setup.md).
+Setup and housekeeping. Flow: [setup](../workflows/setup.md). Installing the command and
+the skill: [install](../install.md).
 
 | Command | Does | Options |
 |---|---|---|

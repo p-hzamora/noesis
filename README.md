@@ -14,19 +14,22 @@ with any of them.
 ## Install
 
 ```bash
-uv tool install git+https://github.com/p-hzamora/noesis   # or: uv tool install -e . from a checkout
+curl -LsSf https://raw.githubusercontent.com/p-hzamora/noesis/main/install.sh | sh
 noesis config init --vault-dir ~/brain  # writes ~/.config/noesis/.env
 noesis doctor                           # checks folders, git, the curator CLI, and whether this checkout is behind origin
 ```
 
+The installer uses `uv` if you have it, otherwise `pipx`, otherwise a private virtual
+environment built with Python 3.14+. From a checkout, `./install.sh` installs that checkout;
+`make install` does an editable install for development. Options, manual installs and
+uninstalling: [docs/install.md](docs/install.md).
+
 ## Use it from Claude Code
 
 ```bash
-make install                                  # or: uv tool install ~/Desktop/noesis
-noesis config init --vault-dir ~/brain        # where notes go
+npx skills add p-hzamora/noesis --skill noesis -g   # teach agents the CLI (or copy skills/noesis/)
 noesis integrate claude-code install          # preview the hooks diff for ~/.claude/settings.json
 noesis integrate claude-code install --yes    # write it (a timestamped backup is kept)
-npx skills add ~/Desktop/noesis --skill noesis -g   # teach agents the CLI (or copy skills/noesis/)
 noesis doctor
 ```
 
