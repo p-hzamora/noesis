@@ -1,35 +1,26 @@
 """`NOESIS_WRITER_BACKEND=mcp` end to end: the issue's acceptance criteria."""
 
 import json
+import re
 from pathlib import Path
 
 import pytest
 from tests.support.fake_claude import TTL_DECISION, success_envelope, write_fake_claude
 from tests.support.fake_obsidian_mcp import fake_obsidian_mcp, free_port
-from tests.support.notes_support import a_brief
+from tests.support.notes_support import a_brief, note_file
 
 from noesis.interfaces.cli import run
 from noesis.shared_kernel.domain import JsonObject
 
 pytestmark = pytest.mark.integration
 
-TTL_PATH: str = "repos/demo/auto/decisions/use-ttl-cache.md"
-LRU_PATH: str = "repos/demo/auto/decisions/use-lru-cache.md"
+TTL_PATH: str = "repos/demo/decisions/use-ttl-cache.md"
+LRU_PATH: str = "repos/demo/decisions/use-lru-cache.md"
 LRU_DECISION: JsonObject = {**TTL_DECISION, "slug": "use-lru-cache", "title": "Use an LRU cache"}
-RELATED_NOTE: str = """---
-type: decision
-id: auto-decision-use-ttl-cache
-title: Use a TTL cache
-updated: 2026-10-02
----
-
-# Use a TTL cache
-
-## Decision
-
-Cache lookups for sixty seconds.
-"""
-MANUAL_NOTE: str = "---\ntype: decision\ntitle: Use a TTL cache\n---\n\n# Use a TTL cache\n\n## Decision\n\nMine.\n"
+RELATED_NOTE: str = note_file(
+    TTL_PATH, title="Use a TTL cache", origin="auto", body="Cache lookups for sixty seconds."
+)
+MANUAL_NOTE: str = note_file(TTL_PATH, title="Use a TTL cache", body="Mine.")
 TOKEN: str = "s3cret-token"
 PROBE_PATH: str = "noesis-doctor-probe.md"
 
@@ -50,6 +41,11 @@ def served(tmp_path: Path) -> Path:
     folder: Path = tmp_path / "served"
     folder.mkdir()
     return folder
+
+
+def _without_id(markdown: str) -> str:
+    """The note with its (random) id line removed, to compare what two writers stored."""
+    return re.sub(r"^  id: \w+\n", "", markdown, flags=re.MULTILINE)
 
 
 def _json(capsys: pytest.CaptureFixture[str]) -> JsonObject:
@@ -138,8 +134,8 @@ def test_mcp_writer_matches_the_filesystem_writer(
     sent: dict[str, str] = _writes(server)
     assert list(sent) == [TTL_PATH, LRU_PATH]
     for path, content in sent.items():
-        assert content == (vault / path).read_text(encoding="utf-8")
-        assert (served / path).read_bytes() == (vault / path).read_bytes()
+        assert content == (served / path).read_text(encoding="utf-8")
+        assert _without_id(content) == _without_id((vault / path).read_text(encoding="utf-8"))
 
 
 def test_manual_note_wins_on_the_mcp_writer(

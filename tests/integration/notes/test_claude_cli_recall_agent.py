@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 from tests.support.fake_claude import briefing_envelope, write_fake_claude
+from tests.support.notes_support import a_content
 
 from noesis.bounded_context.notes.application.dtos import NoteContentDto
 from noesis.bounded_context.notes.infrastructure.outbound.recall import (
@@ -26,10 +27,7 @@ BRIEFING: JsonObject = {
 
 
 def _note(content: str = "# Privacy\n\nNothing leaves the machine.") -> NoteContentDto:
-    return NoteContentDto(
-        path=PATH, title='The "privacy" rule', kind="decision", origin="manual",
-        updated="2026-11-01", content=content,
-    )  # fmt: skip
+    return a_content(PATH, title='The "privacy" rule', content=content)
 
 
 def _adapter(

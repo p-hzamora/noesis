@@ -1,6 +1,7 @@
 """A briefing is checked against the notes that were read, then written as Markdown."""
 
 import pytest
+from tests.support.notes_support import a_content
 
 from noesis.bounded_context.notes.application.dtos import (
     BriefingItemDto,
@@ -16,9 +17,7 @@ B = "repos/demo/gotchas/b.md"
 
 
 def _note(path: str, title: str) -> NoteContentDto:
-    return NoteContentDto(
-        path=path, title=title, kind="decision", origin="manual", updated="2026-11-01", content="x"
-    )
+    return a_content(path, title=title)
 
 
 NOTES = (_note(A, "Note A"), _note(B, "Note B"))

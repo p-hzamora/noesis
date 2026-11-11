@@ -58,15 +58,15 @@ def test_curate_writes_auto_notes_then_search_and_list_find_them(
     assert run(["notes", "curate", "--brief-file", str(brief_file), "--json"]) == 0
     assert _out(capsys)["result"] == {
         "repository": "demo",
-        "created": ["repos/demo/auto/decisions/use-ttl-cache.md"],
+        "created": ["repos/demo/decisions/use-ttl-cache.md"],
         "updated": [],
         "skipped": [],
     }
-    assert (vault / "repos/demo/auto/decisions/use-ttl-cache.md").is_file()
+    assert (vault / "repos/demo/decisions/use-ttl-cache.md").is_file()
 
     assert run(["notes", "search", "TTL cache", "--repo", "demo", "--json"]) == 0
     assert [note["path"] for note in _out(capsys)["result"]["notes"]] == [  # type: ignore[index]
-        "repos/demo/auto/decisions/use-ttl-cache.md"
+        "repos/demo/decisions/use-ttl-cache.md"
     ]
     assert run(["notes", "list", "--origin", "manual"]) == 0
     assert capsys.readouterr().out.strip() == "no notes"
@@ -168,7 +168,7 @@ def test_curate_dry_run_shows_the_decision_without_writing_or_parking(
 
     assert _out(capsys)["result"] == {
         "repository": "demo",
-        "created": ["repos/demo/auto/decisions/use-ttl-cache.md"],
+        "created": ["repos/demo/decisions/use-ttl-cache.md"],
         "updated": [],
         "skipped": [],
         "dry_run": True,

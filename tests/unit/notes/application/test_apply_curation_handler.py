@@ -2,13 +2,18 @@
 
 import pytest
 from tests.support.notes_support import (
+    DefaultManifestProvider,
     FixedClock,
     InMemoryApplyFailureLog,
+    InMemoryNoteReadRepository,
     InMemoryNoteRepository,
     InMemoryNotesUnitOfWork,
+    SequentialIds,
     a_decision,
     a_draft,
     a_note,
+    a_scope,
+    a_summary,
 )
 
 from noesis.bounded_context.notes.application.dtos import CurationResultDto, RejectedEntryDto
@@ -19,19 +24,21 @@ from noesis.bounded_context.notes.application.handlers.commands import (
 from noesis.bounded_context.notes.domain.policies import AutoCurationPolicy
 from noesis.bounded_context.notes.domain.value_objects import (
     CurationActionEnum,
-    NoteArea,
     NoteOriginEnum,
+    NoteScope,
 )
 from noesis.exceptions import ApplyFailedError, NoteStorageError
 
 pytestmark = pytest.mark.unit
 
-AUTO_PATH = "repos/demo/auto/decisions/use-ttl-cache.md"
+AUTO_PATH = "repos/demo/decisions/use-ttl-cache.md"
+MANUAL_PATH = "repos/demo/decisions/manual-topic.md"
 
 
 class _World:
     def __init__(self, *, with_failure_log: bool = True) -> None:
         self.repository = InMemoryNoteRepository()
+        self.read_repository = InMemoryNoteReadRepository()
         self.failures = InMemoryApplyFailureLog()
         self.units: list[InMemoryNotesUnitOfWork] = []
         self.commit_errors: list[NoteStorageError] = []
@@ -44,13 +51,16 @@ class _World:
             uow_factory=unit_of_work,
             clock=FixedClock(),
             policy=AutoCurationPolicy(),
+            manifest=DefaultManifestProvider(),
+            ids=SequentialIds(),
+            read_repository=self.read_repository,
             failures=self.failures if with_failure_log else None,
         )
 
 
 def _command(*decisions, **overrides) -> ApplyCurationCommand:  # type: ignore[no-untyped-def]
     fields = {
-        "area": NoteArea.for_repository("demo"),
+        "scope": a_scope(),
         "decisions": tuple(decisions) or (a_decision(),),
         "raw_payload": '{"decisions": []}',
     }
@@ -65,8 +75,7 @@ async def test_a_draft_is_stored_without_commits_or_session() -> None:
     assert result.repository == "demo"
     assert result.created == (AUTO_PATH,)
     stored = world.repository.stored[AUTO_PATH]
-    assert stored.commits == ()
-    assert stored.session is None
+    assert stored.sources == ()
     assert world.units[0].commits == 1
 
 
@@ -76,30 +85,32 @@ async def test_provenance_is_stored_when_given() -> None:
     await world.handler.handle(_command(commits=("abc123",), session="abcd1234"))
 
     stored = world.repository.stored[AUTO_PATH]
-    assert stored.commits == ("abc123",)
-    assert stored.session == "abcd1234"
+    assert [source.value for source in stored.sources] == ["commit:abc123", "session:abcd1234"]
 
 
 async def test_an_existing_auto_note_is_updated_not_duplicated() -> None:
     world = _World()
-    world.repository.stored[AUTO_PATH] = a_note()
+    existing = a_note()
+    world.repository.stored[AUTO_PATH] = existing
+    world.read_repository.notes.append(a_summary(AUTO_PATH))
 
     result = await world.handler.handle(_command())
 
     assert result.updated == (AUTO_PATH,)
     assert result.created == ()
+    assert world.repository.stored[AUTO_PATH].id == existing.id
 
 
 async def test_a_manual_note_on_the_same_topic_wins() -> None:
     world = _World()
-    world.repository.stored["repos/demo/decisions/use-ttl-cache.md"] = a_note(
-        origin=NoteOriginEnum.MANUAL
-    )
+    world.repository.stored[AUTO_PATH] = a_note(origin=NoteOriginEnum.MANUAL)
+    world.read_repository.notes.append(a_summary(AUTO_PATH, origin="manual"))
 
     result = await world.handler.handle(_command())
 
-    assert result.skipped[0].reason == "covered by repos/demo/decisions/use-ttl-cache.md"
-    assert AUTO_PATH not in world.repository.stored
+    assert result.skipped[0].reason == f"covered by {AUTO_PATH}"
+    assert list(world.repository.stored) == [AUTO_PATH]
+    assert world.repository.stored[AUTO_PATH].is_auto is False
 
 
 async def test_skip_decisions_are_reported_not_stored() -> None:
@@ -182,9 +193,8 @@ async def test_without_a_failure_log_a_storage_failure_propagates_unchanged() ->
 
 async def test_dry_run_reports_paths_but_writes_nothing() -> None:
     world = _World()
-    world.repository.stored["repos/demo/decisions/manual-topic.md"] = a_note(
-        origin=NoteOriginEnum.MANUAL, slug="manual-topic"
-    )
+    world.repository.stored[MANUAL_PATH] = a_note(origin=NoteOriginEnum.MANUAL, slug="manual-topic")
+    world.read_repository.notes.append(a_summary(MANUAL_PATH, origin="manual"))
 
     result = await world.handler.handle(
         _command(
@@ -195,7 +205,7 @@ async def test_dry_run_reports_paths_but_writes_nothing() -> None:
     )
 
     assert result.created == (AUTO_PATH,)
-    assert result.skipped[0].reason == "covered by repos/demo/decisions/manual-topic.md"
+    assert result.skipped[0].reason == f"covered by {MANUAL_PATH}"
     assert AUTO_PATH not in world.repository.stored
     assert world.units[0].commits == 0
     assert world.repository.staged == {}
@@ -205,6 +215,7 @@ async def test_dry_run_does_not_touch_an_existing_auto_note() -> None:
     world = _World()
     existing = a_note()
     world.repository.stored[AUTO_PATH] = existing
+    world.read_repository.notes.append(a_summary(AUTO_PATH))
     title, updated_at = existing.title, existing.updated_at
 
     result = await world.handler.handle(
@@ -225,3 +236,36 @@ async def test_dry_run_with_rejected_entries_fails_without_a_record() -> None:
 
     assert world.failures.records == []
     assert "ticket" not in raised.value.metadata
+
+
+async def test_a_taken_path_gets_a_numeric_suffix_and_nothing_is_overwritten() -> None:
+    world = _World()
+    taken = a_note(origin=NoteOriginEnum.MANUAL, slug="use-ttl-cache")
+    taken.scope = NoteScope.for_repository("other")  # same file, not this scope's note
+    world.repository.stored[AUTO_PATH] = taken
+
+    result = await world.handler.handle(_command())
+
+    assert result.created == ("repos/demo/decisions/use-ttl-cache-2.md",)
+    assert world.repository.stored[AUTO_PATH] is taken
+
+
+async def test_an_unknown_kind_is_reported_as_a_skip() -> None:
+    world = _World()
+
+    result = await world.handler.handle(_command(a_decision(draft=a_draft(kind="no-such-kind"))))
+
+    assert result.created == ()
+    assert "unknown note kind 'no-such-kind'" in result.skipped[0].reason
+
+
+async def test_a_note_at_the_layout_path_is_found_even_when_the_read_side_does_not_know_it() -> (
+    None
+):
+    world = _World()
+    world.repository.stored[AUTO_PATH] = a_note(origin=NoteOriginEnum.MANUAL)
+
+    result = await world.handler.handle(_command())
+
+    assert result.skipped[0].reason == f"covered by {AUTO_PATH}"
+    assert result.created == ()

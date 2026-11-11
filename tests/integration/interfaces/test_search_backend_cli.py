@@ -6,26 +6,23 @@ from pathlib import Path
 import pytest
 from tests.support.fake_claude import TTL_DECISION, success_envelope, write_fake_claude
 from tests.support.fake_obsidian_mcp import fake_obsidian_mcp, free_port
-from tests.support.notes_support import a_brief
+from tests.support.notes_support import a_brief, note_file
 
 from noesis.interfaces.cli import run
 from noesis.shared_kernel.domain import JsonObject
 
 pytestmark = pytest.mark.integration
 
-NOTE: str = """---
-type: decision
-id: auto-decision-use-ttl-cache
-title: Use a TTL cache
-updated: 2026-10-02
----
 
-# Use a TTL cache
+def _note(path: str) -> str:
+    return note_file(
+        path,
+        title="Use a TTL cache",
+        origin="auto",
+        body="Cache lookups for sixty seconds.",
+    )
 
-## Decision
 
-Cache lookups for sixty seconds.
-"""
 FALLBACK_NOTICE: str = "Obsidian MCP unreachable, searched files instead"
 
 
@@ -33,11 +30,11 @@ FALLBACK_NOTICE: str = "Obsidian MCP unreachable, searched files instead"
 def vault(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     folder: Path = tmp_path / "vault"
     for relative in (
-        "repos/demo/auto/decisions/use-ttl-cache.md",
+        "repos/demo/decisions/use-ttl-cache.md",
         "repos/other/decisions/use-ttl-cache.md",
     ):
         (folder / relative).parent.mkdir(parents=True)
-        (folder / relative).write_text(NOTE, encoding="utf-8")
+        (folder / relative).write_text(_note(relative), encoding="utf-8")
     monkeypatch.setenv("NOESIS_VAULT_DIR", str(folder))
     monkeypatch.setenv("NOESIS_CURATOR_RETRY_SECONDS", "0")
     return folder
@@ -70,9 +67,7 @@ def test_search_goes_through_the_mcp_in_the_same_envelope_and_shape(
     filesystem: JsonObject = _json(capsys)
 
     # Obsidian ranks a note by its own index: the canned hit has none of the query's words.
-    with fake_obsidian_mcp(
-        vault, canned=[("repos/demo/auto/decisions/use-ttl-cache.md", 9)]
-    ) as server:
+    with fake_obsidian_mcp(vault, canned=[("repos/demo/decisions/use-ttl-cache.md", 9)]) as server:
         _use_mcp(monkeypatch, server.url)
         assert run(["notes", "search", "anything at all", "--json"]) == 0
         via_mcp: JsonObject = _json(capsys)
@@ -87,9 +82,9 @@ def test_search_goes_through_the_mcp_in_the_same_envelope_and_shape(
     assert via_mcp["result"]["notes"][0] == next(  # type: ignore[index]
         note
         for note in filesystem["result"]["notes"]  # type: ignore[index]
-        if note["path"] == "repos/demo/auto/decisions/use-ttl-cache.md"
+        if note["path"] == "repos/demo/decisions/use-ttl-cache.md"
     )
-    assert _paths(via_mcp) == ["repos/demo/auto/decisions/use-ttl-cache.md"]
+    assert _paths(via_mcp) == ["repos/demo/decisions/use-ttl-cache.md"]
 
 
 def test_repo_restricts_results_to_repos_r_on_both_backends(
@@ -112,13 +107,13 @@ def test_with_obsidian_closed_search_falls_back_to_files_and_exits_zero(
 
     assert run(["notes", "search", "ttl cache", "--repo", "demo", "--json"]) == 0
     envelope: JsonObject = _json(capsys)
-    assert _paths(envelope) == ["repos/demo/auto/decisions/use-ttl-cache.md"]
+    assert _paths(envelope) == ["repos/demo/decisions/use-ttl-cache.md"]
     assert envelope["result"]["notice"] == FALLBACK_NOTICE  # type: ignore[index]
     assert envelope["result"]["backend"] == "filesystem"  # files answered, not the MCP  # type: ignore[index]
 
     assert run(["notes", "search", "ttl cache", "--repo", "demo"]) == 0
     text: str = capsys.readouterr().out
-    assert "repos/demo/auto/decisions/use-ttl-cache.md" in text
+    assert "repos/demo/decisions/use-ttl-cache.md" in text
     assert text.count(FALLBACK_NOTICE) == 1
     assert "backend: filesystem" in text
 
@@ -170,8 +165,8 @@ def test_curate_uses_the_mcp_search_for_related_notes(
 
     assert server.calls[0][0] == "search_simple"
     result: JsonObject = _json(capsys)["result"]  # type: ignore[assignment]
-    assert result["created"] + result["updated"] == ["repos/demo/auto/decisions/use-ttl-cache.md"]  # type: ignore[operator]
-    assert (vault / "repos/demo/auto/decisions/use-ttl-cache.md").is_file()  # written to files
+    assert result["created"] + result["updated"] == ["repos/demo/decisions/use-ttl-cache.md"]  # type: ignore[operator]
+    assert (vault / "repos/demo/decisions/use-ttl-cache.md").is_file()  # written to files
 
 
 def test_curate_still_succeeds_when_obsidian_is_closed(
@@ -184,7 +179,7 @@ def test_curate_still_succeeds_when_obsidian_is_closed(
 
     captured = capsys.readouterr()
     result: JsonObject = json.loads(captured.out)["result"]  # stdout stays pure JSON
-    assert result["created"] + result["updated"] == ["repos/demo/auto/decisions/use-ttl-cache.md"]  # type: ignore[operator]
+    assert result["created"] + result["updated"] == ["repos/demo/decisions/use-ttl-cache.md"]  # type: ignore[operator]
     assert FALLBACK_NOTICE in captured.err
 
 

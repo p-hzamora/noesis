@@ -5,7 +5,7 @@ import json
 import pytest
 
 from noesis.bounded_context.notes.application.dtos import RejectedEntryDto
-from noesis.bounded_context.notes.domain.value_objects import CurationActionEnum, NoteKindEnum
+from noesis.bounded_context.notes.domain.value_objects import CurationActionEnum, NoteKind
 from noesis.bounded_context.notes.infrastructure.outbound.curation.apply_input_schema import (
     parse_decisions_strict,
 )
@@ -36,7 +36,7 @@ def test_a_valid_payload_becomes_decisions() -> None:
     assert rejected == ()
     assert decisions[0].action is CurationActionEnum.CREATE
     assert decisions[0].draft is not None
-    assert decisions[0].draft.kind is NoteKindEnum.DECISION
+    assert decisions[0].draft.kind == NoteKind(value="decision")
     assert decisions[0].draft.slug.value == "use-ttl-cache"
     assert decisions[0].draft.sections[0].heading == "Decision"
 

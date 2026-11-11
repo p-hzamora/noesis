@@ -1,8 +1,8 @@
-"""What a work brief means to Notes: its area, search text and provenance."""
+"""What a work brief means to Notes: its scope, search text and provenance."""
 
 import pytest
 
-from noesis.bounded_context.notes.domain.value_objects import CommitRef, NoteArea, WorkBrief
+from noesis.bounded_context.notes.domain.value_objects import CommitRef, NoteScope, WorkBrief
 
 pytestmark = pytest.mark.unit
 
@@ -25,8 +25,8 @@ def _brief(
     )
 
 
-def test_its_notes_belong_to_the_repository_area() -> None:
-    assert _brief().area == NoteArea(value="repos/demo")
+def test_its_notes_belong_to_the_repository_scope() -> None:
+    assert _brief().scope == NoteScope.for_repository("demo")
 
 
 def test_search_text_is_the_goal_followed_by_the_commit_subjects() -> None:

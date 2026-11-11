@@ -8,7 +8,10 @@ from tests.support.fake_obsidian_mcp import FakeObsidianMcp, fake_obsidian_mcp, 
 from tests.support.notes_support import a_note
 
 from noesis.bounded_context.notes.domain.entities import Note
-from noesis.bounded_context.notes.domain.value_objects import NoteLocation
+from noesis.bounded_context.notes.domain.value_objects import NotePath
+from noesis.bounded_context.notes.infrastructure.outbound.frontmatter import (
+    YamlFrontmatterCodecAdapter,
+)
 from noesis.bounded_context.notes.infrastructure.outbound.storage import (
     FilesystemNoteRepositoryAdapter,
     FilesystemNotesUnitOfWorkAdapter,
@@ -21,8 +24,8 @@ from noesis.shared_kernel.infrastructure.outbound.mcp import ObsidianMcpClient
 
 pytestmark = pytest.mark.integration
 
-FIRST: str = "repos/demo/auto/decisions/first-note.md"
-SECOND: str = "repos/demo/auto/decisions/second-note.md"
+FIRST: str = "repos/demo/decisions/first-note.md"
+SECOND: str = "repos/demo/decisions/second-note.md"
 
 
 def _notes() -> list[Note]:
@@ -33,7 +36,8 @@ def _unit(
     url: str, mapper: NoteMapper | None = None
 ) -> tuple[McpNotesUnitOfWorkAdapter, McpNoteRepositoryAdapter]:
     repository = McpNoteRepositoryAdapter(
-        ObsidianMcpClient(url, timeout_seconds=2), mapper or NoteMapper()
+        ObsidianMcpClient(url, timeout_seconds=2),
+        mapper or NoteMapper(YamlFrontmatterCodecAdapter()),
     )
     return McpNotesUnitOfWorkAdapter(repository), repository
 
@@ -55,7 +59,7 @@ async def _commit(url: str, notes: list[Note], mapper: NoteMapper | None = None)
 
 
 async def test_commit_sends_the_same_markdown_the_filesystem_writer_stores(tmp_path: Path) -> None:
-    mapper = NoteMapper()
+    mapper = NoteMapper(YamlFrontmatterCodecAdapter())
     files: Path = tmp_path / "files"
     unit = FilesystemNotesUnitOfWorkAdapter(FilesystemNoteRepositoryAdapter(files, mapper))
     async with unit as uow:
@@ -80,18 +84,16 @@ async def test_commit_sends_the_same_markdown_the_filesystem_writer_stores(tmp_p
 async def test_get_reads_an_existing_note_through_vault_read(tmp_path: Path) -> None:
     note: Note = a_note(slug="first-note")
     (tmp_path / FIRST).parent.mkdir(parents=True)
-    (tmp_path / FIRST).write_text(NoteMapper().to_markdown(note), encoding="utf-8")
+    (tmp_path / FIRST).write_text(
+        NoteMapper(YamlFrontmatterCodecAdapter()).to_markdown(note), encoding="utf-8"
+    )
 
     with fake_obsidian_mcp(tmp_path) as server:
         _, repository = _unit(server.url)
-        loaded: Note | None = await repository.get(note.location)
+        loaded: Note | None = await repository.get(note.path)
 
     assert loaded is not None
-    assert (loaded.title, loaded.sections, loaded.location) == (
-        note.title,
-        note.sections,
-        note.location,
-    )
+    assert (loaded.title, loaded.sections, loaded.path) == (note.title, note.sections, note.path)
     assert server.calls == [("vault_read", {"path": FIRST})]
 
 
@@ -105,12 +107,12 @@ async def test_get_returns_none_when_the_note_is_absent(
 
     with fake_obsidian_mcp(tmp_path) as server:
         _, repository = _unit(server.url)
-        loaded: Note | None = await repository.get(NoteLocation.parse(FIRST))
+        loaded: Note | None = await repository.get(NotePath(value=FIRST))
 
     assert loaded is None
     assert server.calls == [
         ("vault_read", {"path": FIRST}),
-        ("vault_list", {"path": "repos/demo/auto/decisions"}),  # is the file really absent?
+        ("vault_list", {"path": "repos/demo/decisions"}),  # is the file really absent?
     ]
 
 
@@ -118,7 +120,7 @@ async def test_get_with_an_unreachable_server_raises_a_storage_error() -> None:
     _, repository = _unit(_closed_url())
 
     with pytest.raises(NoteStorageError) as raised:
-        await repository.get(NoteLocation.parse(FIRST))
+        await repository.get(NotePath(value=FIRST))
 
     assert raised.value.error_code == "NOTES_102_NOTE_STORAGE_FAILED"
     assert raised.value.message.startswith(f"Cannot read {FIRST} through the Obsidian MCP:")
@@ -135,14 +137,14 @@ async def test_get_of_a_listed_file_that_cannot_be_read_raises_a_storage_error(
     with fake_obsidian_mcp(tmp_path) as server:
         _, repository = _unit(server.url)
         with pytest.raises(NoteStorageError):
-            await repository.get(NoteLocation.parse(FIRST))
+            await repository.get(NotePath(value=FIRST))
 
 
 async def test_get_of_an_answer_without_content_raises_a_storage_error(tmp_path: Path) -> None:
     with fake_obsidian_mcp(tmp_path, read_without_content=True) as server:
         _, repository = _unit(server.url)
         with pytest.raises(NoteStorageError):
-            await repository.get(NoteLocation.parse(FIRST))
+            await repository.get(NotePath(value=FIRST))
 
 
 async def test_a_staged_note_is_returned_by_get_without_any_mcp_call(tmp_path: Path) -> None:
@@ -151,7 +153,7 @@ async def test_a_staged_note_is_returned_by_get_without_any_mcp_call(tmp_path: P
     with fake_obsidian_mcp(tmp_path) as server:
         _, repository = _unit(server.url)
         await repository.save(note)
-        loaded: Note | None = await repository.get(note.location)
+        loaded: Note | None = await repository.get(note.path)
 
     assert loaded is note
     assert server.calls == []
@@ -166,7 +168,7 @@ async def test_leaving_the_unit_without_commit_sends_nothing_and_clears_the_stag
         unit, repository = _unit(server.url)
         async with unit as uow:
             await uow.notes.save(note)
-        loaded: Note | None = await repository.get(note.location)
+        loaded: Note | None = await repository.get(note.path)
 
     assert loaded is None  # no longer staged, and never written
     assert _writes(server) == []
@@ -215,12 +217,13 @@ class _FailingMapper(NoteMapper):
     """Renders every note except `bad_slug`, which fails like a note that cannot be serialised."""
 
     def __init__(self, bad_slug: str, failure: str) -> None:
+        super().__init__(YamlFrontmatterCodecAdapter())
         self._bad_slug: str = bad_slug
         self._failure: str = failure
 
-    def to_markdown(self, note: Note) -> str:
-        if note.location.slug.value != self._bad_slug:
-            return super().to_markdown(note)
+    def to_markdown(self, note: Note, existing: str | None = None) -> str:
+        if note.path.stem != self._bad_slug:
+            return super().to_markdown(note, existing)
         match self._failure:
             case "value-error":
                 raise ValueError("cannot be encoded")
@@ -237,7 +240,7 @@ async def test_pre_validation_failure_sends_nothing(tmp_path: Path, failure: str
     with fake_obsidian_mcp(tmp_path) as server, pytest.raises(NoteStorageError) as raised:
         await _commit(server.url, _notes(), mapper)
 
-    assert server.calls == []  # not even the first, valid note
+    assert _writes(server) == []  # not even the first, valid note
     assert raised.value.message.startswith(
         f"Refusing to send any note: {SECOND} cannot be rendered ("
     )
@@ -247,3 +250,16 @@ async def test_pre_validation_failure_sends_nothing(tmp_path: Path, failure: str
         "not_written": [FIRST, SECOND],
         "invalid": SECOND,
     }
+
+
+async def test_exists_looks_at_the_stage_then_at_the_vault(tmp_path: Path) -> None:
+    (tmp_path / FIRST).parent.mkdir(parents=True)
+    (tmp_path / FIRST).write_text("# Plain\n", encoding="utf-8")
+
+    with fake_obsidian_mcp(tmp_path) as server:
+        _, repository = _unit(server.url)
+        await repository.save(a_note(slug="second-note"))
+
+        assert await repository.exists(NotePath(value=FIRST))
+        assert await repository.exists(NotePath(value=SECOND))
+        assert not await repository.exists(NotePath(value="repos/demo/decisions/none.md"))

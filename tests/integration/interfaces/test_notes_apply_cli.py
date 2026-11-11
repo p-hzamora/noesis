@@ -12,8 +12,12 @@ from noesis.shared_kernel.domain import JsonObject
 
 pytestmark = pytest.mark.integration
 
-NOTE_PATH = "repos/demo/auto/decisions/use-ttl-cache.md"
-MANUAL_NOTE = "---\ntype: decision\ntitle: Use a TTL cache\n---\n\n# Use a TTL cache\n\n## Decision\n\nMine.\n"
+NOTE_PATH = "repos/demo/decisions/use-ttl-cache.md"
+MANUAL_NOTE = (
+    "---\nnoesis:\n  id: 01ARZ3NDEKTSV4RRFFQ69G5FAW\n  scope: repo:demo\n  kind: decision\n"
+    "  origin: manual\n  sources: []\n  updated: 2026-01-05\n---\n\n"
+    "# Use a TTL cache\n\n## Decision\n\nMine.\n"
+)
 
 
 def _entry(**overrides: object) -> dict[str, object]:
@@ -64,7 +68,7 @@ def _failure_records(tmp_path: Path) -> list[Path]:
     return sorted(p for p in folder.glob("*.json") if ".payload." not in p.name)
 
 
-def test_apply_writes_the_note_under_the_repository_area(
+def test_apply_writes_the_note_under_the_repository_scope(
     vault: Path, repo: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     assert run(["notes", "apply", "--decisions-file", str(_decisions(tmp_path)), "--json"]) == 0
@@ -76,9 +80,9 @@ def test_apply_writes_the_note_under_the_repository_area(
         "skipped": [],
     }
     text: str = (vault / NOTE_PATH).read_text()
-    assert "origin: auto" in text or "auto" in text
+    assert "origin: auto" in text
+    assert "sources: []" in text
     assert "session:" not in text
-    assert "commits:" not in text
 
 
 def test_apply_stores_the_provenance_it_is_given(vault: Path, repo: Path, tmp_path: Path) -> None:
@@ -103,9 +107,9 @@ def test_apply_stores_the_provenance_it_is_given(vault: Path, repo: Path, tmp_pa
     )
 
     text: str = (vault / NOTE_PATH).read_text()
-    assert "session: abcd1234\n" in text
-    assert "aaa111" in text
-    assert "bbb222" in text
+    assert "session:abcd1234\n" in text
+    assert "commit:aaa111" in text
+    assert "commit:bbb222" in text
 
 
 def test_applying_again_updates_the_same_note(
@@ -120,6 +124,7 @@ def test_applying_again_updates_the_same_note(
     result: JsonObject = _out(capsys)["result"]  # type: ignore[assignment]
     assert result["updated"] == [NOTE_PATH]
     assert result["created"] == []
+    assert not (vault / "repos/demo/decisions/use-ttl-cache-2.md").exists()
 
 
 def test_a_manual_note_wins(
@@ -136,7 +141,7 @@ def test_a_manual_note_wins(
         {"candidate": "ttl cache", "reason": "covered by repos/demo/decisions/use-ttl-cache.md"}
     ]
     assert manual.read_text() == MANUAL_NOTE
-    assert not (vault / NOTE_PATH).exists()
+    assert not (vault / "repos/demo/decisions/use-ttl-cache-2.md").exists()
 
 
 def test_apply_reads_the_decisions_from_stdin(
@@ -285,7 +290,7 @@ def test_the_old_knowledge_group_no_longer_exists(
     assert run(["knowledge", "list"]) == 2
 
 
-def test_a_linked_worktree_writes_under_the_main_repository_area(
+def test_a_linked_worktree_writes_under_the_main_repository_scope(
     vault: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     isolate_git(monkeypatch)

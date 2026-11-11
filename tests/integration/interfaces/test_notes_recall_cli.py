@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 from tests.support.fake_obsidian_mcp import free_port
+from tests.support.notes_support import note_file
 
 from noesis.interfaces.cli import run
 from noesis.shared_kernel.domain import JsonObject
@@ -13,25 +14,25 @@ pytestmark = pytest.mark.integration
 
 FALLBACK_NOTICE: str = "Obsidian MCP unreachable, searched files instead"
 GOTCHA = "repos/demo/gotchas/cache-stampede.md"
-RUN = "repos/demo/auto/runs/login-cache-rollout.md"
+RUN = "repos/demo/runs/login-cache-rollout.md"
 OTHER = "repos/other/decisions/login-cache.md"
 
 
-def _note(kind: str, title: str, updated: str, body: str) -> str:
-    heading: str = {"gotcha": "Symptom", "run": "Outcome", "decision": "Decision"}[kind]
-    return (
-        f"---\ntype: {kind}\ntitle: {title}\nupdated: {updated}\n---\n\n# {title}\n\n"
-        f"## {heading}\n\n{body}\n"
-    )
+def _note(path: str, kind: str, title: str, updated: str, body: str, origin: str = "manual") -> str:
+    return note_file(path, title=title, kind=kind, updated=updated, body=body, origin=origin)
 
 
 @pytest.fixture
 def vault(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     folder: Path = tmp_path / "vault"
     notes: dict[str, str] = {
-        GOTCHA: _note("gotcha", "Cache stampede", "2026-10-20", "Login cache expires together."),
-        RUN: _note("run", "Login cache rollout", "2025-01-10", "Login cache shipped."),
-        OTHER: _note("decision", "Login cache elsewhere", "2026-10-20", "Login cache other repo."),
+        GOTCHA: _note(
+            GOTCHA, "gotcha", "Cache stampede", "2026-10-20", "Login cache expires together."
+        ),
+        RUN: _note(RUN, "run", "Login cache rollout", "2025-01-10", "Login cache shipped.", "auto"),
+        OTHER: _note(
+            OTHER, "decision", "Login cache elsewhere", "2026-10-20", "Login cache other repo."
+        ),
     }
     for relative, text in notes.items():
         (folder / relative).parent.mkdir(parents=True, exist_ok=True)
@@ -96,9 +97,9 @@ def test_text_output_lists_entries_with_a_path_to_read(
     assert "backend: filesystem" in text
 
 
-def test_area_option_restricts_the_search(vault: Path, capsys: pytest.CaptureFixture[str]) -> None:
+def test_scope_option_restricts_the_search(vault: Path, capsys: pytest.CaptureFixture[str]) -> None:
     assert (
-        run(["notes", "recall", "login cache", "--area", "repos/other", "--json", "--no-synthesis"])
+        run(["notes", "recall", "login cache", "--scope", "repo:other", "--json", "--no-synthesis"])
         == 0
     )
 

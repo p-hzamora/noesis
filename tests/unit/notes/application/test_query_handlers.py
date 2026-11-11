@@ -7,6 +7,7 @@ from tests.support.notes_support import (
     InMemoryNoteReadRepository,
     InMemoryParkedQueue,
     a_brief,
+    a_summary,
 )
 
 from noesis.bounded_context.notes.application.dtos import NoteSummaryDto
@@ -23,10 +24,9 @@ from noesis.bounded_context.notes.domain.value_objects import NoteOriginEnum
 pytestmark = pytest.mark.unit
 
 NOTES: list[NoteSummaryDto] = [
-    NoteSummaryDto(
-        path=f"repos/demo/{origin}/decisions/{i}.md",
+    a_summary(
+        f"repos/demo/{origin}/decisions/{i}.md",
         title=str(i),
-        kind="decision",
         origin=origin,
         updated=None,
         snippet="",

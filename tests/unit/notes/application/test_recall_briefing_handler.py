@@ -1,7 +1,13 @@
 """Recall with synthesis: multi-keyword search, bounded full reads, grounded briefing, honest failures."""
 
 import pytest
-from tests.support.notes_support import FixedClock, InMemoryNoteReadRepository, ScriptedRecallAgent
+from tests.support.notes_support import (
+    DefaultManifestProvider,
+    FixedClock,
+    InMemoryNoteReadRepository,
+    ScriptedRecallAgent,
+    a_summary,
+)
 
 from noesis.bounded_context.notes.application.dtos import (
     BriefingItemDto,
@@ -23,8 +29,8 @@ TASK = "Continue the cv-generator project while preserving candidate privacy"
 
 
 def _note(path: str, title: str, snippet: str, *, kind: str = "decision") -> NoteSummaryDto:
-    return NoteSummaryDto(
-        path=path, title=title, kind=kind, origin="manual", updated="2026-11-01", snippet=snippet
+    return a_summary(
+        path, title=title, kind=kind, origin="manual", updated="2026-11-01", snippet=snippet
     )
 
 
@@ -54,6 +60,7 @@ def _handler(
     agent = ScriptedRecallAgent(answer)
     handler = RecallNotesHandler(
         read_repository=repository,
+        manifest=DefaultManifestProvider(),
         clock=FixedClock(),
         agent=agent,
         max_input_chars=max_input_chars,
@@ -64,7 +71,7 @@ def _handler(
 async def test_notes_found_by_different_keywords_are_all_candidates() -> None:
     handler, repository, _ = _handler()
 
-    digest = await handler.handle(RecallNotesQuery(task=TASK, area="repos/cv"))
+    digest = await handler.handle(RecallNotesQuery(task=TASK, scope="repo:cv"))
 
     # the combined sentence would match nothing; each keyword finds its own notes
     assert "candidate" in repository.queries and "privacy" in repository.queries
@@ -120,16 +127,16 @@ async def test_no_evidence_means_no_agent_call_and_an_explicit_status() -> None:
     assert repository.read_paths == []
 
 
-async def test_no_evidence_in_an_area_warns_which_folder_was_searched() -> None:
+async def test_no_evidence_in_a_scope_warns_which_scope_was_searched() -> None:
     handler, _, _ = _handler(notes=())
 
-    digest = await handler.handle(RecallNotesQuery(task=TASK, area="repos/noesis"))
+    digest = await handler.handle(RecallNotesQuery(task=TASK, scope="repo:noesis"))
 
     assert len(digest.warnings) == 1
-    assert "repos/noesis/" in digest.warnings[0]
+    assert "repo:noesis" in digest.warnings[0]
 
 
-async def test_no_evidence_without_an_area_has_no_scope_warning() -> None:
+async def test_no_evidence_without_a_scope_has_no_scope_warning() -> None:
     handler, _, _ = _handler(notes=())
 
     digest = await handler.handle(RecallNotesQuery(task=TASK))
@@ -202,7 +209,9 @@ async def test_an_agent_failure_propagates_with_the_candidates_and_a_way_out() -
 
 async def test_synthesis_without_an_agent_is_an_error_not_a_silent_digest() -> None:
     repository = InMemoryNoteReadRepository(NOTES, match_all=False)
-    handler = RecallNotesHandler(read_repository=repository, clock=FixedClock())
+    handler = RecallNotesHandler(
+        read_repository=repository, manifest=DefaultManifestProvider(), clock=FixedClock()
+    )
 
     with pytest.raises(RecallAgentFailedError):
         await handler.handle(RecallNotesQuery(task=TASK))

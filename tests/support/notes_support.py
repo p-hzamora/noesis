@@ -1,5 +1,6 @@
 """In-memory fakes of the Notes ports, and builders for briefs and decisions."""
 
+import hashlib
 from collections.abc import Sequence
 from datetime import UTC, datetime
 from types import TracebackType
@@ -15,23 +16,30 @@ from noesis.bounded_context.notes.application.dtos import (
 )
 from noesis.bounded_context.notes.application.ports.curation import ICurator
 from noesis.bounded_context.notes.application.ports.failures import IApplyFailureLog
+from noesis.bounded_context.notes.application.ports.ids import INoteIdGenerator
+from noesis.bounded_context.notes.application.ports.manifest import IManifestProvider
 from noesis.bounded_context.notes.application.ports.queue import IParkedCurationQueue
 from noesis.bounded_context.notes.application.ports.read_repositories import INoteReadRepository
 from noesis.bounded_context.notes.application.ports.recall import IRecallAgent
 from noesis.bounded_context.notes.application.ports.uow import INotesUnitOfWork
+from noesis.bounded_context.notes.application.services.manifest import KindCatalog, Manifest
 from noesis.bounded_context.notes.domain.entities import Note
 from noesis.bounded_context.notes.domain.repositories import INoteRepository
 from noesis.bounded_context.notes.domain.value_objects import (
     CurationActionEnum,
     CurationDecision,
-    NoteArea,
     NoteDraft,
-    NoteKindEnum,
-    NoteLocation,
+    NoteId,
+    NoteKind,
     NoteOriginEnum,
+    NotePath,
+    NoteScope,
     NoteSection,
     NoteSlug,
     WorkBrief,
+)
+from noesis.bounded_context.notes.infrastructure.outbound.manifest import (
+    YamlManifestProviderAdapter,
 )
 from noesis.exceptions import (
     CuratorFailedError,
@@ -43,6 +51,95 @@ from noesis.shared_kernel.contracts import CommitRefContract, WorkBriefContract
 from noesis.shared_kernel.enums import SearchEngineEnum
 
 NOW: datetime = datetime(2026, 10, 30, 12, 0, tzinfo=UTC)
+ID_ALPHABET: str = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
+
+
+class DefaultManifestProvider(IManifestProvider):
+    """The packaged default manifest, with no user file."""
+
+    async def load(self) -> Manifest:
+        return await YamlManifestProviderAdapter(None).load()
+
+
+CROCKFORD: str = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
+
+
+def path_note_id(path: str) -> NoteId:
+    """A valid, stable `NoteId` derived from a note path, so fixtures need no generator."""
+    number: int = int.from_bytes(hashlib.sha256(path.encode("utf-8")).digest()[:16], "big")
+    chars: list[str] = []
+    for _ in range(26):
+        chars.append(CROCKFORD[number & 31])
+        number >>= 5
+    return NoteId(value="".join(reversed(chars)))
+
+
+def default_catalog() -> KindCatalog:
+    """The kind catalog of the packaged default manifest."""
+    return YamlManifestProviderAdapter(None).load_now().catalog()
+
+
+class SequentialIds(INoteIdGenerator):
+    """Ids `01ARZ3NDEKTSV4RRFFQ69G5FA<A, B, C...>`, one per call."""
+
+    def __init__(self) -> None:
+        self.issued: int = 0
+
+    def new_id(self) -> NoteId:
+        letter: str = ID_ALPHABET[10 + self.issued]
+        self.issued += 1
+        return NoteId(value=f"01ARZ3NDEKTSV4RRFFQ69G5FA{letter}")
+
+
+def a_scope(repository: str = "demo") -> NoteScope:
+    """The scope of a repository."""
+    return NoteScope.for_repository(repository)
+
+
+def a_content(
+    path: str = "repos/demo/decisions/use-ttl-cache.md",
+    *,
+    title: str = "Use a TTL cache",
+    kind: str = "decision",
+    origin: str = "manual",
+    updated: str | None = "2026-11-01",
+    content: str = "x",
+) -> NoteContentDto:
+    """A note's full content with sensible defaults."""
+    return NoteContentDto(
+        id=path_note_id(path).value,
+        scope="repo:demo",
+        path=path,
+        title=title,
+        kind=kind,
+        origin=origin,
+        updated=updated,
+        content=content,
+    )
+
+
+def a_summary(
+    path: str = "repos/demo/decisions/use-ttl-cache.md",
+    *,
+    id: str | None = None,
+    scope: str = "repo:demo",
+    title: str = "Use a TTL cache",
+    kind: str = "decision",
+    origin: str = "auto",
+    updated: str | None = "2026-10-30",
+    snippet: str = "Keep tokens in memory.",
+) -> NoteSummaryDto:
+    """A note summary with sensible defaults."""
+    return NoteSummaryDto(
+        id=id or path_note_id(path).value,
+        scope=scope,
+        path=path,
+        title=title,
+        kind=kind,
+        origin=origin,
+        updated=updated,
+        snippet=snippet,
+    )
 
 
 class FixedClock(IClock):
@@ -56,7 +153,7 @@ class FixedClock(IClock):
 
 
 class InMemoryNoteRepository(INoteRepository):
-    """Notes in a dict; `save` stages, the unit of work publishes on commit.
+    """Notes in a dict by path; `save` stages, the unit of work publishes on commit.
 
     `get_errors` scripts storage failures: each `get` pops and raises one while any remain.
     """
@@ -66,14 +163,16 @@ class InMemoryNoteRepository(INoteRepository):
         self.staged: dict[str, Note] = {}
         self.get_errors: list[NoteStorageError] = []
 
-    async def get(self, location: NoteLocation) -> Note | None:
+    async def get(self, path: NotePath) -> Note | None:
         if self.get_errors:
             raise self.get_errors.pop(0)
-        path: str = location.relative_path
-        return self.staged.get(path) or self.stored.get(path)
+        return self.staged.get(path.value) or self.stored.get(path.value)
+
+    async def exists(self, path: NotePath) -> bool:
+        return path.value in self.staged or path.value in self.stored
 
     async def save(self, note: Note) -> None:
-        self.staged[note.location.relative_path] = note
+        self.staged[note.path.value] = note
 
 
 class InMemoryNotesUnitOfWork(INotesUnitOfWork):
@@ -144,7 +243,9 @@ class InMemoryNoteReadRepository(INoteReadRepository):
         self.unreadable: tuple[str, ...] = tuple(unreadable)
         self.match_all: bool = match_all
 
-    async def search(self, text: str, *, area: NoteArea | None, limit: int) -> NoteSearchResultDto:
+    async def search(
+        self, text: str, *, scope: NoteScope | None, limit: int
+    ) -> NoteSearchResultDto:
         self.queries.append(text)
         self.limits.append(limit)
         words: list[str] = text.lower().split()
@@ -156,12 +257,20 @@ class InMemoryNoteReadRepository(INoteReadRepository):
         ]
         return NoteSearchResultDto(notes=tuple(hits[:limit]), backend=SearchEngineEnum.FILESYSTEM)
 
-    async def read_note(self, path: str, *, area: NoteArea | None) -> NoteContentDto:
+    async def find_active(self, scope: NoteScope, kind: NoteKind) -> list[NoteSummaryDto]:
+        return [n for n in self.notes if n.scope == scope.value and n.kind == kind.value]
+
+    async def find_by_id(self, note_id: NoteId) -> NoteSummaryDto | None:
+        return next((n for n in self.notes if n.id == note_id.value), None)
+
+    async def read_note(self, path: str, *, scope: NoteScope | None) -> NoteContentDto:
         self.read_paths.append(path)
         if path in self.unreadable:
             raise NoteStorageError(f"Cannot read the note {path}.", {"path": path})
         note: NoteSummaryDto = next(note for note in self.notes if note.path == path)
         return NoteContentDto(
+            id=note.id,
+            scope=note.scope,
             path=note.path,
             title=note.title,
             kind=note.kind,
@@ -171,7 +280,7 @@ class InMemoryNoteReadRepository(INoteReadRepository):
         )
 
     async def list_notes(
-        self, *, area: NoteArea | None, origin: NoteOriginEnum | None
+        self, *, scope: NoteScope | None, origin: NoteOriginEnum | None
     ) -> list[NoteSummaryDto]:
         return [note for note in self.notes if origin is None or note.origin == origin.value]
 
@@ -186,7 +295,7 @@ class ScriptedCurator(ICurator):
         self.briefs_seen: list[WorkBrief] = []
 
     async def judge(
-        self, brief: WorkBrief, related: Sequence[NoteSummaryDto]
+        self, brief: WorkBrief, related: Sequence[NoteSummaryDto], catalog: KindCatalog
     ) -> tuple[CurationDecision, ...]:
         self.calls += 1
         self.briefs_seen.append(brief)
@@ -255,7 +364,7 @@ class InMemoryApplyFailureLog(IApplyFailureLog):
         self,
         *,
         raw_payload: str,
-        area: NoteArea,
+        scope: NoteScope,
         commits: tuple[str, ...],
         session: str | None,
         errors: Sequence[str],
@@ -266,7 +375,7 @@ class InMemoryApplyFailureLog(IApplyFailureLog):
         self.records.append(
             {
                 "raw_payload": raw_payload,
-                "area": area.value,
+                "scope": scope.value,
                 "commits": commits,
                 "session": session,
                 "errors": list(errors),
@@ -298,15 +407,15 @@ def a_brief(repository: str = "demo", session_id: str = "abcd1234ef") -> WorkBri
 
 def a_draft(
     slug: str = "use-ttl-cache",
-    kind: NoteKindEnum = NoteKindEnum.DECISION,
+    kind: str = "decision",
     title: str = "Use a TTL cache",
 ) -> NoteDraft:
-    """A draft with one section of its kind."""
+    """A draft with one section."""
     return NoteDraft(
-        kind=kind,
+        kind=NoteKind(value=kind),
         slug=NoteSlug(value=slug),
         title=title,
-        sections=(NoteSection(heading=kind.required_sections[0], body="Keep tokens in memory."),),
+        sections=(NoteSection(heading="Decision", body="Keep tokens in memory."),),
     )
 
 
@@ -327,5 +436,33 @@ def a_decision(
 def a_note(origin: NoteOriginEnum = NoteOriginEnum.AUTO, slug: str = "use-ttl-cache") -> Note:
     """A stored note in `repos/demo`."""
     return Note.create(
-        area=NoteArea.for_repository("demo"), origin=origin, draft=a_draft(slug=slug), now=NOW
+        id=NoteId(value="01ARZ3NDEKTSV4RRFFQ69G5FAV"),
+        scope=a_scope(),
+        origin=origin,
+        path=NotePath(value=f"repos/demo/decisions/{slug}.md"),
+        draft=a_draft(slug=slug),
+        required_sections=("Decision", "Rationale"),
+        now=NOW,
+    )
+
+
+def note_file(
+    path: str,
+    *,
+    title: str,
+    kind: str = "decision",
+    origin: str = "manual",
+    updated: str = "2026-10-02",
+    body: str = "",
+    scope: str | None = None,
+) -> str:
+    """The Markdown of a noesis note at `path` (id derived from it, scope from its folder)."""
+    parts: list[str] = path.split("/")
+    if scope is None:
+        scope = f"{'repo' if parts[0] == 'repos' else 'topic'}:{parts[1]}"
+    heading: str = {"gotcha": "Symptom", "run": "Outcome"}.get(kind, "Decision")
+    return (
+        f"---\nnoesis:\n  id: {path_note_id(path).value}\n  scope: {scope}\n  kind: {kind}\n"
+        f"  origin: {origin}\n  sources: []\n  updated: {updated}\n---\n\n"
+        f"# {title}\n\n## {heading}\n\n{body}\n"
     )

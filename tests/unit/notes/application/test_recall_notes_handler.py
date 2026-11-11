@@ -2,7 +2,12 @@
 
 import pytest
 from pydantic import ValidationError
-from tests.support.notes_support import FixedClock, InMemoryNoteReadRepository
+from tests.support.notes_support import (
+    DefaultManifestProvider,
+    FixedClock,
+    InMemoryNoteReadRepository,
+    a_summary,
+)
 
 from noesis.bounded_context.notes.application.dtos import NoteSummaryDto, RecallDigestDto
 from noesis.bounded_context.notes.application.handlers.queries import (
@@ -24,10 +29,10 @@ def _note(
     updated: str | None = "2026-10-01",
     snippet: str = "",
 ) -> NoteSummaryDto:
-    return NoteSummaryDto(
-        path=f"repos/demo/{name}.md",
+    return a_summary(
+        f"repos/demo/{name}.md",
         title=f"Title {name}",
-        kind=kind,
+        kind=kind or "decision",
         origin=origin,
         updated=updated,
         snippet=snippet,
@@ -36,7 +41,9 @@ def _note(
 
 def _handler(*notes: NoteSummaryDto) -> tuple[RecallNotesHandler, InMemoryNoteReadRepository]:
     repository = InMemoryNoteReadRepository(notes)
-    return RecallNotesHandler(read_repository=repository, clock=FixedClock()), repository
+    return RecallNotesHandler(
+        read_repository=repository, manifest=DefaultManifestProvider(), clock=FixedClock()
+    ), repository
 
 
 def _size(digest: RecallDigestDto) -> int:
@@ -53,7 +60,7 @@ def _size(digest: RecallDigestDto) -> int:
 def test_query_defaults_and_bounds() -> None:
     query = RecallNotesQuery(task="fix the login cache")
 
-    assert (query.limit, query.budget_tokens, query.area) == (5, 1000, None)
+    assert (query.limit, query.budget_tokens, query.scope) == (5, 1000, None)
     for bad in (
         {"task": ""},
         {"task": "x", "limit": 0},
@@ -132,12 +139,12 @@ async def test_no_matches_is_an_empty_digest() -> None:
     assert (digest.entries, digest.considered, digest.omitted) == ((), 0, 0)
 
 
-async def test_a_preferred_area_ranks_first_without_hiding_the_rest() -> None:
-    mine = _note("a").model_copy(update={"path": "repos/mine/a.md"})
+async def test_a_preferred_scope_ranks_first_without_hiding_the_rest() -> None:
+    mine = _note("a").model_copy(update={"path": "repos/mine/a.md", "scope": "repo:mine"})
     handler, _ = _handler(_note("b"), mine)
 
     digest = await handler.handle(
-        RecallNotesQuery(synthesize=False, task="login cache", prefer_area="repos/mine")
+        RecallNotesQuery(synthesize=False, task="login cache", prefer_scope="repo:mine")
     )
 
     assert [entry.path for entry in digest.entries] == ["repos/mine/a.md", "repos/demo/b.md"]
@@ -182,6 +189,7 @@ async def test_budget_then_shortens_snippets_from_the_lowest_ranked() -> None:
     bare = _size(
         await RecallNotesHandler(
             read_repository=InMemoryNoteReadRepository([_note("0"), _note("1")]),
+            manifest=DefaultManifestProvider(),
             clock=FixedClock(),
         ).handle(RecallNotesQuery(synthesize=False, task="login cache"))
     )

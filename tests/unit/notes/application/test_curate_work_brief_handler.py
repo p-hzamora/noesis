@@ -2,16 +2,19 @@
 
 import pytest
 from tests.support.notes_support import (
+    DefaultManifestProvider,
     FixedClock,
     InMemoryNoteReadRepository,
     InMemoryNoteRepository,
     InMemoryNotesUnitOfWork,
     InMemoryParkedQueue,
     ScriptedCurator,
+    SequentialIds,
     a_brief,
     a_decision,
     a_draft,
     a_note,
+    a_summary,
 )
 
 from noesis.bounded_context.notes.application.dtos import CurationResultDto, NoteSummaryDto
@@ -55,9 +58,15 @@ class _World:
 
         self.handler = CurateWorkBriefHandler(
             apply=ApplyCurationHandler(
-                uow_factory=unit_of_work, clock=FixedClock(), policy=AutoCurationPolicy()
+                uow_factory=unit_of_work,
+                clock=FixedClock(),
+                policy=AutoCurationPolicy(),
+                manifest=DefaultManifestProvider(),
+                ids=SequentialIds(),
+                read_repository=self.read_repository,
             ),
             read_repository=self.read_repository,
+            manifest=DefaultManifestProvider(),
             curator=curator,
             queue=self.queue,
             clock=FixedClock(),
@@ -86,29 +95,22 @@ async def test_admitted_decisions_are_stored_and_skips_reported() -> None:
 
     result: CurationResultDto = await world.handler.handle(_command())
 
-    assert result.created == ("repos/demo/auto/decisions/use-ttl-cache.md",)
+    assert result.created == ("repos/demo/decisions/use-ttl-cache.md",)
     assert [(s.candidate, s.reason) for s in result.skipped] == [
         ("readme typo", "single instance, no shared state")
     ]
-    stored = world.repository.stored["repos/demo/auto/decisions/use-ttl-cache.md"]
-    assert stored.commits == ("8e6d3b5fe598c6bf",)
-    assert stored.session == "abcd1234"
+    stored = world.repository.stored["repos/demo/decisions/use-ttl-cache.md"]
+    assert [source.value for source in stored.sources] == [
+        "commit:8e6d3b5fe598c6bf",
+        "session:abcd1234",
+    ]
     assert world.units[0].commits == 1
 
 
 async def test_related_notes_are_searched_with_goal_and_commit_subjects_and_shown_to_the_curator() -> (
     None
 ):
-    related = [
-        NoteSummaryDto(
-            path="repos/demo/decisions/x.md",
-            title="x",
-            kind="decision",
-            origin="manual",
-            updated=None,
-            snippet="",
-        )
-    ]
+    related = [a_summary("repos/demo/decisions/x.md", title="x", origin="manual", updated=None)]
     world = _World(ScriptedCurator(()), related)
 
     await world.handler.handle(_command())
@@ -127,14 +129,18 @@ async def test_existing_auto_notes_are_updated_and_manual_ones_protected() -> No
             )
         )
     )
-    world.repository.stored["repos/demo/auto/decisions/use-ttl-cache.md"] = a_note()
+    world.repository.stored["repos/demo/decisions/use-ttl-cache.md"] = a_note()
     world.repository.stored["repos/demo/decisions/manual-topic.md"] = a_note(
         origin=NoteOriginEnum.MANUAL, slug="manual-topic"
     )
+    world.read_repository.notes += [
+        a_summary("repos/demo/decisions/use-ttl-cache.md"),
+        a_summary("repos/demo/decisions/manual-topic.md", origin="manual"),
+    ]
 
     result: CurationResultDto = await world.handler.handle(_command())
 
-    assert result.updated == ("repos/demo/auto/decisions/use-ttl-cache.md",)
+    assert result.updated == ("repos/demo/decisions/use-ttl-cache.md",)
     assert result.skipped[0].reason == "covered by repos/demo/decisions/manual-topic.md"
 
 
@@ -200,8 +206,8 @@ def _storage_error() -> NoteStorageError:
         "Wrote 1 of 2 note(s) through the Obsidian MCP before it failed: disk full",
         {
             "backend": "mcp",
-            "written": ["repos/demo/auto/decisions/a.md"],
-            "not_written": ["repos/demo/auto/decisions/b.md"],
+            "written": ["repos/demo/decisions/a.md"],
+            "not_written": ["repos/demo/decisions/b.md"],
         },
         next_steps=["Check NOESIS_OBSIDIAN_MCP_URL (`noesis doctor`)."],
     )
@@ -213,6 +219,7 @@ async def test_storage_failure_parks_the_brief_and_keeps_the_error_details(
 ) -> None:
     world = _World(ScriptedCurator((a_decision(),)))
     if failing_step == "lookup":
+        world.read_repository.notes.append(a_summary("repos/demo/decisions/use-ttl-cache.md"))
         world.repository.get_errors.append(_storage_error())
     else:
         world.commit_errors.append(_storage_error())
@@ -225,8 +232,8 @@ async def test_storage_failure_parks_the_brief_and_keeps_the_error_details(
     assert error.message.startswith("Storing the notes failed: Wrote 1 of 2 note(s)")
     assert error.metadata == {
         "backend": "mcp",
-        "written": ["repos/demo/auto/decisions/a.md"],
-        "not_written": ["repos/demo/auto/decisions/b.md"],
+        "written": ["repos/demo/decisions/a.md"],
+        "not_written": ["repos/demo/decisions/b.md"],
         "repository": "demo",
         "ticket": "ticket-1",
     }
@@ -261,7 +268,7 @@ async def test_retry_that_hits_a_storage_failure_keeps_the_ticket_then_succeeds(
         await retry.handle(RetryParkedCurationCommand(ticket="ticket-1"))
 
     assert raised.value.metadata["ticket"] == "ticket-1"
-    assert raised.value.metadata["written"] == ["repos/demo/auto/decisions/a.md"]
+    assert raised.value.metadata["written"] == ["repos/demo/decisions/a.md"]
     assert raised.value.next_steps[-1].endswith("`noesis notes retry ticket-1` again.")
     assert list(world.queue.parked) == ["ticket-1"]  # kept, and not parked a second time
 
@@ -275,7 +282,7 @@ async def test_a_dry_run_judges_and_reports_but_stores_nothing() -> None:
 
     result: CurationResultDto = await world.handler.handle(_command(dry_run=True))
 
-    assert result.created == ("repos/demo/auto/decisions/use-ttl-cache.md",)
+    assert result.created == ("repos/demo/decisions/use-ttl-cache.md",)
     assert world.curator.calls == 1
     assert world.repository.stored == {}
     assert world.units[0].commits == 0
@@ -295,6 +302,7 @@ async def test_a_dry_run_never_parks_a_failed_judgement() -> None:
 
 async def test_a_dry_run_does_not_park_when_reading_existing_notes_fails() -> None:
     world = _World(ScriptedCurator((a_decision(),)))
+    world.read_repository.notes.append(a_summary("repos/demo/decisions/use-ttl-cache.md"))
     world.repository.get_errors.append(NoteStorageError("vault unreadable"))
 
     with pytest.raises(NoteStorageError):

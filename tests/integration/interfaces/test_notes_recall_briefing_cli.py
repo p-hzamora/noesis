@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 from tests.support.fake_claude import briefing_envelope, write_fake_claude
 from tests.support.fake_obsidian_mcp import fake_obsidian_mcp, free_port
+from tests.support.notes_support import note_file
 
 from noesis.interfaces.cli import run
 from noesis.shared_kernel.domain import JsonObject
@@ -14,7 +15,7 @@ pytestmark = pytest.mark.integration
 
 PRIVACY = "repos/cv-generator/decisions/candidate-privacy.md"
 GROUNDING = "repos/cv-generator/decisions/cv-grounding.md"
-RUN = "repos/cv-generator/auto/runs/2026-11-06-knowledge-base.md"
+RUN = "repos/cv-generator/runs/2026-11-06-knowledge-base.md"
 OTHER = "repos/other/decisions/privacy.md"
 TASK = "Continue working on the cv-generator project while preserving candidate privacy and CV evidence grounding."
 BRIEFING: JsonObject = {
@@ -27,8 +28,8 @@ BRIEFING: JsonObject = {
 }
 
 
-def _note(title: str, updated: str, body: str) -> str:
-    return f"---\ntype: decision\ntitle: {title}\nupdated: {updated}\n---\n\n# {title}\n\n## Decision\n\n{body}\n"
+def _note(path: str, title: str, updated: str, body: str) -> str:
+    return note_file(path, title=title, updated=updated, body=body)
 
 
 @pytest.fixture
@@ -36,11 +37,13 @@ def vault(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     folder: Path = tmp_path / "vault"
     notes: dict[str, str] = {
         PRIVACY: _note(
-            "Candidate privacy", "2026-11-03", "Candidate data never leaves the machine."
+            PRIVACY, "Candidate privacy", "2026-11-03", "Candidate data never leaves the machine."
         ),
-        GROUNDING: _note("CV grounding", "2026-11-03", "Every CV claim cites evidence."),
-        RUN: _note("Knowledge base", "2026-11-06", "Implemented the cv-generator knowledge base."),
-        OTHER: _note("Other privacy", "2026-11-03", "Candidate privacy elsewhere."),
+        GROUNDING: _note(GROUNDING, "CV grounding", "2026-11-03", "Every CV claim cites evidence."),
+        RUN: _note(
+            RUN, "Knowledge base", "2026-11-06", "Implemented the cv-generator knowledge base."
+        ),
+        OTHER: _note(OTHER, "Other privacy", "2026-11-03", "Candidate privacy elsewhere."),
     }
     for relative, text in notes.items():
         (folder / relative).parent.mkdir(parents=True, exist_ok=True)
