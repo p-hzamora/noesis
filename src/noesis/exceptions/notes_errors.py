@@ -9,10 +9,10 @@ class InvalidNoteSlugError(DomainException):
     __error_code__ = "NOTES_001_INVALID_NOTE_SLUG"
 
 
-class InvalidNoteAreaError(DomainException):
-    """A note area is not a safe relative folder inside the vault."""
+class InvalidNoteScopeError(DomainException):
+    """A note scope is not `repo:<name>` or `topic:<name>` with a safe name."""
 
-    __error_code__ = "NOTES_002_INVALID_NOTE_AREA"
+    __error_code__ = "NOTES_002_INVALID_NOTE_SCOPE"
 
 
 class ManualNoteProtectedError(DomainException):
@@ -21,10 +21,28 @@ class ManualNoteProtectedError(DomainException):
     __error_code__ = "NOTES_003_MANUAL_NOTE_PROTECTED"
 
 
-class InvalidNoteLocationError(DomainException):
-    """A file path does not follow the vault's note layout."""
+class InvalidNotePathError(DomainException):
+    """A note path is not a safe relative Markdown path inside the vault."""
 
-    __error_code__ = "NOTES_004_INVALID_NOTE_LOCATION"
+    __error_code__ = "NOTES_004_INVALID_NOTE_PATH"
+
+
+class InvalidNoteIdError(DomainException):
+    """A note id is not a ULID."""
+
+    __error_code__ = "NOTES_005_INVALID_NOTE_ID"
+
+
+class InvalidNoteKindError(DomainException):
+    """A note kind name is not lowercase words joined by hyphens."""
+
+    __error_code__ = "NOTES_006_INVALID_NOTE_KIND"
+
+
+class InvalidNoteSourceRefError(DomainException):
+    """A note source reference is not `<type>:<id>`."""
+
+    __error_code__ = "NOTES_007_INVALID_NOTE_SOURCE_REF"
 
 
 class CuratorFailedError(InfrastructureException):
@@ -67,3 +85,15 @@ class NoRecallTermsError(ApplicationException):
     """A recall task has no keywords left once short words and stopwords are removed."""
 
     __error_code__ = "NOTES_204_NO_RECALL_TERMS"
+
+
+class InvalidManifestError(ApplicationException):
+    """A `noesis.yaml` manifest (or the merge of it with the default) breaks a rule."""
+
+    __error_code__ = "NOTES_205_INVALID_MANIFEST"
+
+
+class UnknownNoteKindError(ApplicationException):
+    """A note kind is not in the manifest's kind catalog."""
+
+    __error_code__ = "NOTES_206_UNKNOWN_NOTE_KIND"

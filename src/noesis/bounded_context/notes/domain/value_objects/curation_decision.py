@@ -4,7 +4,7 @@ from enum import StrEnum
 
 from noesis.shared_kernel.domain.value_objects import ValueObject
 
-from .note_kind_enum import NoteKindEnum
+from .note_kind import NoteKind
 from .note_section import NoteSection
 from .note_slug import NoteSlug
 
@@ -27,7 +27,7 @@ class NoteDraft(ValueObject):
         sections: Proposed sections (missing required ones are filled by the domain).
     """
 
-    kind: NoteKindEnum
+    kind: NoteKind
     slug: NoteSlug
     title: str
     sections: tuple[NoteSection, ...]

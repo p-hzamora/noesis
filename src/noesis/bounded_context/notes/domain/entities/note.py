@@ -5,12 +5,15 @@ from datetime import datetime
 from typing import Self
 
 from noesis.bounded_context.notes.domain.value_objects import (
-    NoteArea,
     NoteDraft,
-    NoteKindEnum,
-    NoteLocation,
+    NoteFrontmatter,
+    NoteId,
+    NoteKind,
     NoteOriginEnum,
+    NotePath,
+    NoteScope,
     NoteSection,
+    NoteSourceRef,
 )
 from noesis.exceptions import (
     ManualNoteProtectedError,
@@ -30,7 +33,7 @@ class NoteRevised(DomainEvent["Note"]):
 
 
 def _complete_sections(
-    kind: NoteKindEnum, sections: tuple[NoteSection, ...]
+    required_sections: tuple[str, ...], sections: tuple[NoteSection, ...]
 ) -> tuple[NoteSection, ...]:
     """Required sections first, in canonical order and spelling, `Not recorded` when absent; extras after."""
     by_heading: dict[str, NoteSection] = {
@@ -41,9 +44,9 @@ def _complete_sections(
             heading=heading,
             body=found.body if (found := by_heading.get(heading.casefold())) else NOT_RECORDED,
         )
-        for heading in kind.required_sections
+        for heading in required_sections
     ]  # canonical heading spelling, whatever casing the draft used
-    required_keys: set[str] = {heading.casefold() for heading in kind.required_sections}
+    required_keys: set[str] = {heading.casefold() for heading in required_sections}
     extras: list[NoteSection] = [
         s for s in sections if s.heading.strip().casefold() not in required_keys
     ]
@@ -52,97 +55,106 @@ def _complete_sections(
 
 @dataclass(slots=True, kw_only=True)
 class Note(AggregateRoot["Note"]):
-    """A note with its location, title, sections and provenance.
+    """A note with its identity, title, sections and provenance.
 
     Invariants: the required sections of its kind are always present, and a note written
-    by a person (`origin: manual`) is never changed by automated curation.
+    by a person (`origin: manual`) is never changed by automated curation. Its identity is
+    its id, never its path: the file may be moved without changing the note.
 
     Attributes:
-        location: Where the note lives; also its identity.
+        id: Stable id, kept in the frontmatter.
+        scope: Repository or topic the note belongs to.
+        kind: What the note records.
+        origin: Who wrote it.
+        path: Where its file currently sits in the source.
         title: Human title, rendered as the `#` heading.
         sections: Body sections, required ones first.
-        tags: Free tags.
-        commits: Commit SHAs the knowledge came from (auto notes).
-        session: Short id of the session that produced it (auto notes).
+        sources: Where the knowledge came from (`commit:<sha>`, `session:<id>`).
     """
 
-    location: NoteLocation
+    id: NoteId
+    scope: NoteScope
+    kind: NoteKind
+    origin: NoteOriginEnum
+    path: NotePath
     title: str
     sections: tuple[NoteSection, ...]
-    tags: tuple[str, ...] = ()
-    commits: tuple[str, ...] = ()
-    session: str | None = None
-
-    @property
-    def id(self) -> str:
-        """Stable id: `auto-<kind>-<slug>` or `<kind>-<slug>`."""
-        prefix: str = "auto-" if self.is_auto else ""
-        return f"{prefix}{self.location.kind.value}-{self.location.slug.value}"
+    sources: tuple[NoteSourceRef, ...] = ()
 
     @property
     def is_auto(self) -> bool:
         """Whether noesis wrote it without a person in the loop."""
-        return self.location.origin is NoteOriginEnum.AUTO
+        return self.origin is NoteOriginEnum.AUTO
+
+    @property
+    def frontmatter(self) -> NoteFrontmatter:
+        """The identity block written at the top of its file."""
+        return NoteFrontmatter(
+            id=self.id,
+            scope=self.scope,
+            kind=self.kind,
+            origin=self.origin,
+            sources=self.sources,
+            updated=self.updated_at.date(),
+        )
 
     @classmethod
     def create(
         cls,
         *,
-        area: NoteArea,
+        id: NoteId,
+        scope: NoteScope,
         origin: NoteOriginEnum,
+        path: NotePath,
         draft: NoteDraft,
-        commits: tuple[str, ...] = (),
-        session: str | None = None,
+        required_sections: tuple[str, ...],
+        sources: tuple[NoteSourceRef, ...] = (),
         now: datetime,
     ) -> Self:
         """Create a note from a draft, completing its required sections.
 
         Args:
-            area: Vault folder the note belongs to.
+            id: The new note's id.
+            scope: Repository or topic the note belongs to.
             origin: Who is writing it.
+            path: Free path where its file will be written.
             draft: Kind, slug, title and proposed sections.
-            commits: Commit SHAs the knowledge came from.
-            session: Short session id, for auto notes.
+            required_sections: Headings every note of the draft's kind has, in order.
+            sources: What the knowledge came from.
             now: Creation time.
 
         Returns:
             The new note, with a `NoteCreated` event pending.
         """
-        location = NoteLocation(area=area, origin=origin, kind=draft.kind, slug=draft.slug)
         note: Self = cls(
-            location=location,
+            id=id,
+            scope=scope,
+            kind=draft.kind,
+            origin=origin,
+            path=path,
             title=draft.title.strip(),
-            sections=_complete_sections(draft.kind, draft.sections),
-            tags=tuple(
-                dict.fromkeys(
-                    (
-                        draft.kind.value,
-                        *([area.repository] if area.repository else []),
-                        *(["auto"] if origin is NoteOriginEnum.AUTO else []),
-                    )
-                )
-            ),
-            commits=tuple(dict.fromkeys(commits)),
-            session=session,
+            sections=_complete_sections(required_sections, draft.sections),
+            sources=tuple(dict.fromkeys(sources)),
             created_at=now,
             updated_at=now,
         )
-        note._record(
-            NoteCreated(
-                aggregate_id=location.relative_path, payload={"path": location.relative_path}
-            )
-        )
+        note._record(NoteCreated(aggregate_id=id.value, payload={"path": path.value}))
         return note
 
     def revise(
-        self, draft: NoteDraft, *, commits: tuple[str, ...], session: str | None, now: datetime
+        self,
+        draft: NoteDraft,
+        *,
+        required_sections: tuple[str, ...],
+        sources: tuple[NoteSourceRef, ...],
+        now: datetime,
     ) -> None:
-        """Replace the content with a newer draft from automated curation.
+        """Replace the content with a newer draft from automated curation, in place.
 
         Args:
-            draft: New title and sections (kind and slug must match the note).
-            commits: Commit SHAs behind the revision; merged with the existing ones.
-            session: Short id of the revising session.
+            draft: New title and sections (the kind must match the note).
+            required_sections: Headings every note of this kind has, in order.
+            sources: References behind the revision; merged with the existing ones.
             now: Revision time.
 
         Raises:
@@ -150,17 +162,11 @@ class Note(AggregateRoot["Note"]):
         """
         if not self.is_auto:
             raise ManualNoteProtectedError(
-                f"{self.location.relative_path} was written by a person; automated curation may not change it.",
-                {"path": self.location.relative_path},
+                f"{self.path.value} was written by a person; automated curation may not change it.",
+                {"path": self.path.value},
             )
         self.title = draft.title.strip() or self.title
-        self.sections = _complete_sections(self.location.kind, draft.sections)
-        self.commits = tuple(dict.fromkeys((*self.commits, *commits)))
-        self.session = session or self.session
+        self.sections = _complete_sections(required_sections, draft.sections)
+        self.sources = tuple(dict.fromkeys((*self.sources, *sources)))
         self.updated_at = now
-        self._record(
-            NoteRevised(
-                aggregate_id=self.location.relative_path,
-                payload={"path": self.location.relative_path},
-            )
-        )
+        self._record(NoteRevised(aggregate_id=self.id.value, payload={"path": self.path.value}))

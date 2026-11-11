@@ -4,37 +4,31 @@ from pydantic import Field
 
 from noesis.shared_kernel.domain.value_objects import ValueObject
 
-from .note_kind_enum import NoteKindEnum
+from .note_kind import NoteKind
 from .note_origin_enum import NoteOriginEnum
 
 
 class RecallWeights(ValueObject):
     """Multipliers for the recall score; each factor is in (0, 1], 1 meaning no penalty.
 
-    Kinds weigh gotcha = decision > glossary > run. A note of unknown kind gets
-    `neutral_kind` instead. Recency halves every `recency_half_life_days` but never goes
+    Each kind has the weight its manifest entry declares (`kind_weights`); a note of an
+    unlisted kind gets `neutral_kind` instead. Recency halves every `recency_half_life_days` but never goes
     below `recency_floor`, so an old note is down-weighted, never dropped. A manual note
-    outweighs an auto one. A note outside the preferred area (the repository the work is in) is
+    outweighs an auto one. A note outside the preferred scope (the repository the work is in) is
     down-weighted by `elsewhere`, so the repository's own notes come first without hiding the rest.
 
     Attributes:
-        gotcha: Weight of a gotcha.
-        decision: Weight of a decision.
-        glossary: Weight of a glossary term.
-        run: Weight of a run outcome.
-        neutral_kind: Weight of a note with no kind.
+        kind_weights: Weight per kind name, from the manifest's kind catalog.
+        neutral_kind: Weight of a note whose kind is not in `kind_weights`.
         recency_half_life_days: Days after which the recency factor halves.
         recency_floor: Lowest recency factor; also used when the date is unknown.
         manual: Weight of a manual note.
         auto: Weight of an auto note.
-        elsewhere: Weight of a note outside the preferred area; unused when no area is preferred.
+        elsewhere: Weight of a note outside the preferred scope; unused when no scope is preferred.
         rank_decay: How fast the engine position loses weight: `1 / (1 + rank_decay * rank)`.
     """
 
-    gotcha: float = Field(default=1.0, gt=0, le=1)
-    decision: float = Field(default=1.0, gt=0, le=1)
-    glossary: float = Field(default=0.8, gt=0, le=1)
-    run: float = Field(default=0.6, gt=0, le=1)
+    kind_weights: dict[str, float] = Field(default_factory=dict)
     neutral_kind: float = Field(default=0.8, gt=0, le=1)
     recency_half_life_days: int = Field(default=90, gt=0)
     recency_floor: float = Field(default=0.3, gt=0, le=1)
@@ -43,19 +37,11 @@ class RecallWeights(ValueObject):
     elsewhere: float = Field(default=0.7, gt=0, le=1)
     rank_decay: float = Field(default=0.15, ge=0)
 
-    def kind_weight(self, kind: NoteKindEnum | None) -> float:
+    def kind_weight(self, kind: NoteKind | None) -> float:
         """The weight of `kind`; `neutral_kind` when it is unknown."""
-        match kind:
-            case NoteKindEnum.GOTCHA:
-                return self.gotcha
-            case NoteKindEnum.DECISION:
-                return self.decision
-            case NoteKindEnum.GLOSSARY:
-                return self.glossary
-            case NoteKindEnum.RUN:
-                return self.run
-            case None:
-                return self.neutral_kind
+        if kind is None:
+            return self.neutral_kind
+        return self.kind_weights.get(kind.value, self.neutral_kind)
 
     def origin_weight(self, origin: NoteOriginEnum) -> float:
         """The weight of a manual or an auto note."""

@@ -8,9 +8,12 @@ from noesis.bounded_context.notes.domain.entities import Note
 from noesis.bounded_context.notes.domain.value_objects import (
     CurationActionEnum,
     CurationDecision,
-    NoteArea,
     NoteDraft,
     NoteOriginEnum,
+    NotePath,
+    NotePlacement,
+    NoteScope,
+    NoteSourceRef,
 )
 
 
@@ -42,32 +45,33 @@ class CurationOutcome:
 class AutoCurationPolicy:
     """Applies a curator decision without a person in the loop.
 
-    Auto notes live only under `<area>/auto/`. A manual note on the same topic (same kind
-    and slug) always wins: the candidate is skipped as covered, never merged. CREATE and
-    UPDATE both upsert the auto note, so a curator that guesses the wrong verb cannot
-    duplicate or lose knowledge.
+    A manual note on the same topic (same scope, kind and slug) always wins: the candidate is
+    skipped as covered, never merged. CREATE and UPDATE both upsert the auto note, in place
+    and with its id kept, so a curator that guesses the wrong verb cannot duplicate or lose
+    knowledge. A note is never superseded: it is revised or created.
     """
 
     def apply(
         self,
         decision: CurationDecision,
         *,
-        area: NoteArea,
+        scope: NoteScope,
         existing_auto: Note | None,
-        existing_manual: Note | None,
-        commits: tuple[str, ...],
-        session: str | None,
+        manual_path: NotePath | None,
+        placement: NotePlacement | None,
+        sources: tuple[NoteSourceRef, ...],
         now: datetime,
     ) -> CurationOutcome:
         """Decide what to store for one decision.
 
         Args:
             decision: The curator's verdict.
-            area: Vault folder of the work's repository.
-            existing_auto: The auto note at the decision's location, if any.
-            existing_manual: A manual note with the same kind and slug, if any.
-            commits: Commit SHAs behind the work.
-            session: Short session id.
+            scope: Scope of the work's repository.
+            existing_auto: The auto note on the decision's topic, if any.
+            manual_path: Path of a manual note on the same topic, if any.
+            placement: Id, free path and required sections for the draft's kind; None when the
+                decision has no draft.
+            sources: Source references behind the work.
             now: Current time.
 
         Returns:
@@ -80,20 +84,22 @@ class AutoCurationPolicy:
                 candidate=decision.candidate,
                 reason=decision.reason,
             )
-        if draft is None:
+        if draft is None or placement is None:
             return CurationOutcome(
                 outcome=CurationOutcomeEnum.SKIPPED,
                 candidate=decision.candidate,
                 reason="malformed decision: no note draft",
             )
-        if existing_manual is not None:
+        if manual_path is not None:
             return CurationOutcome(
                 outcome=CurationOutcomeEnum.SKIPPED,
                 candidate=decision.candidate,
-                reason=f"covered by {existing_manual.location.relative_path}",
+                reason=f"covered by {manual_path.value}",
             )
         if existing_auto is not None:
-            existing_auto.revise(draft, commits=commits, session=session, now=now)
+            existing_auto.revise(
+                draft, required_sections=placement.required_sections, sources=sources, now=now
+            )
             return CurationOutcome(
                 outcome=CurationOutcomeEnum.UPDATED,
                 candidate=decision.candidate,
@@ -101,11 +107,13 @@ class AutoCurationPolicy:
                 note=existing_auto,
             )
         note = Note.create(
-            area=area,
+            id=placement.id,
+            scope=scope,
             origin=NoteOriginEnum.AUTO,
+            path=placement.path,
             draft=draft,
-            commits=commits,
-            session=session,
+            required_sections=placement.required_sections,
+            sources=sources,
             now=now,
         )
         return CurationOutcome(

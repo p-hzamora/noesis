@@ -6,7 +6,7 @@ from pydantic import Field
 
 from noesis.shared_kernel.domain.value_objects import ValueObject
 
-from .note_kind_enum import NoteKindEnum
+from .note_kind import NoteKind
 from .note_origin_enum import NoteOriginEnum
 
 
@@ -17,15 +17,15 @@ class RecallCandidate(ValueObject):
 
     Attributes:
         path: Vault-relative path; identifies the note.
-        kind: Note kind; None for a note outside the noesis layout.
+        kind: Note kind; None when the note's kind is unknown to the catalog.
         origin: Who wrote the note.
         updated: Last update date; None when unknown.
         rank: Position in the engine's answer, 0 is the best match.
-        preferred: False when an area is preferred and the note is outside it.
+        preferred: False when a scope is preferred and the note is outside it.
     """
 
     path: str
-    kind: NoteKindEnum | None
+    kind: NoteKind | None
     origin: NoteOriginEnum
     updated: date | None
     rank: int = Field(ge=0)

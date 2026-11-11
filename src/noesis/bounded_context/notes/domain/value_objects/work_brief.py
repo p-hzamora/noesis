@@ -7,7 +7,7 @@ and the shared contract stays plain, versioned data.
 
 from noesis.shared_kernel.domain.value_objects import ValueObject
 
-from .note_area import NoteArea
+from .note_scope import NoteScope
 
 SHORT_SESSION_LENGTH: int = 8
 
@@ -52,9 +52,9 @@ class WorkBrief(ValueObject):
     session_label: str = ""
 
     @property
-    def area(self) -> NoteArea:
-        """The vault area its notes belong to: the repository's."""
-        return NoteArea.for_repository(self.repository)
+    def scope(self) -> NoteScope:
+        """The scope its notes belong to: the repository's."""
+        return NoteScope.for_repository(self.repository)
 
     def search_text(self) -> str:
         """Text that finds the notes the curator should know about: goal and commit subjects."""
