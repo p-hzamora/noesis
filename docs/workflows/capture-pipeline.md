@@ -13,7 +13,7 @@ sequenceDiagram
     participant State as state dir<br/>capture/sessions, journal, briefs
     participant Cur as noesis notes curate<br/>(detached process)
     participant LLM as claude -p (curator)
-    participant Vault as vault repos/REPO/auto/
+    participant Vault as vault repos/REPO/
 
     Dev->>CC: noesis capture on --session S
     CC->>Cap: EnableCapture -> session S enabled

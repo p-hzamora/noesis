@@ -16,12 +16,12 @@ sequenceDiagram
     participant M as SecretRedactor / BriefingGrounder (services)
     participant A as IRecallAgent<br/>(NOESIS_RECALL_RUNTIME)
 
-    Cmd->>Cmd: area from --repo/--area; else the whole vault, preferring the cwd git repository's notes
-    Cmd->>H: RecallNotesQuery(task, area, prefer_area, limit, budget_tokens, synthesize)
+    Cmd->>Cmd: scope from --repo/--scope; else the whole vault, preferring the cwd git repository's notes
+    Cmd->>H: RecallNotesQuery(task, scope, prefer_scope, limit, budget_tokens, synthesize)
     H->>Q: task
     Q-->>H: one query per keyword (else NoRecallTermsError NOTES_204, exit 1)
     loop each query
-        H->>RR: search(query, area, min(limit*3, 10))
+        H->>RR: search(query, scope, min(limit*3, 10))
         RR-->>H: notes in engine order (+ backend)
     end
     H->>H: merge by reciprocal rank, rarer keywords weigh more
@@ -33,7 +33,7 @@ sequenceDiagram
         H-->>Cmd: RecallDigestDto, trimmed to the budget, no model
     else synthesis (default)
         loop top `limit` paths
-            H->>RR: read_note(path, area)
+            H->>RR: read_note(path, scope)
             RR-->>H: the whole note (an unreadable one becomes a warning)
         end
         H->>M: mask secrets, cut each note to its share of the input limit
@@ -103,11 +103,11 @@ Ties break by merged rank, then path. A note is only down-weighted, never droppe
   project settings, no hooks, no saved session and a spend cap (`--tools ""`,
   `--strict-mcp-config`, `--setting-sources ""`, `--no-session-persistence`,
   `--max-budget-usd`). It cannot search, read or write anything else.
-- **Scope.** With `--repo`/`--area`, only notes under that folder are read. Without them the whole
+- **Scope.** With `--repo`/`--scope`, only notes of that scope are read. Without them the whole
   vault is searched and notes under the cwd repository rank first (outside a git repository there
   is no preference); a scoped search that finds nothing says which folder it searched in
   `warnings`. `read_note` refuses `..`, absolute paths, hidden folders, non-Markdown files,
-  anything outside the area when one is set, and a symlink that leaves the vault.
+  anything outside the scope when one is set, and a symlink that leaves the vault.
 - **Secrets.** Private-key blocks, well-known token shapes (`sk-…`, `ghp_…`, `AKIA…`, `xox…`),
   bearer tokens and `password|secret|token|api_key = value` assignments become `[REDACTED]` before
   sending, and the count is reported as a warning. This is a safety net, not a guarantee: a secret
@@ -160,7 +160,7 @@ only passes it on. The model the CLI reports is shown as `briefing.model`.
 
 ## Flags and output
 
-`--limit` (1..20, default 5), `--budget-tokens` (default 1000, `0` none), `--repo`/`--area`,
+`--limit` (1..20, default 5), `--budget-tokens` (default 1000, `0` none), `--repo`/`--scope`,
 `--synthesis/--no-synthesis`, `--json`.
 
 `--json` result:

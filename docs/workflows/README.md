@@ -1,7 +1,7 @@
 # Workflows per command
 
 What happens, layer by layer, when each `noesis` command runs. Read
-[architecture.md](../architecture.md) first for the folder layout; these pages follow the calls.
+[architecture.md](../architecture.md) first for the folder layout, and the [command reference](../commands/README.md) for options; these pages follow the calls.
 
 Legend used in every diagram:
 

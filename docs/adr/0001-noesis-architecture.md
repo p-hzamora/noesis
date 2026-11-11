@@ -4,6 +4,10 @@
 
 Accepted (2026-10-30).
 
+Note (2026-11-11): the note layout described below (areas such as `repos/<repo>`, `auto/`
+folders, `NoteArea`) is superseded. Notes are now identified by a `noesis:` frontmatter block,
+not by their path, and their folders come from a manifest (`noesis.yaml`). The rest of this ADR is unchanged.
+
 ## Context
 
 The capture logic lived in a Claude Code plugin (`hook-vault-log` in claude-flow) and

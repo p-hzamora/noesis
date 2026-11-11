@@ -13,8 +13,9 @@ installed noesis version. Use `noesis <command> --help` for anything not covered
   `--session` or `--parent`, a missing `--session`, `--parent` equal to the session, running
   outside a git repository).
 - Never guess commands or flags. If something is not in this guide, run `--help`.
-- Never edit files under a vault's `auto/` folders by hand. To record a note yourself, use
-  `notes apply` (below); noesis picks the path. Read the notes freely.
+- Never edit a note whose frontmatter says `origin: auto` by hand. To record a note yourself, use
+  `notes apply` (below); noesis picks the path. Read the notes freely. A note is identified by the
+  `noesis:` block in its frontmatter (id, scope, kind, origin), never by its folder.
 - Costly or settings-changing commands (`notes curate`, `notes apply`, `integrate … --yes`)
   only when the user asked for them. `--dry-run` on both shows the result without writing.
 
@@ -95,8 +96,8 @@ capture command is that stored id; passing it back as `--session` is stable.
 
 Every worktree of a repository is one repository: commits made in a linked worktree are
 captured (even when the hook reports the main checkout as the working directory), the brief
-records the branch the commit was made on, and the notes go to the main repository's area,
-`repos/<main repo folder name>/`. If two worktrees committed within two minutes and the command
+records the branch the commit was made on, and the notes go to the main repository's scope,
+`repo:<main repo folder name>`. If two worktrees committed within two minutes and the command
 does not say which one, noesis records neither and `capture runs` shows `ambiguous_worktree`:
 tell the user, and have them commit again.
 
@@ -149,7 +150,7 @@ task. It takes up to about a minute and calls a model, so run it once.
 - Pass one sentence about the task, not a pasted prompt. A sentence with no usable keyword fails
   with `NOTES_204_NO_RECALL_TERMS` (exit 1), a blank task with `INTERFACE_005_EMPTY_RECALL_TASK`
   (exit 2).
-- Without `--repo` or `--area` the repository you are in is used; outside a git repository it
+- Without `--repo` or `--scope` (`repo:<name>` or `topic:<name>`) the repository you are in is used; outside a git repository it
   fails with `INTERFACE_002_NOT_IN_GIT_REPOSITORY`.
 - Read `result.synthesis`:
   - `briefing`: use `result.briefing`. `constraints`, `decisions`, `gotchas` and `context` each
@@ -174,8 +175,9 @@ task. It takes up to about a minute and calls a model, so run it once.
 
 When the user asks you to record something in the vault, write the draft and let noesis store
 it. No curator runs. Run it from inside the repository: the note goes to
-`repos/<repo folder name>/auto/<kind>s/<slug>.md`, never anywhere else, and a manual note on
-the same topic is never touched (it is reported as skipped, `covered by <path>`).
+the path the vault's `noesis.yaml` layout gives (by default
+`repos/<repo folder name>/<kind folder>/<slug>.md`, with a `-2`, `-3` suffix instead of overwriting
+anything), and a manual note on the same topic is never touched (it is reported as skipped, `covered by <path>`).
 
 ```bash
 noesis notes apply --decisions-file draft.json --dry-run --json     # preview: paths, created/updated/skipped

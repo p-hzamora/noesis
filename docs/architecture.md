@@ -2,7 +2,8 @@
 
 noesis follows tactical DDD with a strict hexagonal (ports and adapters) layout, in the
 context-first topology described in ADR-0001. For what each command does step by step, see
-[workflows/](workflows/README.md).
+[workflows/](workflows/README.md); for each command's options and output, see
+[commands/](commands/README.md).
 
 ```text
 src/noesis/
@@ -42,14 +43,14 @@ WorkBriefContract ──► CurateWorkBriefHandler                  (`notes cura
                         ├─ WorkBriefMapper.to_domain(contract) -> WorkBrief      ACL into Notes' model
                         ├─ INoteReadRepository.search(brief.search_text())       related notes
                         ├─ ICurator.judge(brief, related)                        LLM judgment (retry once)
-                        └─ ApplyCurationHandler.handle(area, decisions, provenance)
+                        └─ ApplyCurationHandler.handle(scope, decisions, provenance)
                              ├─ AutoCurationPolicy.apply(decision, existing)     domain rules
                              └─ INotesUnitOfWork: notes.save(...) + commit       all or nothing
                       on repeated curator failure, or a storage failure (NoteStorageError):
                         IParkedCurationQueue.park -> `noesis notes retry`
 
 drafts written by a person or an agent ──► ApplyCurationHandler      (`notes apply`: no curator)
-                        area = git root of the cwd; strict parse; `--dry-run` skips save + commit
+                        scope = `repo:<git root name of the cwd>`; strict parse; `--dry-run` skips save + commit
                       on a rejected entry or a storage failure:
                         IApplyFailureLog.record(raw payload, errors) -> NOTES_203, kept for a second try
 ```
@@ -57,8 +58,10 @@ drafts written by a person or an agent ──► ApplyCurationHandler      (`not
 | Piece | Where | Notes |
 |---|---|---|
 | `Note` aggregate | `domain/entities/note.py` | Required sections per kind, canonical headings, `Not recorded` filler; manual notes cannot be revised by automation. |
-| `WorkBrief` | `domain/value_objects/work_brief.py`, `application/mappers/` | Notes' own copy of the brief, translated from the contract by `WorkBriefMapper`; owns the rules on it (area, search text, provenance). The contract stays data-only; the parked queue stores the contract so a retry re-enters through the command. |
-| `NoteLocation` | `domain/value_objects/` | Auto: `<area>/auto/<kind>s/<slug>.md`; manual: `<area>/<kind>s/<slug>.md`. |
+| `WorkBrief` | `domain/value_objects/work_brief.py`, `application/mappers/` | Notes' own copy of the brief, translated from the contract by `WorkBriefMapper`; owns the rules on it (scope, search text, provenance). The contract stays data-only; the parked queue stores the contract so a retry re-enters through the command. |
+| `NoteId`, `NoteScope`, `NoteKind`, `NotePath`, `NoteFrontmatter` | `domain/value_objects/` | Identity lives in the `noesis:` frontmatter block (ULID id, `repo:<name>`/`topic:<name>` scope, kind name, origin); `NotePath` is a free, safe relative path that carries no meaning. Kind membership is checked in the application against the manifest. |
+| `Manifest`, `KindCatalog`, `NotePathResolver` | `application/services/manifest/` | The merged `noesis.yaml` (packaged default under `infrastructure/outbound/manifest/` plus the vault's own): sources (exactly one primary), layout templates for new notes, kinds with folder, description, sections and recall weight. `YamlManifestProviderAdapter` is the only loader. |
+| `MultiSourceNoteReadRepositoryAdapter` | `infrastructure/outbound/storage/` | Fans recall out over the manifest's sources and fuses the rankings by note id (reciprocal rank, primary wins). The `vector` source is a stub behind `IVectorSearch`. |
 | `AutoCurationPolicy` | `domain/policies/` | Manual note on the same topic wins (`covered by <path>`); create/update both upsert the auto note. |
 | `ClaudeCliCuratorAdapter` | `infrastructure/outbound/curation/` | `claude -p --output-format json --json-schema` with no tools, no settings, no saved session, a budget cap; prompt on stdin; reads `structured_output`. The system prompt holds the admission rule; the adapter receives it as text from the composition root (`build_curator`), which reads `NOESIS_CURATOR_SYSTEM_PROMPT_FILE` or falls back to the packaged `prompts/curator_system.md` (`default_system_prompt()`). |
 | `ClaudeCliRecallAgentAdapter` | `infrastructure/outbound/recall/` | `IRecallAgent` for `notes recall`: `claude -p` with no tools, no MCP servers, no settings, no saved session, a budget cap; notes and task on stdin; reads `structured_output` (`recall_response_schema.py`). Packaged instructions in `prompts/recall_system.md`; `NOESIS_RECALL_MODEL` and `_EFFORT` go to the CLI verbatim; `build_recall_agent` picks the runtime. See [notes recall](workflows/notes-recall.md). |

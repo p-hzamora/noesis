@@ -54,12 +54,13 @@ Keep decisions with rationale, non-obvious gotchas, run outcomes, and glossary t
 reject anything the repository already records.
 
 **Note**:
-One Markdown document with frontmatter, of a kind (decision, gotcha, run, glossary) and an
-origin (manual or auto).
+One Markdown document whose `noesis:` frontmatter block (id, scope, kind, origin, sources,
+updated) is its identity; the folder it sits in means nothing. Kinds come from the manifest
+(`noesis.yaml`; defaults: decision, gotcha, howto, concept, run, glossary).
 
 **Auto note**:
-A note written by noesis without a person in the loop. Lives only under
-`<area>/auto/`, carries `origin: auto`, and never edits a manual note.
+A note written by noesis without a person in the loop. Carries `origin: auto`, is updated in
+place (same id) when the topic recurs, and never edits a manual note.
 
 **Recall**:
 Preparing for a task from the notes: search by keyword, read the best notes in full, and have the

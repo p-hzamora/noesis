@@ -16,12 +16,12 @@ sequenceDiagram
     participant Log as IApplyFailureLog<br/>(JsonFileApplyFailureLogAdapter)
 
     Cmd->>Git: repository root of the working directory
-    Git-->>Cmd: area repos/<repo> (else INTERFACE_002, exit 2, nothing read)
+    Git-->>Cmd: scope repo:<repo> (else INTERFACE_002, exit 2, nothing read)
     Cmd->>Cmd: read F or stdin (unreadable: one rejected entry)
     Cmd->>Par: raw text
     Par-->>Cmd: decisions + rejected entries (index, reason)
     Cmd->>Boot: vault only where files are used; no curator, no queue
-    Cmd->>H: ApplyCurationCommand(area, decisions, rejected, raw_payload, commits, session, dry_run)
+    Cmd->>H: ApplyCurationCommand(scope, decisions, rejected, raw_payload, commits, session, dry_run)
     alt any rejected entry
         H->>Log: record(raw payload, errors)  (not in --dry-run)
         H-->>Cmd: ApplyFailedError NOTES_203 (rejected, ticket, record_path, payload_path)
@@ -44,7 +44,7 @@ sequenceDiagram
 
 Rules worth knowing:
 
-- The path is never chosen by the caller: `repos/<repo folder>/auto/<kind>s/<slug>.md`.
+- The path is never chosen by the caller: the manifest layout (default `repos/<repo folder>/<kind folder>/<slug>.md`).
 - One malformed entry fails the whole call before anything is written; nothing is partly applied.
 - A failed call keeps the payload under `<state>/notes/apply-failed/`; if that cannot be written
   the payload is returned in `error.metadata.raw_payload`. Re-applying the kept payload is the

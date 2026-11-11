@@ -18,8 +18,8 @@ sequenceDiagram
     Cmd->>Boot: vault required only where files are used, system prompt resolved
     Cmd->>H: CurateWorkBriefCommand(brief, max_attempts=2, park=true, dry_run=false)
     H->>Map: to_domain(contract)
-    Map-->>H: WorkBrief (area, search_text, provenance)
-    H->>Read: search(brief.search_text(), area, limit=8)
+    Map-->>H: WorkBrief (scope, search_text, provenance)
+    H->>Read: search(brief.search_text(), scope, limit=8)
     Read-->>H: related NoteSummaryDto[]<br/>(never fails: MCP errors fall back to files)
     loop up to max_attempts
         H->>Cur: judge(brief, related)
@@ -29,7 +29,7 @@ sequenceDiagram
         H->>Q: park(contract, error) -> ticket
         H-->>Cmd: CurationFailedError (next step: notes retry ticket)
     else decisions
-        H->>A: ApplyCurationCommand(area, decisions, commits, session, dry_run)
+        H->>A: ApplyCurationCommand(scope, decisions, commits, session, dry_run)
         loop each decision
             A->>UoW: get existing auto note and manual note (from the writer's backend)
             A->>Pol: apply(decision, existing, commits, session)

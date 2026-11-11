@@ -38,7 +38,7 @@ flowchart LR
 `NOESIS_SEARCH_BACKEND` picks who answers `search` (default `filesystem`: no MCP call, no
 network). With `obsidian-mcp`:
 
-- `search` calls the MCP tool `search_simple`, keeps the hits under `--repo`/`--area`
+- `search` calls the MCP tool `search_simple`, keeps the hits under `--repo`/`--scope`
   (a folder prefix filter, so both backends return only `repos/R/` for `--repo R`), ranks by
   Obsidian's score, and reads each of the best `--limit` hits with `vault_read` to build the
   same `NoteSummaryDto` as the filesystem adapter. Notes outside the noesis layout (e.g.
