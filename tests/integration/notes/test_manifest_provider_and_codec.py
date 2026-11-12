@@ -29,9 +29,12 @@ ULID: str = "01ARZ3NDEKTSV4RRFFQ69G5FAV"
 async def test_packaged_default_is_the_single_source_of_kind_knowledge(tmp_path: Path) -> None:
     manifest = await YamlManifestProviderAdapter(tmp_path).load()
     catalog = manifest.catalog()
-    assert catalog.names() == ("decision", "gotcha", "howto", "concept", "run", "glossary")
+    assert catalog.names() == (
+        "decision", "gotcha", "howto", "concept", "run", "glossary", "drift", "dependency",
+    )  # fmt: skip
     assert catalog.recall_weights() == {
         "decision": 1.0, "gotcha": 1.0, "howto": 0.8, "concept": 0.8, "run": 0.6, "glossary": 0.8,
+        "drift": 0.8, "dependency": 0.6,
     }  # fmt: skip
     decision = catalog.require(NoteKind(value="decision"))
     assert decision.folder == "decisions" and decision.description
@@ -58,6 +61,8 @@ async def test_user_noesis_yaml_at_the_source_root_is_merged_on_the_default(tmp_
         "concept",
         "run",
         "glossary",
+        "drift",
+        "dependency",
         "recipe",
     )
     assert catalog.require(NoteKind(value="decision")).folder == "adr"
@@ -78,7 +83,7 @@ async def test_a_user_manifest_with_two_primaries_is_refused(tmp_path: Path) -> 
 
 async def test_no_vault_means_the_default_alone() -> None:
     manifest = await YamlManifestProviderAdapter(None).load()
-    assert len(manifest.kinds) == 6
+    assert len(manifest.kinds) == 8
 
 
 def test_frontmatter_round_trip() -> None:
@@ -126,3 +131,22 @@ def test_render_keeps_extra_keys_before_the_noesis_block_and_dates_as_dates() ->
     text = codec.render(frontmatter, "body\n", header)
     assert text.startswith("---\ntags:\n- a\n- b\ncreated: 2026-01-02\nnoesis:\n  id: " + ULID)
     assert text.count("noesis:") == 1
+
+
+async def test_drift_and_dependency_kinds_have_their_folders_and_sections() -> None:
+    catalog = (await YamlManifestProviderAdapter(None).load()).catalog()
+    drift = catalog.require(NoteKind(value="drift"))
+    dependency = catalog.require(NoteKind(value="dependency"))
+    assert (drift.folder, dependency.folder) == ("drift", "dependencies")
+    assert "diverg" in drift.description and "reconcile" in drift.description
+    assert "depends on" in dependency.description
+    assert drift.sections and dependency.sections
+
+
+def test_codec_flags_a_header_it_cannot_read_instead_of_hiding_it() -> None:
+    codec = YamlFrontmatterCodecAdapter()
+    assert codec.parse("---\nkey: [unclosed\n---\nbody\n").malformed_header
+    assert codec.parse("---\n- a list\n---\nbody\n").malformed_header
+    assert codec.parse("---\nno closing line\n").malformed_header
+    assert not codec.parse("---\ntags: [a]\n---\nbody\n").malformed_header
+    assert not codec.parse("# no header\n").malformed_header
