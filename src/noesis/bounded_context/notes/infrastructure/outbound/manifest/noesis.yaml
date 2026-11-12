@@ -47,3 +47,17 @@ kinds:
     description: A term the project uses with a specific meaning, and the words to avoid for it.
     sections: [Definition, Avoid]
     recall_weight: 0.8
+  - name: drift
+    folder: drift
+    description: >-
+      A recorded divergence between a repository's actual state and its intended design or
+      contracts: what drifted and how to reconcile it.
+    sections: [What drifted, Reconciliation]
+    recall_weight: 0.8
+  - name: dependency
+    folder: dependencies
+    description: >-
+      What a repository depends on and what depends on it, with versions or contracts where
+      relevant.
+    sections: [Depends on, Depended on by]
+    recall_weight: 0.6

@@ -11,12 +11,15 @@ from .parsed_document_dto import ParsedDocumentDto
 from .recall_briefing_dto import BriefingItemDto, RecallBriefingDto
 from .recall_digest_dto import RecallDigestDto
 from .recall_entry_dto import RecallEntryDto
+from .vault_diagnosis_dto import DuplicateProjectDto, VaultDiagnosisDto
+from .vault_migration_dto import VaultMigrationDto
 from .vector_hit_dto import VectorHitDto
 
 __all__ = [
     "ApplyFailureRecordDto",
     "BriefingItemDto",
     "CurationResultDto",
+    "DuplicateProjectDto",
     "NoteContentDto",
     "NoteListDto",
     "NoteSearchResultDto",
@@ -30,5 +33,7 @@ __all__ = [
     "RejectedEntryDto",
     "SkippedCandidateDto",
     "SkippedFileDto",
+    "VaultDiagnosisDto",
+    "VaultMigrationDto",
     "VectorHitDto",
 ]

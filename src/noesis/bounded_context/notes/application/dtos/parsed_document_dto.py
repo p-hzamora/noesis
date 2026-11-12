@@ -14,8 +14,11 @@ class ParsedDocumentDto(BaseDto):
             own survive a rewrite.
         body: Everything after the header block, byte for byte (the whole text when there is
             no header).
+        malformed_header: Whether the text opens with a `---` header that cannot be read as a
+            YAML mapping (a file rewritten around it would keep two headers or lose one).
     """
 
     frontmatter: NoteFrontmatter | None
     header: dict[str, JsonValue]
     body: str
+    malformed_header: bool = False

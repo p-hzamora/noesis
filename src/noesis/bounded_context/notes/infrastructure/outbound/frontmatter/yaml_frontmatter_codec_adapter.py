@@ -65,17 +65,23 @@ class YamlFrontmatterCodecAdapter(IFrontmatterCodec):
         """Split `text`; see `IFrontmatterCodec.parse`."""
         match: re.Match[str] | None = HEADER_PATTERN.match(text)
         if match is None:
-            return ParsedDocumentDto(frontmatter=None, header={}, body=text)
+            return ParsedDocumentDto(
+                frontmatter=None, header={}, body=text, malformed_header=text.startswith("---")
+            )
+        malformed: bool = False
         try:
             loaded: object = yaml.safe_load(match.group("yaml"))
         except yaml.YAMLError:
-            loaded = None
+            loaded, malformed = None, True
+        if loaded is not None and not isinstance(loaded, dict):
+            malformed = True
         raw: dict[str, Any] = loaded if isinstance(loaded, dict) else {}
         header: dict[str, JsonValue] = {str(key): _jsonable(value) for key, value in raw.items()}
         return ParsedDocumentDto(
             frontmatter=self._frontmatter(raw.get(BLOCK_KEY)),
             header=header,
             body=match.group("body"),
+            malformed_header=malformed,
         )
 
     @staticmethod

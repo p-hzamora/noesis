@@ -97,3 +97,21 @@ class UnknownNoteKindError(ApplicationException):
     """A note kind is not in the manifest's kind catalog."""
 
     __error_code__ = "NOTES_206_UNKNOWN_NOTE_KIND"
+
+
+class InvalidMigrationPlanError(ApplicationException):
+    """A vault migration plan is malformed, or does not fit the vault it is applied to."""
+
+    __error_code__ = "NOTES_207_INVALID_MIGRATION_PLAN"
+
+
+class MigrationConflictError(ApplicationException):
+    """A migration target already exists with different content; nothing was written."""
+
+    __error_code__ = "NOTES_208_MIGRATION_CONFLICT"
+
+
+class MigrationVerificationError(InfrastructureException):
+    """A written migration target does not match its source; no source file was deleted."""
+
+    __error_code__ = "NOTES_104_MIGRATION_VERIFICATION_FAILED"
