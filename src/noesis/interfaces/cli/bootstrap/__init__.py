@@ -35,11 +35,13 @@ from .notes_handlers_builder import (
     require_vault,
 )
 from .obsidian_mcp_client_builder import build_obsidian_mcp_client
+from .vault_handlers_builder import VaultHandlers, build_vault
 
 __all__ = [
     "AgentHooksHandlers",
     "CaptureHandlers",
     "NotesHandlers",
+    "VaultHandlers",
     "APPLY_FAILED_FOLDER",
     "CAPTURE_FOLDER",
     "DOCTOR_UPDATE_TIMEOUT_SECONDS",
@@ -54,6 +56,7 @@ __all__ = [
     "build_notes",
     "build_obsidian_mcp_client",
     "build_update_check",
+    "build_vault",
     "build_unit_of_work_factory",
     "curator_command",
     "curator_system_prompt",

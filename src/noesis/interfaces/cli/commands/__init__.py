@@ -8,6 +8,7 @@ from .integrate_commands import integrate_app
 from .notes_commands import notes_app
 from .skills_commands import skills_app
 from .update_commands import update_app
+from .vault_commands import vault_app
 
 __all__ = [
     "capture_app",
@@ -18,4 +19,5 @@ __all__ = [
     "notes_app",
     "skills_app",
     "update_app",
+    "vault_app",
 ]

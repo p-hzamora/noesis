@@ -41,6 +41,7 @@ from .recall_response import (
 from .skill_guide_response import SkillGuideListResponse, SkillGuideResponse
 from .success_response import SuccessResponse
 from .update_check_response import UpdateCheckResponse
+from .vault_response import DuplicateProjectResponse, VaultDoctorResponse, VaultMigrationResponse
 
 __all__ = [
     "CaptureRunListResponse",
@@ -51,6 +52,7 @@ __all__ = [
     "CurationPreviewResponse",
     "CurationResponse",
     "DoctorCheckResponse",
+    "DuplicateProjectResponse",
     "DoctorResponse",
     "ErrorDetail",
     "ErrorResponse",
@@ -74,4 +76,6 @@ __all__ = [
     "SkippedCandidateResponse",
     "SuccessResponse",
     "UpdateCheckResponse",
+    "VaultDoctorResponse",
+    "VaultMigrationResponse",
 ]
