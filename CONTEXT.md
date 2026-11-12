@@ -56,7 +56,7 @@ reject anything the repository already records.
 **Note**:
 One Markdown document whose `noesis:` frontmatter block (id, scope, kind, origin, sources,
 updated) is its identity; the folder it sits in means nothing. Kinds come from the manifest
-(`noesis.yaml`; defaults: decision, gotcha, howto, concept, run, glossary).
+(`noesis.yaml`; defaults: decision, gotcha, howto, concept, run, glossary, drift, dependency).
 
 **Auto note**:
 A note written by noesis without a person in the loop. Carries `origin: auto`, is updated in
@@ -80,3 +80,9 @@ instructions (`recall_system.md`) and not a work brief.
 The folder that stores notes (`NOESIS_VAULT_DIR`). An Obsidian vault is one kind of vault.
 
 _Avoid_: "brain" as a structural term; "writer" for the curator (it does not write).
+
+**Migration plan**:
+A JSON file of entries `{old, new, action, scope?, kind?}` that `noesis vault migrate` applies:
+`note` adds or refreshes the `noesis:` block and moves the file, `move` relocates it byte for
+byte, `keep` leaves it. noesis knows nothing about the old layout; a one-off generator writes
+the plan.

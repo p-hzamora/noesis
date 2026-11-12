@@ -8,6 +8,7 @@ layer, see [workflows](../workflows/README.md); for the ideas behind the CLI, se
 |---|---|
 | `capture on \| off \| status \| runs` | [capture.md](capture.md) |
 | `notes curate \| apply \| retry \| parked \| search \| recall \| list` | [notes.md](notes.md) |
+| `vault doctor \| migrate` | [vault.md](vault.md) |
 | `hook claude-code`, `integrate claude-code install \| uninstall \| status` | [agent-integration.md](agent-integration.md) |
 | `doctor`, `config show \| init`, `skills list \| get`, `update check` | [setup.md](setup.md) |
 
