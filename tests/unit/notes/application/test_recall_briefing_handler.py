@@ -30,7 +30,13 @@ TASK = "Continue the cv-generator project while preserving candidate privacy"
 
 def _note(path: str, title: str, snippet: str, *, kind: str = "decision") -> NoteSummaryDto:
     return a_summary(
-        path, title=title, kind=kind, origin="manual", updated="2026-11-01", snippet=snippet
+        path,
+        scope="repo:cv",
+        title=title,
+        kind=kind,
+        origin="manual",
+        updated="2026-11-01",
+        snippet=snippet,
     )
 
 

@@ -79,7 +79,7 @@ def test_recall_returns_a_ranked_digest_without_bodies(
     assert result["omitted"] == 0
     assert result["backend"] == "filesystem"
     first: JsonObject = result["entries"][0]  # type: ignore[index]
-    assert set(first) == {"kind", "title", "path", "date", "snippet"}
+    assert set(first) == {"id", "kind", "title", "path", "date", "snippet"}
     assert first["kind"] == "gotcha"
     assert first["title"] == "Cache stampede"
     assert first["date"] == "2026-10-20"

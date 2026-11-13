@@ -35,7 +35,7 @@ def _candidate(
     origin: NoteOriginEnum = NoteOriginEnum.MANUAL,
     updated: date | None = TODAY,
 ) -> RecallCandidate:
-    return RecallCandidate(path=path, kind=kind, origin=origin, updated=updated, rank=rank)
+    return RecallCandidate(note_id=path, kind=kind, origin=origin, updated=updated, rank=rank)
 
 
 def _rank(*candidates: RecallCandidate) -> tuple[str, ...]:
@@ -136,7 +136,7 @@ def test_every_candidate_comes_back() -> None:
         for i in range(30)
     ]
 
-    assert sorted(_rank(*candidates)) == sorted(c.path for c in candidates)
+    assert sorted(_rank(*candidates)) == sorted(c.note_id for c in candidates)
 
 
 def test_a_much_better_engine_rank_beats_a_better_kind() -> None:

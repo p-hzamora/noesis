@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 from tests.support.fake_claude import briefing_envelope, write_fake_claude
 from tests.support.fake_obsidian_mcp import fake_obsidian_mcp, free_port
-from tests.support.notes_support import note_file
+from tests.support.notes_support import note_file, path_note_id
 
 from noesis.interfaces.cli import run
 from noesis.shared_kernel.domain import JsonObject
@@ -81,7 +81,11 @@ def test_the_default_is_a_grounded_briefing_not_a_list_of_paths(
     briefing: JsonObject = result["briefing"]  # type: ignore[assignment]
     assert result["synthesis"] == "briefing"
     assert briefing["constraints"] == [
-        {"text": "Never send candidate data to a provider.", "sources": [PRIVACY]}
+        {
+            "text": "Never send candidate data to a provider.",
+            "sources": [PRIVACY],
+            "source_ids": [path_note_id(PRIVACY).value],
+        }
     ]
     assert briefing["decisions"][0]["sources"] == [GROUNDING]  # type: ignore[index]  # invented path dropped
     assert [item["text"] for item in briefing["unsupported"]] == ["Invented claim."]  # type: ignore[union-attr]

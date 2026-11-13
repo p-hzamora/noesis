@@ -35,7 +35,11 @@ def test_citations_to_notes_that_were_not_read_are_removed() -> None:
 
     checked = BriefingGrounder.ground(draft, NOTES)
 
-    assert checked.constraints == (_item("keep it private", A, B),)
+    assert checked.constraints == (
+        _item("keep it private", A, B).model_copy(
+            update={"source_ids": tuple(note.id for note in NOTES)}
+        ),
+    )
     assert checked.unsupported == ()
 
 
@@ -87,5 +91,25 @@ def test_markdown_separates_grounded_claims_from_inferences_and_lists_the_notes_
     assert "## Decisions\n\n_None stated in the notes._" in markdown
     assert "## Not covered by the notes\n\n- deployment" in markdown
     assert (
-        f"## Notes read\n\n- `{A}`: Note A (2026-11-01)\n- `{B}`: Note B (2026-11-01)" in markdown
+        f"## Notes read\n\n- `{A}`: Note A [ID: `{NOTES[0].id}`] (2026-11-01)\n- `{B}`: Note B [ID: `{NOTES[1].id}`] (2026-11-01)"
+        in markdown
     )
+
+
+def test_ids_and_legacy_paths_resolve_to_verified_ids_and_forged_ids_are_ignored() -> None:
+    draft = RecallBriefingDto(
+        summary="s",
+        constraints=(
+            BriefingItemDto(
+                text="Known", sources=(NOTES[0].id, A, "unknown"), source_ids=(NOTES[1].id,)
+            ),
+        ),
+        decisions=(BriefingItemDto(text="Forged", sources=(), source_ids=(NOTES[0].id,)),),
+    )
+
+    checked = BriefingGrounder.ground(draft, NOTES)
+
+    assert checked.constraints[0].sources == (A,)
+    assert checked.constraints[0].source_ids == (NOTES[0].id,)
+    assert checked.decisions == ()
+    assert checked.unsupported[0].source_ids == ()
