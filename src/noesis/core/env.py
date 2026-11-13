@@ -77,7 +77,7 @@ def load_environment(env_file: Path | None = None) -> Environment:
     capture: CaptureSettings | None = _load(CaptureSettings, path, problems)
     curator: CuratorSettings | None = _load(CuratorSettings, path, problems)
     recall: RecallSettings | None = _load(RecallSettings, path, problems)
-    if None in (runtime, notes, capture, curator, recall):
+    if runtime is None or notes is None or capture is None or curator is None or recall is None:
         raise InvalidConfigurationError(
             f"Invalid configuration in {path} or the environment.",
             {"env_file": str(path), "problems": problems},
