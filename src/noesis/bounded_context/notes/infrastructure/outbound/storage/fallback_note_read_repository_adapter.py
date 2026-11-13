@@ -20,6 +20,9 @@ from noesis.exceptions import ObsidianMcpError
 class FallbackNoteReadRepositoryAdapter(INoteReadRepository):
     """Searches with `preferred`; when it fails, searches with `fallback` instead.
 
+    `fails_with` names the errors that mean "preferred is unavailable" (Obsidian's MCP server
+    unreachable by default; a vectra collection that cannot answer for the vectra backend).
+
     After the first failure the preferred repository is not tried again by this instance, so
     one process pays the unreachable-server timeout once, and `on_fallback` fires once.
     """
@@ -29,11 +32,13 @@ class FallbackNoteReadRepositoryAdapter(INoteReadRepository):
         preferred: INoteReadRepository,
         fallback: INoteReadRepository,
         *,
-        on_fallback: Callable[[ObsidianMcpError], None],
+        on_fallback: Callable[[Exception], None],
+        fails_with: tuple[type[Exception], ...] = (ObsidianMcpError,),
     ) -> None:
         self._preferred: INoteReadRepository = preferred
         self._fallback: INoteReadRepository = fallback
-        self._on_fallback: Callable[[ObsidianMcpError], None] = on_fallback
+        self._on_fallback: Callable[[Exception], None] = on_fallback
+        self._fails_with: tuple[type[Exception], ...] = fails_with
         self._degraded: bool = False
 
     async def search(
@@ -46,7 +51,7 @@ class FallbackNoteReadRepositoryAdapter(INoteReadRepository):
         if not self._degraded:
             try:
                 return await self._preferred.search(text, scope=scope, limit=limit)
-            except ObsidianMcpError as error:
+            except self._fails_with as error:
                 self._degraded = True
                 self._on_fallback(error)
         return await self._fallback.search(text, scope=scope, limit=limit)
@@ -61,16 +66,18 @@ class FallbackNoteReadRepositoryAdapter(INoteReadRepository):
         """Always the fallback: lookups never go through Obsidian."""
         return await self._fallback.find_active(scope, kind)
 
-    async def find_by_id(self, note_id: NoteId) -> NoteSummaryDto | None:
+    async def find_by_id(
+        self, note_id: NoteId, *, scope: NoteScope | None
+    ) -> NoteSummaryDto | None:
         """Always the fallback: lookups never go through Obsidian."""
-        return await self._fallback.find_by_id(note_id)
+        return await self._fallback.find_by_id(note_id, scope=scope)
 
     async def read_note(self, path: str, *, scope: NoteScope | None) -> NoteContentDto:
         """The preferred repository's note, or the fallback's when it is unavailable."""
         if not self._degraded:
             try:
                 return await self._preferred.read_note(path, scope=scope)
-            except ObsidianMcpError as error:
+            except self._fails_with as error:
                 self._degraded = True
                 self._on_fallback(error)
         return await self._fallback.read_note(path, scope=scope)

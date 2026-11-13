@@ -36,7 +36,9 @@ class UnavailableNoteReadRepositoryAdapter(INoteReadRepository):
         """No files to look in, so nothing is known: curation proceeds without duplicates check."""
         return []
 
-    async def find_by_id(self, note_id: NoteId) -> NoteSummaryDto | None:
+    async def find_by_id(
+        self, note_id: NoteId, *, scope: NoteScope | None
+    ) -> NoteSummaryDto | None:
         return None
 
     async def read_note(self, path: str, *, scope: NoteScope | None) -> NoteContentDto:

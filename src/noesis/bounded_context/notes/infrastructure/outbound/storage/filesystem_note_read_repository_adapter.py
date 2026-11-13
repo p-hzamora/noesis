@@ -95,10 +95,12 @@ class FilesystemNoteReadRepositoryAdapter(INoteReadRepository):
         """The notes of `scope` and `kind`, sorted by path."""
         return [note.summary for note in self._notes(scope) if note.summary.kind == kind.value]
 
-    async def find_by_id(self, note_id: NoteId) -> NoteSummaryDto | None:
-        """The note with this id, wherever its file is."""
+    async def find_by_id(
+        self, note_id: NoteId, *, scope: NoteScope | None
+    ) -> NoteSummaryDto | None:
+        """The note with this id, wherever its file is, when it belongs to `scope`."""
         return next(
-            (note.summary for note in self._notes(None) if note.summary.id == note_id.value), None
+            (note.summary for note in self._notes(scope) if note.summary.id == note_id.value), None
         )
 
     async def read_note(self, path: str, *, scope: NoteScope | None) -> NoteContentDto:

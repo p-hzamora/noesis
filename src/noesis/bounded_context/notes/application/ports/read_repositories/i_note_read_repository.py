@@ -44,8 +44,15 @@ class INoteReadRepository(abc.ABC):
         ...
 
     @abc.abstractmethod
-    async def find_by_id(self, note_id: NoteId) -> NoteSummaryDto | None:
-        """The note with this id wherever its file is, or None."""
+    async def find_by_id(
+        self, note_id: NoteId, *, scope: NoteScope | None
+    ) -> NoteSummaryDto | None:
+        """The note with this id wherever its file is, or None.
+
+        Args:
+            note_id: Id written in the note's frontmatter.
+            scope: When given, a note of another scope is not found.
+        """
         ...
 
     @abc.abstractmethod

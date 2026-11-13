@@ -7,10 +7,8 @@ from noesis.bounded_context.notes.application.dtos import (
     NoteContentDto,
     NoteSearchResultDto,
     NoteSummaryDto,
-    VectorHitDto,
 )
 from noesis.bounded_context.notes.application.ports.read_repositories import INoteReadRepository
-from noesis.bounded_context.notes.application.ports.vector import IVectorSearch
 from noesis.bounded_context.notes.application.services.manifest import (
     SourceRoleEnum,
     SourceSpec,
@@ -44,22 +42,20 @@ class SourceReader:
 class MultiSourceNoteReadRepositoryAdapter(INoteReadRepository):
     """Merges the sources' answers by note id; the primary's copy of a note wins.
 
+    Every source is an `INoteReadRepository` (files, Obsidian, a vectra collection), so a
+    vector index is one more reader whose ranking is fused with the others.
+
     Args:
         readers: The sources to read.
-        index: An optional vector index derived from the primary; its hits are resolved to notes
-            through the readers.
     """
 
-    def __init__(
-        self, readers: Sequence[SourceReader], *, index: IVectorSearch | None = None
-    ) -> None:
+    def __init__(self, readers: Sequence[SourceReader]) -> None:
         self._readers: list[SourceReader] = sorted(readers, key=lambda reader: not reader.primary)
-        self._index: IVectorSearch | None = index
 
     async def search(
         self, text: str, *, scope: NoteScope | None, limit: int
     ) -> NoteSearchResultDto:
-        """Fused ranking of every source's search (and of the index, when there is one)."""
+        """Fused ranking of every source's search."""
         rankings: list[RankedNotes] = []
         backend = None
         for reader in self._readers:
@@ -68,27 +64,11 @@ class MultiSourceNoteReadRepositoryAdapter(INoteReadRepository):
             )
             backend = backend or answer.backend
             rankings.append(RankedNotes(primary=reader.primary, notes=answer.notes))
-        if self._index is not None:
-            rankings.append(
-                RankedNotes(primary=False, notes=await self._indexed(text, scope, limit))
-            )
         if backend is None:
             raise NoteStorageError("No source is configured to search.", {})
         return NoteSearchResultDto(
             notes=tuple(fuse_rankings(rankings, limit=limit)), backend=backend
         )
-
-    async def _indexed(
-        self, text: str, scope: NoteScope | None, limit: int
-    ) -> list[NoteSummaryDto]:
-        assert self._index is not None  # noqa: S101 - narrowed by the caller
-        notes: list[NoteSummaryDto] = []
-        hits: tuple[VectorHitDto, ...] = await self._index.search(text, limit)
-        for hit in sorted(hits, key=lambda item: item.rank):
-            found: NoteSummaryDto | None = await self.find_by_id(NoteId(value=hit.id))
-            if found is not None and (scope is None or found.scope == scope.value):
-                notes.append(found)
-        return notes
 
     async def list_notes(
         self, *, scope: NoteScope | None, origin: NoteOriginEnum | None
@@ -108,10 +88,12 @@ class MultiSourceNoteReadRepositoryAdapter(INoteReadRepository):
                 merged.setdefault(note.id, note)
         return list(merged.values())
 
-    async def find_by_id(self, note_id: NoteId) -> NoteSummaryDto | None:
+    async def find_by_id(
+        self, note_id: NoteId, *, scope: NoteScope | None
+    ) -> NoteSummaryDto | None:
         """The first source (primary first) that has the note."""
         for reader in self._readers:
-            found: NoteSummaryDto | None = await reader.repository.find_by_id(note_id)
+            found: NoteSummaryDto | None = await reader.repository.find_by_id(note_id, scope=scope)
             if found is not None:
                 return found
         return None

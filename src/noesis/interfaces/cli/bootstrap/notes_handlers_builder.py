@@ -59,13 +59,17 @@ from noesis.bounded_context.notes.infrastructure.outbound.storage import (
     ObsidianMcpNoteReadRepositoryAdapter,
     SourceReader,
     UnavailableNoteReadRepositoryAdapter,
+    VectraNoteReadRepositoryAdapter,
+    VectraNoteRepositoryAdapter,
+    VectraNotesUnitOfWorkAdapter,
 )
 from noesis.bounded_context.notes.infrastructure.outbound.storage.mappers import NoteMapper
-from noesis.bounded_context.notes.infrastructure.outbound.vector import StubVectorSearchAdapter
+from noesis.bounded_context.notes.infrastructure.outbound.vectra import VectraCliClient
 from noesis.core import Environment, RecallRuntimeEnum
 from noesis.exceptions import (
     CuratorPromptUnreadableError,
     InvalidConfigurationError,
+    NoteStorageError,
     VaultNotConfiguredError,
 )
 from noesis.shared_kernel.enums import SearchEngineEnum, WriterBackendEnum
@@ -77,6 +81,8 @@ PARKED_FOLDER: tuple[str, ...] = ("notes", "parked")
 APPLY_FAILED_FOLDER: tuple[str, ...] = ("notes", "apply-failed")
 CLAUDE_EFFORT_LEVELS: tuple[str, ...] = ("low", "medium", "high", "xhigh", "max")  # `claude --help`
 MCP_FALLBACK_NOTICE: str = "Obsidian MCP unreachable, searched files instead"
+VECTRA_FALLBACK_NOTICE: str = "vectra could not search, searched files instead"
+VECTRA_SYNC_NOTICE: str = "Notes written, but vectra could not index them; run `vectra sync`"
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -124,12 +130,15 @@ def require_vault(environment: Environment) -> Path:
 
 
 def needs_vault(environment: Environment) -> bool:
-    """Whether something still uses local files: the filesystem writer or filesystem search."""
+    """Whether something still uses local files: the filesystem or vectra writer or search.
+
+    Vectra indexes a folder, so its backends read and write the vault's files too.
+    """
     settings = environment.notes
-    return (
-        settings.writer_backend is WriterBackendEnum.FILESYSTEM
-        or settings.search_backend is SearchEngineEnum.FILESYSTEM
-    )
+    return settings.writer_backend in {
+        WriterBackendEnum.FILESYSTEM,
+        WriterBackendEnum.VECTRA,
+    } or settings.search_backend in {SearchEngineEnum.FILESYSTEM, SearchEngineEnum.VECTRA}
 
 
 def curator_system_prompt(environment: Environment) -> str:
@@ -256,8 +265,41 @@ def build_read_repository(
                 files,
                 on_fallback=lambda _error: notices.append(MCP_FALLBACK_NOTICE),
             )
+        case SearchEngineEnum.VECTRA:
+            if vault is None:
+                raise _vault_not_configured()
+            files = FilesystemNoteReadRepositoryAdapter(vault, mapper)
+            return _vectra_reader(
+                build_vectra_client(environment),
+                environment.notes.vectra_collection,
+                files,
+                notices,
+            )
         case _ as unhandled:
             assert_never(unhandled)
+
+
+def build_vectra_client(environment: Environment) -> VectraCliClient:
+    """The client of the `vectra` program (`NOESIS_VECTRA_BIN`, `NOESIS_VECTRA_TIMEOUT_SECONDS`)."""
+    return VectraCliClient(
+        vectra_bin=environment.notes.vectra_bin,
+        timeout_seconds=environment.notes.vectra_timeout_seconds,
+    )
+
+
+def _vectra_reader(
+    client: VectraCliClient,
+    collection: str,
+    files: INoteReadRepository,
+    notices: list[str],
+) -> INoteReadRepository:
+    """Semantic search in `collection`, degrading to `files` (one notice) when vectra fails."""
+    return FallbackNoteReadRepositoryAdapter(
+        VectraNoteReadRepositoryAdapter(client=client, collection=collection, files=files),
+        files,
+        on_fallback=lambda _error: notices.append(VECTRA_FALLBACK_NOTICE),
+        fails_with=(NoteStorageError,),
+    )
 
 
 def build_manifest_provider(vault: Path | None) -> YamlManifestProviderAdapter:
@@ -275,23 +317,31 @@ def with_declared_sources(
     manifest: Manifest,
     vault: Path | None,
     mapper: NoteMapper,
+    client: VectraCliClient | None = None,
+    notices: list[str] | None = None,
 ) -> INoteReadRepository:
-    """`primary` alone, or merged with the manifest's `read` sources and `index`.
+    """`primary` alone, or merged with the manifest's other sources.
 
-    The primary keeps following the environment (`NOESIS_SEARCH_BACKEND`). Extra sources are
-    read from their `path` (relative to the vault) as files. A `vector` source is the stub
-    until a real index adapter exists. Without a vault only the primary can be read.
+    The primary keeps following the environment (`NOESIS_SEARCH_BACKEND`). Every other source
+    is one more `INoteReadRepository`, whatever its role: a `filesystem` or `obsidian` source
+    reads its `path` (relative to the vault) as files; a `vector` source is the vectra
+    collection named after the source, indexing that same `path`, and degrades to its files
+    when vectra cannot answer. Without a vault, or without a `client` for a `vector` source,
+    the source is skipped. Their rankings are fused, primary first.
     """
     readers: list[SourceReader] = [SourceReader(manifest.primary(), primary)]
-    index: StubVectorSearchAdapter | None = None
     for spec in manifest.sources:
-        if spec.role is SourceRoleEnum.INDEX or spec.type is SourceTypeEnum.VECTOR:
-            index = StubVectorSearchAdapter()
-        elif spec.role is SourceRoleEnum.READ and vault is not None and spec.path:
-            readers.append(SourceReader(spec, _file_reader(vault, spec, mapper)))
-    if len(readers) == 1 and index is None:
+        if spec.role is SourceRoleEnum.PRIMARY or vault is None or not spec.path:
+            continue
+        files: INoteReadRepository = _file_reader(vault, spec, mapper)
+        if spec.type is SourceTypeEnum.VECTOR:
+            if client is None:
+                continue
+            files = _vectra_reader(client, spec.name, files, notices if notices is not None else [])
+        readers.append(SourceReader(spec, files))
+    if len(readers) == 1:
         return primary
-    return MultiSourceNoteReadRepositoryAdapter(readers, index=index)
+    return MultiSourceNoteReadRepositoryAdapter(readers)
 
 
 def _file_reader(vault: Path, spec: SourceSpec, mapper: NoteMapper) -> INoteReadRepository:
@@ -302,12 +352,14 @@ def _file_reader(vault: Path, spec: SourceSpec, mapper: NoteMapper) -> INoteRead
 
 
 def build_unit_of_work_factory(
-    environment: Environment, mapper: NoteMapper
+    environment: Environment, mapper: NoteMapper, notices: list[str] | None = None
 ) -> Callable[[], INotesUnitOfWork]:
     """The factory of units of work for `NOESIS_WRITER_BACKEND`.
 
     `filesystem` writes files under the vault (so it needs one, checked now, before the
-    curator spends budget); `mcp` writes through Obsidian's MCP server.
+    curator spends budget); `mcp` writes through Obsidian's MCP server; `vectra` writes the
+    files and then syncs them into `NOESIS_VECTRA_COLLECTION`, appending one notice to
+    `notices` when the sync fails (the notes are written all the same).
 
     Raises:
         VaultNotConfiguredError: The writer is `filesystem` and no vault is configured.
@@ -322,6 +374,20 @@ def build_unit_of_work_factory(
         case WriterBackendEnum.MCP:
             client = build_obsidian_mcp_client(environment)
             return lambda: McpNotesUnitOfWorkAdapter(McpNoteRepositoryAdapter(client, mapper))
+        case WriterBackendEnum.VECTRA:
+            root: Path = require_vault(environment)
+            vectra: VectraCliClient = build_vectra_client(environment)
+            collection: str = environment.notes.vectra_collection
+            sink: list[str] = notices if notices is not None else []
+            return lambda: VectraNotesUnitOfWorkAdapter(
+                VectraNoteRepositoryAdapter(
+                    files=FilesystemNoteRepositoryAdapter(root, mapper),
+                    client=vectra,
+                    collection=collection,
+                    root=root,
+                    on_sync_failure=lambda _error: sink.append(VECTRA_SYNC_NOTICE),
+                )
+            )
         case _ as unhandled:
             assert_never(unhandled)
 
@@ -371,6 +437,8 @@ def build_notes(environment: Environment, *, curator: ICurator | None = None) ->
         manifest.load_now(),
         vault,
         mapper,
+        build_vectra_client(environment),
+        notices,
     )
     queue = JsonFileParkedCurationQueueAdapter(
         environment.runtime.state_dir.joinpath(*PARKED_FOLDER)
@@ -378,7 +446,7 @@ def build_notes(environment: Environment, *, curator: ICurator | None = None) ->
 
     curate = CurateWorkBriefHandler(
         apply=ApplyCurationHandler(
-            uow_factory=build_unit_of_work_factory(environment, mapper),
+            uow_factory=build_unit_of_work_factory(environment, mapper, notices),
             clock=clock,
             policy=AutoCurationPolicy(),
             manifest=manifest,

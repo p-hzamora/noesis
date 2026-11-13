@@ -120,9 +120,11 @@ class ObsidianMcpNoteReadRepositoryAdapter(INoteReadRepository):
         """Delegated to the filesystem repository."""
         return await self._listing.find_active(scope, kind)
 
-    async def find_by_id(self, note_id: NoteId) -> NoteSummaryDto | None:
+    async def find_by_id(
+        self, note_id: NoteId, *, scope: NoteScope | None
+    ) -> NoteSummaryDto | None:
         """Delegated to the filesystem repository."""
-        return await self._listing.find_by_id(note_id)
+        return await self._listing.find_by_id(note_id, scope=scope)
 
     async def read_note(self, path: str, *, scope: NoteScope | None) -> NoteContentDto:
         """The note through `vault_read`, refused when it is not a note of `scope`.

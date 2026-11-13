@@ -1,4 +1,5 @@
-"""Note storage and reading: files (any folder, NFS, an Obsidian vault) and Obsidian's MCP server."""
+"""Note storage and reading: files (any folder, NFS, an Obsidian vault), Obsidian's MCP server
+and vectra collections."""
 
 from .fallback_note_read_repository_adapter import FallbackNoteReadRepositoryAdapter
 from .filesystem_note_read_repository_adapter import FilesystemNoteReadRepositoryAdapter
@@ -12,6 +13,9 @@ from .multi_source_note_read_repository_adapter import (
 )
 from .obsidian_mcp_note_read_repository_adapter import ObsidianMcpNoteReadRepositoryAdapter
 from .unavailable_note_read_repository_adapter import UnavailableNoteReadRepositoryAdapter
+from .vectra_note_read_repository_adapter import VectraNoteReadRepositoryAdapter
+from .vectra_note_repository_adapter import VectraNoteRepositoryAdapter
+from .vectra_notes_unit_of_work_adapter import VectraNotesUnitOfWorkAdapter
 
 __all__ = [
     "FallbackNoteReadRepositoryAdapter",
@@ -24,4 +28,7 @@ __all__ = [
     "ObsidianMcpNoteReadRepositoryAdapter",
     "SourceReader",
     "UnavailableNoteReadRepositoryAdapter",
+    "VectraNoteReadRepositoryAdapter",
+    "VectraNoteRepositoryAdapter",
+    "VectraNotesUnitOfWorkAdapter",
 ]

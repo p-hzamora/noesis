@@ -13,7 +13,6 @@ from .recall_digest_dto import RecallDigestDto
 from .recall_entry_dto import RecallEntryDto
 from .vault_diagnosis_dto import DuplicateProjectDto, VaultDiagnosisDto
 from .vault_migration_dto import VaultMigrationDto
-from .vector_hit_dto import VectorHitDto
 
 __all__ = [
     "ApplyFailureRecordDto",
@@ -35,5 +34,4 @@ __all__ = [
     "SkippedFileDto",
     "VaultDiagnosisDto",
     "VaultMigrationDto",
-    "VectorHitDto",
 ]

@@ -19,11 +19,13 @@ class NotesSettings(AppBaseSettings):
         vault_dir: Folder that holds the notes: an Obsidian vault, a plain folder, or an
             NFS mount (`NOESIS_VAULT_DIR`). None until the user configures it.
         search_backend: `filesystem` scans the Markdown files (default); `obsidian-mcp` asks
-            Obsidian's MCP server and falls back to files when it is unreachable
+            Obsidian's MCP server and falls back to files when it is unreachable; `vectra`
+            searches `vectra_collection` by meaning and falls back to files when vectra fails
             (`NOESIS_SEARCH_BACKEND`).
         writer_backend: `filesystem` writes the notes as files under `vault_dir` (default; point
             it at an NFS mount to write there); `mcp` stores them through Obsidian's MCP server,
-            using the `obsidian_mcp_*` settings (`NOESIS_WRITER_BACKEND`). Reads follow
+            using the `obsidian_mcp_*` settings; `vectra` writes the files and then syncs them
+            into `vectra_collection` (`NOESIS_WRITER_BACKEND`). Reads follow
             `search_backend`, independent of the writer.
         obsidian_mcp_url: Obsidian MCP endpoint, for search and for the `mcp` writer
             (`NOESIS_OBSIDIAN_MCP_URL`).
@@ -31,6 +33,11 @@ class NotesSettings(AppBaseSettings):
             a secret: masked in `config show`, never logged.
         obsidian_mcp_timeout_seconds: Connect and per-call time limit; a closed Obsidian must
             not stall a search (`NOESIS_OBSIDIAN_MCP_TIMEOUT_SECONDS`).
+        vectra_bin: The `vectra` executable (`NOESIS_VECTRA_BIN`).
+        vectra_collection: Collection of the whole vault for the `vectra` search and writer
+            backends (`NOESIS_VECTRA_COLLECTION`); manifest `vector` sources use their own name.
+        vectra_timeout_seconds: Time limit for one `vectra search`; a slow index must not stall
+            recall, and one `vectra sync` (`NOESIS_VECTRA_TIMEOUT_SECONDS`).
     """
 
     model_config = SettingsConfigDict(env_prefix="NOESIS_")
@@ -41,6 +48,9 @@ class NotesSettings(AppBaseSettings):
     obsidian_mcp_url: str = DEFAULT_OBSIDIAN_MCP_URL
     obsidian_mcp_token: SecretStr | None = None
     obsidian_mcp_timeout_seconds: float = Field(default=5.0, gt=0)
+    vectra_bin: str = "vectra"
+    vectra_collection: str = "noesis"
+    vectra_timeout_seconds: float = Field(default=120.0, gt=0)
 
     @field_validator("vault_dir", mode="after")
     @classmethod
