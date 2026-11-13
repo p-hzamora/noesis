@@ -7,6 +7,7 @@ class RecallEntryDto(BaseDto):
     """A pointer to a note, never its body.
 
     Attributes:
+        id: Stable identity of the selected note.
         kind: Note kind name.
         title: Note title.
         path: Vault-relative path, to read the full note.
@@ -14,6 +15,7 @@ class RecallEntryDto(BaseDto):
         snippet: Start of the first section, possibly shortened to fit the budget.
     """
 
+    id: str
     kind: str
     title: str
     path: str

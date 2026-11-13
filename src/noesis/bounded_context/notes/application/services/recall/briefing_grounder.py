@@ -1,6 +1,6 @@
-"""Decides what a briefing may claim: only what the notes that were read back, as Markdown."""
+"""Checks citation identity against records read; does not verify semantic entailment."""
 
-from collections.abc import Collection, Sequence
+from collections.abc import Sequence
 
 from noesis.bounded_context.notes.application.dtos import (
     BriefingItemDto,
@@ -17,11 +17,11 @@ class BriefingGrounder:
 
     @staticmethod
     def ground(draft: RecallBriefingDto, notes: Sequence[NoteContentDto]) -> RecallBriefingDto:
-        """`draft` with every citation checked against `notes`, rendered as Markdown.
+        """`draft` with every citation resolved against `notes`.
 
-        Paths that are not among `notes` are removed. A constraint, decision, gotcha or context
-        item left with no citation is moved to `unsupported`: the briefing never presents a claim
-        as grounded unless a note that was read backs it. Open questions and inferences keep
+        IDs and unambiguous legacy paths resolve only to `notes`; other citations are removed.
+        A constraint, decision, gotcha or context item left with no citation is moved to `unsupported`: the briefing never presents a claim
+        as grounded unless it cites a note that was read. This does not verify claim truth. Open questions and inferences keep
         whatever valid paths they have, possibly none.
 
         Args:
@@ -29,25 +29,39 @@ class BriefingGrounder:
             notes: The notes the agent was given.
 
         Returns:
-            The checked briefing, with `markdown` set.
+            The checked briefing; call `markdown` separately to render it.
         """
-        read: frozenset[str] = frozenset(note.path for note in notes)
-        unsupported: list[BriefingItemDto] = list(draft.unsupported)
+        by_id: dict[str, NoteContentDto] = {note.id: note for note in notes}
+        references: dict[str, set[str]] = {}
+        for note in notes:
+            for reference in (note.id, note.path):
+                references.setdefault(reference, set()).add(note.id)
+        unsupported: list[BriefingItemDto] = [
+            item.model_copy(update={"sources": (), "source_ids": ()}) for item in draft.unsupported
+        ]
+
+        def resolve(item: BriefingItemDto) -> BriefingItemDto:
+            ids: dict[str, None] = {}
+            for source in item.sources:
+                matches: set[str] = references.get(source.strip().lstrip("/"), set())
+                if len(matches) == 1:
+                    ids.setdefault(next(iter(matches)), None)
+            return item.model_copy(
+                update={
+                    "sources": tuple(dict.fromkeys(by_id[note_id].path for note_id in ids)),
+                    "source_ids": tuple(ids),
+                }
+            )
 
         def grounded(items: Sequence[BriefingItemDto]) -> tuple[BriefingItemDto, ...]:
             kept: list[BriefingItemDto] = []
             for item in items:
-                sources: tuple[str, ...] = BriefingGrounder._valid(item.sources, read)
-                (kept if sources else unsupported).append(
-                    item.model_copy(update={"sources": sources})
-                )
+                checked_item: BriefingItemDto = resolve(item)
+                (kept if checked_item.source_ids else unsupported).append(checked_item)
             return tuple(kept)
 
         def loose(items: Sequence[BriefingItemDto]) -> tuple[BriefingItemDto, ...]:
-            return tuple(
-                item.model_copy(update={"sources": BriefingGrounder._valid(item.sources, read)})
-                for item in items
-            )
+            return tuple(resolve(item) for item in items)
 
         checked: RecallBriefingDto = draft.model_copy(
             update={
@@ -89,20 +103,15 @@ class BriefingGrounder:
         lines += [f"- {gap}" for gap in briefing.not_covered] or [_NONE_STATED]
         lines += ["", "## Notes read", ""]
         lines += [
-            f"- `{note.path}`: {note.title}" + (f" ({note.updated})" if note.updated else "")
+            f"- `{note.path}`: {note.title} [ID: `{note.id}`]"
+            + (f" ({note.updated})" if note.updated else "")
             for note in notes
         ]
         return "\n".join(lines) + "\n"
 
     @staticmethod
-    def _valid(sources: Collection[str], read: Collection[str]) -> tuple[str, ...]:
-        return tuple(
-            dict.fromkeys(
-                path.strip().lstrip("/") for path in sources if path.strip().lstrip("/") in read
-            )
-        )
-
-    @staticmethod
     def _bullet(item: BriefingItemDto) -> str:
         cited: str = ", ".join(f"`{path}`" for path in item.sources)
-        return f"- {item.text.strip()} [{cited}]" if cited else f"- {item.text.strip()}"
+        text: str = f"- {item.text.strip()} [{cited}]" if cited else f"- {item.text.strip()}"
+        identities: str = ", ".join(f"`{note_id}`" for note_id in item.source_ids)
+        return f"{text} (IDs: {identities})" if identities else text

@@ -26,6 +26,7 @@ from noesis.bounded_context.notes.application.services.recall import (
 )
 from noesis.bounded_context.notes.domain.policies import RecallRankingPolicy
 from noesis.bounded_context.notes.domain.value_objects import (
+    NoteId,
     NoteKind,
     NoteOriginEnum,
     NoteScope,
@@ -110,23 +111,23 @@ class RecallNotesHandler(IHandler[RecallNotesQuery, RecallDigestDto]):
         weights = RecallWeights(
             kind_weights=(await self._manifest.load()).catalog().recall_weights()
         )
-        by_path, backend = await self._search(queries, scope, action.limit)
+        by_id, backend = await self._search(queries, scope, action.limit)
         candidates: list[RecallCandidate] = [
             self._candidate(note, rank, action.prefer_scope)
-            for rank, note in enumerate(by_path.values())
+            for rank, note in enumerate(by_id.values())
         ]
         ranked: tuple[str, ...] = RecallRankingPolicy(weights).rank(
             candidates, today=self._clock.now().date()
         )
         if not action.synthesize:
             entries: list[RecallEntryDto] = [
-                self._entry(by_path[path]) for path in ranked[: action.limit]
+                self._entry(by_id[note_id]) for note_id in ranked[: action.limit]
             ]
             fitted: tuple[RecallEntryDto, ...] = self._fit(entries, action.budget_tokens)
             return RecallDigestDto(
                 entries=fitted,
-                considered=len(by_path),
-                omitted=len(by_path) - len(fitted),
+                considered=len(by_id),
+                omitted=len(by_id) - len(fitted),
                 backend=backend,
                 synthesis="digest",
                 warnings=self._scope_warning(scope) if not fitted else (),
@@ -140,7 +141,7 @@ class RecallNotesHandler(IHandler[RecallNotesQuery, RecallDigestDto]):
                 synthesis="no_evidence",
                 warnings=self._scope_warning(scope),
             )
-        return await self._brief(action, scope, by_path, ranked[: action.limit], backend)
+        return await self._brief(action, scope, by_id, ranked[: action.limit], backend)
 
     async def _search(
         self, queries: tuple[str, ...], scope: NoteScope | None, limit: int
@@ -159,20 +160,22 @@ class RecallNotesHandler(IHandler[RecallNotesQuery, RecallDigestDto]):
             )
             answers.append(found)
             weight: float = 1 / max(len(found.notes), 1)  # a keyword few notes have says more
-            for rank, path in enumerate(dict.fromkeys(note.path for note in found.notes)):
-                score[path] = score.get(path, 0.0) + weight / (RANK_FUSION_OFFSET + rank)
+            for rank, note_id in enumerate(dict.fromkeys(note.id for note in found.notes)):
+                score[note_id] = score.get(note_id, 0.0) + weight / (RANK_FUSION_OFFSET + rank)
             for note in found.notes:
-                seen.setdefault(note.path, note)
-        order: list[str] = sorted(score, key=lambda path: -score[path])  # stable: first seen wins
+                seen.setdefault(note.id, note)
+        order: list[str] = sorted(
+            score, key=lambda note_id: -score[note_id]
+        )  # stable: first seen wins
         # the last answer names who answered after any fallback; queries are never empty
-        return {path: seen[path] for path in order}, answers[-1].backend
+        return {note_id: seen[note_id] for note_id in order}, answers[-1].backend
 
     async def _brief(
         self,
         action: RecallNotesQuery,
         scope: NoteScope | None,
-        by_path: dict[str, NoteSummaryDto],
-        paths: tuple[str, ...],
+        by_id: dict[str, NoteSummaryDto],
+        ids: tuple[str, ...],
         backend: SearchEngineEnum,
     ) -> RecallDigestDto:
         if self._agent is None:
@@ -180,11 +183,16 @@ class RecallNotesHandler(IHandler[RecallNotesQuery, RecallDigestDto]):
                 "No recall agent is configured.", next_steps=["Use --no-synthesis."]
             )
         warnings: list[str] = []
-        notes: list[NoteContentDto] = await self._read(paths, scope, warnings)
+        notes: list[NoteContentDto] = await self._read(
+            tuple(by_id[note_id] for note_id in ids), scope, warnings
+        )
         if not notes:
             raise NoteStorageError(
-                f"Found {len(paths)} notes but could not read any of them.",
-                {"candidates": list(paths)},
+                f"Found {len(ids)} notes but could not read any of them.",
+                {
+                    "candidates": [by_id[note_id].path for note_id in ids],
+                    "candidate_ids": list(ids),
+                },
                 next_steps=["Check that the vault is reachable, or use --no-synthesis."],
             )
         try:
@@ -203,11 +211,13 @@ class RecallNotesHandler(IHandler[RecallNotesQuery, RecallDigestDto]):
             warnings.append(
                 f"{len(briefing.unsupported)} statements cited no note that was read and were set aside."
             )
-        entries: tuple[RecallEntryDto, ...] = tuple(self._entry(by_path[n.path]) for n in notes)
+        entries: tuple[RecallEntryDto, ...] = tuple(
+            self._entry(by_id[n.id].model_copy(update={"path": n.path})) for n in notes
+        )
         return RecallDigestDto(
             entries=entries,
-            considered=len(by_path),
-            omitted=len(by_path) - len(entries),
+            considered=len(by_id),
+            omitted=len(by_id) - len(entries),
             backend=backend,
             synthesis="briefing",
             briefing=briefing,
@@ -215,15 +225,18 @@ class RecallNotesHandler(IHandler[RecallNotesQuery, RecallDigestDto]):
         )
 
     async def _read(
-        self, paths: tuple[str, ...], scope: NoteScope | None, warnings: list[str]
+        self, selected: tuple[NoteSummaryDto, ...], scope: NoteScope | None, warnings: list[str]
     ) -> list[NoteContentDto]:
         """The notes in full, secrets masked and each cut to its share of the input limit."""
-        share: int = max(self._max_input_chars // len(paths), 1)
+        share: int = max(self._max_input_chars // len(selected), 1)
         notes: list[NoteContentDto] = []
         masked: int = 0
-        for path in paths:
+        for selected_note in selected:
+            path: str = selected_note.path
             try:
-                note: NoteContentDto = await self._read_repository.read_note(path, scope=scope)
+                note: NoteContentDto = await self._read_repository.read_by_id(
+                    NoteId(value=selected_note.id), scope=scope, path_hint=path
+                )
             except (NoteStorageError, ObsidianMcpError) as error:
                 warnings.append(f"Could not read {path}: {error.args[0]}")
                 continue
@@ -265,7 +278,7 @@ class RecallNotesHandler(IHandler[RecallNotesQuery, RecallDigestDto]):
         except ValueError:
             updated = None
         return RecallCandidate(
-            path=note.path,
+            note_id=note.id,
             kind=kind,
             origin=origin,
             updated=updated,
@@ -276,6 +289,7 @@ class RecallNotesHandler(IHandler[RecallNotesQuery, RecallDigestDto]):
     @staticmethod
     def _entry(note: NoteSummaryDto) -> RecallEntryDto:
         return RecallEntryDto(
+            id=note.id,
             kind=note.kind,
             title=note.title,
             path=note.path,

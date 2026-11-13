@@ -11,7 +11,7 @@ class RecallRankingPolicy:
 
     The score is `1 / (1 + rank_decay * rank)` times the kind, recency and origin weights, and
     times `elsewhere` for a note outside the preferred area.
-    Highest score first; ties break by the engine's rank, then by path, so the order is
+    Highest score first; ties break by the engine's rank, then by stable ID, so the order is
     deterministic. Pure: `today` is a parameter and nothing is read or written. A candidate
     is only down-weighted, never dropped.
     """
@@ -20,20 +20,20 @@ class RecallRankingPolicy:
         self._weights: RecallWeights = weights
 
     def rank(self, candidates: Iterable[RecallCandidate], *, today: date) -> tuple[str, ...]:
-        """Candidate paths, most worth recalling first.
+        """Candidate IDs, most worth recalling first.
 
         Args:
             candidates: The search hits.
             today: The date recency is measured against.
 
         Returns:
-            Every candidate's path, best first.
+            Every candidate's ID, best first.
         """
         scored: list[tuple[float, int, str]] = [
-            (-self._score(candidate, today), candidate.rank, candidate.path)
+            (-self._score(candidate, today), candidate.rank, candidate.note_id)
             for candidate in candidates
         ]
-        return tuple(path for _, _, path in sorted(scored))
+        return tuple(note_id for _, _, note_id in sorted(scored))
 
     def _score(self, candidate: RecallCandidate, today: date) -> float:
         weights: RecallWeights = self._weights

@@ -14,6 +14,7 @@ class RecallEntryResponse(FrozenObject):
     """A note worth reading, as listed by `noesis notes recall`; never its body.
 
     Attributes:
+        id: Stable note identity, independent of its source-relative path.
         kind: Note kind value; None for a note outside the noesis layout.
         title: Note title.
         path: Vault-relative path; read that file for the full note.
@@ -21,6 +22,7 @@ class RecallEntryResponse(FrozenObject):
         snippet: Start of the first section, possibly shortened to fit the budget.
     """
 
+    id: str
     kind: str | None
     title: str
     path: str
@@ -33,15 +35,17 @@ class BriefingItemResponse(FrozenObject):
 
     Attributes:
         text: The statement.
-        sources: Paths of the notes that support it (for an inference: the notes it builds on).
+        sources: Compatibility paths; may be ambiguous across sources.
+        source_ids: Verified identities of the cited notes.
     """
 
     text: str
     sources: tuple[str, ...]
+    source_ids: tuple[str, ...] = ()
 
 
 class RecallBriefingResponse(FrozenObject):
-    """The briefing an agent wrote from the notes it read, grounded in note paths.
+    """The briefing an agent wrote from the notes it read, grounded in verified note identities.
 
     Attributes:
         summary: What matters most for the task.

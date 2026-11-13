@@ -49,7 +49,7 @@ def render_user_prompt(task: str, notes: Sequence[NoteContentDto], target_tokens
     lines: list[str] = [f"Task: {task.strip()}", target, "", f"Notes ({len(notes)}):", ""]
     for note in notes:
         attributes: str = f'path="{note.path}" title="{note.title.replace(chr(34), chr(39))}"'
-        attributes += f' kind="{note.kind or "note"}" origin="{note.origin}"'
+        attributes += f' id="{note.id}" kind="{note.kind or "note"}" origin="{note.origin}"'
         if note.updated:
             attributes += f' updated="{note.updated}"'
         lines += [f"<note {attributes}>", _escaped(note.content), "</note>", ""]

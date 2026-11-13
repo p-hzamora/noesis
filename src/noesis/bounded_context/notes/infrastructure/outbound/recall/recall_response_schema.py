@@ -17,7 +17,7 @@ class RecallItemModel(_Strict):
     text: str = Field(description="One plain, specific statement.")
     sources: list[str] = Field(
         default_factory=list,
-        description="`path` of each note that states it, copied exactly from the note blocks.",
+        description="`id` of each note that states it, copied exactly from the note blocks.",
     )
 
 

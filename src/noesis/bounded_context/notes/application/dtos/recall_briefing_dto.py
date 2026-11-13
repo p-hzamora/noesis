@@ -9,14 +9,16 @@ class BriefingItemDto(BaseDto):
     Attributes:
         text: The statement.
         sources: Paths of the notes that support it (for an inference: the notes it builds on).
+        source_ids: Verified stable IDs, populated by grounding, never trusted from the agent.
     """
 
     text: str
     sources: tuple[str, ...]
+    source_ids: tuple[str, ...] = ()
 
 
 class RecallBriefingDto(BaseDto):
-    """What the notes say about a task, grounded in note paths.
+    """What the notes say about a task, grounded in note identities.
 
     Every statement in `constraints`, `decisions`, `gotchas` and `context` cites at least one
     note that was read. What the notes do not say is kept apart: `inferences` (the agent's own

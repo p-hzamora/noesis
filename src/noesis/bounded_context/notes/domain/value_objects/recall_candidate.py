@@ -16,7 +16,7 @@ class RecallCandidate(ValueObject):
     Relevance is only the engine's rank position; no score crosses the port.
 
     Attributes:
-        path: Vault-relative path; identifies the note.
+        note_id: Stable ID; identifies the note independently of its location.
         kind: Note kind; None when the note's kind is unknown to the catalog.
         origin: Who wrote the note.
         updated: Last update date; None when unknown.
@@ -24,7 +24,7 @@ class RecallCandidate(ValueObject):
         preferred: False when a scope is preferred and the note is outside it.
     """
 
-    path: str
+    note_id: str
     kind: NoteKind | None
     origin: NoteOriginEnum
     updated: date | None

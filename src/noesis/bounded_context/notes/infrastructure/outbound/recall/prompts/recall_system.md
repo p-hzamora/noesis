@@ -8,7 +8,7 @@ matches the schema you were handed.
 ## What you receive
 
 - `Task`: what is about to be done.
-- A list of `<note path="..." title="..." kind="..." updated="...">` blocks, each the full text
+- A list of `<note id="..." path="..." title="..." kind="..." updated="...">` blocks, each the full text
   of one note (frontmatter included), possibly cut and with secrets masked as `[REDACTED]`.
 - A length target in tokens. Aim for it; shorter is fine, longer is not.
 
@@ -45,8 +45,8 @@ Fill these fields:
 
 ## Grounding rules
 
-1. `sources` of `constraints`, `decisions`, `gotchas` and `context` items must list the `path`
-   of every note that states the item, copied exactly from the `path` attribute. An item you
+1. `sources` of `constraints`, `decisions`, `gotchas` and `context` items must list the `id`
+   of every note that states the item, copied exactly from the `id` attribute. An item you
    cannot cite does not belong in these fields.
 2. Write only what the notes say. Do not add facts from your own knowledge of the project, the
    tools or the domain. General advice that no note supports is an inference, or is left out.

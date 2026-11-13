@@ -107,3 +107,15 @@ class MultiSourceNoteReadRepositoryAdapter(INoteReadRepository):
             except NoteStorageError as error:
                 failure = failure or error
         raise failure or NoteStorageError("No source is configured to read.", {"path": path})
+
+    async def read_by_id(
+        self, note_id: NoteId, *, scope: NoteScope | None, path_hint: str | None = None
+    ) -> NoteContentDto:
+        """First readable copy of this ID, primary first, never a same-path neighbour."""
+        failure: NoteStorageError | None = None
+        for reader in self._readers:
+            try:
+                return await reader.repository.read_by_id(note_id, scope=scope, path_hint=path_hint)
+            except NoteStorageError as error:
+                failure = failure or error
+        raise failure or NoteStorageError("No source is configured to read.", {"id": note_id.value})

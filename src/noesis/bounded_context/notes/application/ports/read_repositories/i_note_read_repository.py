@@ -13,6 +13,7 @@ from noesis.bounded_context.notes.domain.value_objects import (
     NoteOriginEnum,
     NoteScope,
 )
+from noesis.exceptions import NoteStorageError
 
 
 class INoteReadRepository(abc.ABC):
@@ -54,6 +55,27 @@ class INoteReadRepository(abc.ABC):
             scope: When given, a note of another scope is not found.
         """
         ...
+
+    async def read_by_id(
+        self, note_id: NoteId, *, scope: NoteScope | None, path_hint: str | None = None
+    ) -> NoteContentDto:
+        """Resolve current content by identity, checking the record actually read.
+
+        Compatibility implementation for document adapters. A hint permits vault-less MCP
+        reads when no ID listing exists; it is never trusted as identity. Adapters with
+        native ID lookup can override this operation without using a path.
+        """
+        summary: NoteSummaryDto | None = await self.find_by_id(note_id, scope=scope)
+        path: str | None = summary.path if summary is not None else path_hint
+        if path is None:
+            raise NoteStorageError("No note found for this ID.", {"id": note_id.value})
+        note: NoteContentDto = await self.read_note(path, scope=scope)
+        if note.id != note_id.value or (scope is not None and note.scope != scope.value):
+            raise NoteStorageError(
+                "The content read does not match the requested note ID and scope.",
+                {"id": note_id.value, "path": path},
+            )
+        return note
 
     @abc.abstractmethod
     async def read_note(self, path: str, *, scope: NoteScope | None) -> NoteContentDto:
