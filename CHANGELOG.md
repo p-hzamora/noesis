@@ -12,6 +12,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - `noesis vault doctor` and `noesis vault migrate --plan <file> [--apply]`: restructure a vault
   to the manifest layout from a plan, crash-safe and idempotent, with wikilinks kept pointing at
   moved files.
+- Manifest `groups`: repositories matched by remote glob or name keep their notes under a group
+  root (e.g. a gitignored `company/<org>/repos/`); `vault doctor` reports misplaced notes.
 - Default kinds `drift` (folder `drift`) and `dependency` (folder `dependencies`).
 
 ## [0.1.1] - 2026-11-09

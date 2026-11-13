@@ -50,3 +50,31 @@ Order of an apply, so a run that stopped anywhere is finished by running it agai
 A target that already exists with different content stops everything before any write:
 `NOTES_208_MIGRATION_CONFLICT`, listing each pair. A target with the same content counts as
 already done. A failed verification (`NOTES_104_MIGRATION_VERIFICATION_FAILED`) deletes nothing.
+
+## Groups: employer repos in their own root
+
+Notes of some repositories can live under a separate, gitignored root. Configure it in the
+vault's own `noesis.yaml` (never in the packaged default):
+
+```yaml
+groups:
+  stidea:
+    root: company/stidea          # relative, inside the vault, no `..`
+    match:
+      remotes: ["gitlab.com/grupost/*"]   # globs on the canonical remote: host/path, no scheme, no .git
+      repos: [dafne]                      # or repository names
+```
+
+A repository belongs to the first group whose `remotes` glob matches its `origin` (or first
+remote) or whose `repos` lists its name. Scope stays `repo:<name>`; only placement changes: a
+grouped repository's new notes go to `{root}/repos/{name}/{kind_folder}/{slug}.md` (override with
+`layout.grouped_repo`), others keep `repos/{name}/...`. `notes apply` and `notes curate` read the
+remote from the repository's git config. Recall is unaffected: it reads the frontmatter, not paths.
+
+`vault doctor` also reports `misplaced notes` (a note outside the folder its scope's layout
+names, e.g. a grouped repository's note under `repos/`) and counts the group roots when looking
+for projects kept under two roots. A repository whose notes sit under a group root (`{root}/repos/<name>/`) is taken as a member
+of that group, so a vault whose `noesis.yaml` holds remote globs only (the recommendation: the
+file is pushed with the vault, so keep repo names out of it) reports no false positives. Doctor
+still flags a repository with notes under both a group root and `repos/`, and a note under a
+group root when a `repos` list names another group for it.

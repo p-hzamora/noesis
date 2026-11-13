@@ -86,3 +86,10 @@ A JSON file of entries `{old, new, action, scope?, kind?}` that `noesis vault mi
 `note` adds or refreshes the `noesis:` block and moves the file, `move` relocates it byte for
 byte, `keep` leaves it. noesis knows nothing about the old layout; a one-off generator writes
 the plan.
+
+**Group**:
+A manifest entry (`groups:` in the vault's `noesis.yaml`) giving some repositories their own root,
+e.g. a gitignored `company/<org>`; scope stays `repo:<name>`, only the folder changes. Membership
+is decided by a remote glob (recommended: glob only, the file is pushed with the vault) or a
+`repos` list. `vault doctor` has no remotes, so it infers membership from the group root a
+repository's notes sit under (`{root}/repos/<name>/`).
