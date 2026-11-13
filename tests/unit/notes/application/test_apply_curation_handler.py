@@ -21,6 +21,7 @@ from noesis.bounded_context.notes.application.handlers.commands import (
     ApplyCurationCommand,
     ApplyCurationHandler,
 )
+from noesis.bounded_context.notes.application.services.manifest import GroupMatch, GroupSpec
 from noesis.bounded_context.notes.domain.policies import AutoCurationPolicy
 from noesis.bounded_context.notes.domain.value_objects import (
     CurationActionEnum,
@@ -33,6 +34,20 @@ pytestmark = pytest.mark.unit
 
 AUTO_PATH = "repos/demo/decisions/use-ttl-cache.md"
 MANUAL_PATH = "repos/demo/decisions/manual-topic.md"
+
+
+class _GroupedManifest(DefaultManifestProvider):
+    async def load(self):  # type: ignore[no-untyped-def]
+        default = await super().load()
+        return default.model_copy(
+            update={
+                "groups": {
+                    "acme": GroupSpec(
+                        root="company/acme", match=GroupMatch(remotes=("gitlab.com/acme/*",))
+                    ),
+                }
+            }
+        )
 
 
 class _World:
@@ -269,3 +284,14 @@ async def test_a_note_at_the_layout_path_is_found_even_when_the_read_side_does_n
 
     assert result.skipped[0].reason == f"covered by {AUTO_PATH}"
     assert result.created == ()
+
+
+async def test_a_grouped_repository_stores_its_notes_under_the_group_root() -> None:
+    world = _World()
+    world.handler._manifest = _GroupedManifest()
+
+    result = await world.handler.handle(_command(remote="gitlab.com/acme/api"))
+    assert result.created == ("company/acme/repos/demo/decisions/use-ttl-cache.md",)
+
+    result = await world.handler.handle(_command(remote="github.com/me/demo"))
+    assert result.created == (AUTO_PATH,)

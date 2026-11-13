@@ -96,3 +96,78 @@ def test_doctor_counts_and_lists_files_only_with_verbose(
 
     assert run([*args, "--verbose"]) == 0
     assert "without: README.md" in capsys.readouterr().out
+
+
+def test_doctor_reports_notes_outside_their_groups_folder_and_duplicates_across_roots(
+    vault: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    (vault / "noesis.yaml").write_text(
+        "groups:\n  acme: {root: company/acme, match: {repos: [alpha]}}\n", encoding="utf-8"
+    )
+    note = (vault / "repos/alpha/decisions").parent
+    note.mkdir(parents=True, exist_ok=True)
+    stray = (
+        "---\nnoesis:\n  id: 01ARZ3NDEKTSV4RRFFQ69G5FAV\n  scope: repo:alpha\n"
+        "  kind: decision\n  origin: auto\n  updated: 2026-01-01\n---\n# A\n"
+    )
+    (vault / "repos/alpha/decisions").mkdir()
+    (vault / "repos/alpha/decisions/a.md").write_text(stray, encoding="utf-8")
+    (vault / "company/acme/repos/alpha").mkdir(parents=True)
+    (vault / "company/acme/repos/alpha/index.md").write_text("# a\n", encoding="utf-8")
+
+    assert run(["vault", "doctor", "--verbose"]) == 0
+    out = capsys.readouterr().out
+    assert "misplaced notes: 1" in out and "misplaced: repos/alpha/decisions/a.md" in out
+    assert "alpha: company/acme/repos, repos" in out
+
+
+def _scoped_note(vault: Path, path: str, repo: str) -> None:
+    target = vault / path
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(
+        f"---\nnoesis:\n  id: 01ARZ3NDEKTSV4RRFFQ69G5FAV\n  scope: repo:{repo}\n"
+        "  kind: decision\n  origin: auto\n  updated: 2026-01-01\n---\n# A\n",
+        encoding="utf-8",
+    )
+
+
+GLOB_ONLY = "groups:\n  acme: {root: company/acme, match: {remotes: ['gitlab.com/acme/*']}}\n"
+
+
+def test_doctor_infers_group_membership_from_the_group_root(
+    vault: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    (vault / "noesis.yaml").write_text(GLOB_ONLY, encoding="utf-8")
+    _scoped_note(vault, "company/acme/repos/svc/decisions/a.md", "svc")
+    _scoped_note(vault, "repos/personal/decisions/b.md", "personal")
+
+    assert run(["vault", "doctor", "--verbose"]) == 0
+    out = capsys.readouterr().out
+    assert "misplaced notes: 0" in out and "projects under two roots: 0" in out
+
+
+def test_doctor_flags_a_repo_with_notes_under_the_group_root_and_under_repos(
+    vault: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    (vault / "noesis.yaml").write_text(GLOB_ONLY, encoding="utf-8")
+    _scoped_note(vault, "company/acme/repos/svc/decisions/a.md", "svc")
+    _scoped_note(vault, "repos/svc/decisions/b.md", "svc")
+
+    assert run(["vault", "doctor", "--verbose"]) == 0
+    out = capsys.readouterr().out
+    assert "misplaced notes: 1" in out and "misplaced: repos/svc/decisions/b.md" in out
+    assert "svc: company/acme/repos, repos" in out
+
+
+def test_doctor_flags_a_note_under_a_group_root_that_names_another_group(
+    vault: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    (vault / "noesis.yaml").write_text(
+        "groups:\n  a: {root: company/a, match: {remotes: [x]}}\n"
+        "  b: {root: company/b, match: {repos: [svc]}}\n",
+        encoding="utf-8",
+    )
+    _scoped_note(vault, "company/a/repos/svc/decisions/a.md", "svc")
+
+    assert run(["vault", "doctor", "--verbose"]) == 0
+    assert "misplaced: company/a/repos/svc/decisions/a.md" in capsys.readouterr().out

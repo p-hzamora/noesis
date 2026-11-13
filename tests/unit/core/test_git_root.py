@@ -6,10 +6,12 @@ import pytest
 from tests.support.git_support import add_worktree, git, init_repo, isolate_git
 
 from noesis.core.git_root import (
+    canonical_remote,
     find_common_dir,
     find_git_root,
     find_main_repository,
     repository_name,
+    repository_remote,
 )
 
 pytestmark = pytest.mark.unit
@@ -105,3 +107,34 @@ def test_outside_any_repository_there_is_no_identity(tmp_path: Path) -> None:
 )
 def test_the_naming_rule(common_dir: str, expected: str) -> None:
     assert repository_name(Path(common_dir)) == expected
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "git@gitlab.com:grupost/dafne/api.git",
+        "https://gitlab.com/grupost/dafne/api.git",
+        "https://user:token@gitlab.com/grupost/dafne/api",
+        "ssh://git@gitlab.com:2222/grupost/dafne/api.git",
+        "gitlab.com:grupost/dafne/api.git",
+    ],
+)
+def test_every_spelling_of_a_remote_has_one_canonical_form(url: str) -> None:
+    assert canonical_remote(url) == "gitlab.com/grupost/dafne/api"
+
+
+def test_the_remote_is_read_from_the_git_config_preferring_origin(tmp_path: Path) -> None:
+    git_dir = tmp_path / ".git"
+    git_dir.mkdir()
+    (git_dir / "config").write_text(
+        '[core]\n\turl = nope\n[remote "backup"]\n\turl = git@a.com:x/y.git\n'
+        '[remote "origin"]\n\turl = git@gitlab.com:grupost/api.git\n\tfetch = +refs/*\n'
+    )
+    assert repository_remote(git_dir) == "gitlab.com/grupost/api"
+
+
+def test_no_remote_or_no_config_reads_as_none(tmp_path: Path) -> None:
+    (tmp_path / ".git").mkdir()
+    assert repository_remote(tmp_path / ".git") is None
+    (tmp_path / ".git" / "config").write_text("[core]\n\tbare = false\n")
+    assert repository_remote(tmp_path / ".git") is None

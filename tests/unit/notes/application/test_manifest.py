@@ -1,6 +1,7 @@
 """Manifest merge and validation, kind catalog, path resolver, rank fusion."""
 
 import pytest
+from pydantic import ValidationError
 
 from noesis.bounded_context.notes.application.dtos import NoteSummaryDto
 from noesis.bounded_context.notes.application.services.manifest import (
@@ -123,6 +124,73 @@ def test_path_resolver_uses_layout_and_suffixes_on_collision() -> None:
     ]
     topic = next(resolver.candidates(NoteScope.parse("topic:rust"), kind, slug))
     assert topic.value == "learning/rust/gotchas/x.md"
+
+
+GROUPS: dict[str, object] = {
+    "acme": {
+        "root": "company/acme",
+        "match": {"remotes": ["gitlab.com/acme/*"], "repos": ["legacy"]},
+    },
+    "other": {"root": "company/other", "match": {"remotes": ["gitlab.com/*"]}},
+}
+
+
+def _grouped() -> Manifest:
+    return _manifest({"groups": GROUPS})
+
+
+def test_a_grouped_repository_goes_under_its_group_root_and_others_stay_put() -> None:
+    manifest = _grouped()
+    resolver = NotePathResolver(manifest.layout, manifest.catalog(), manifest.groups)
+    kind, slug = NoteKind(value="gotcha"), NoteSlug(value="x")
+
+    def first(scope: str, remote: str | None) -> str:
+        return next(resolver.candidates(NoteScope.parse(scope), kind, slug, remote)).value
+
+    assert first("repo:svc", "gitlab.com/acme/svc") == "company/acme/repos/svc/gotchas/x.md"
+    assert first("repo:legacy", None) == "company/acme/repos/legacy/gotchas/x.md"
+    assert first("repo:svc", "gitlab.com/else/svc") == "company/other/repos/svc/gotchas/x.md"
+    assert first("repo:svc", "github.com/me/svc") == "repos/svc/gotchas/x.md"
+    assert first("repo:svc", None) == "repos/svc/gotchas/x.md"
+    assert first("topic:rust", "gitlab.com/acme/svc") == "learning/rust/gotchas/x.md"
+
+
+def test_the_first_matching_group_wins_in_manifest_order() -> None:
+    swapped = _manifest({"groups": dict(reversed(list(GROUPS.items())))})  # type: ignore[arg-type]
+    resolver = NotePathResolver(swapped.layout, swapped.catalog(), swapped.groups)
+    scope, kind, slug = NoteScope.parse("repo:svc"), NoteKind(value="gotcha"), NoteSlug(value="x")
+    path = next(resolver.candidates(scope, kind, slug, "gitlab.com/acme/svc"))
+    assert path.value == "company/other/repos/svc/gotchas/x.md"
+
+
+def test_the_grouped_template_can_be_overridden() -> None:
+    manifest = _manifest(
+        {"groups": GROUPS, "layout": {"grouped_repo": "{root}/{name}/{kind_folder}/{slug}.md"}}
+    )
+    resolver = NotePathResolver(manifest.layout, manifest.catalog(), manifest.groups)
+    scope, kind, slug = (
+        NoteScope.parse("repo:legacy"),
+        NoteKind(value="gotcha"),
+        NoteSlug(value="x"),
+    )
+    assert next(resolver.candidates(scope, kind, slug)).value == "company/acme/legacy/gotchas/x.md"
+
+
+@pytest.mark.parametrize("root", ["/abs", "../out", "a/../../b", "", "/", "a\\b"])
+def test_a_group_root_must_be_relative_and_inside_the_vault(root: str) -> None:
+    with pytest.raises(InvalidManifestError):
+        _manifest({"groups": {"g": {"root": root}}})
+
+
+@pytest.mark.parametrize("name", ["Acme", "a b", "-a", "a/b"])
+def test_a_group_name_must_be_a_plain_slug(name: str) -> None:
+    with pytest.raises(InvalidManifestError):
+        _manifest({"groups": {name: {"root": "company/x"}}})
+
+
+def test_a_group_rejects_unknown_keys() -> None:
+    with pytest.raises(ValidationError):
+        _manifest({"groups": {"g": {"root": "company/x", "remotes": ["a"]}}})
 
 
 def _hit(note_id: str, path: str) -> NoteSummaryDto:
