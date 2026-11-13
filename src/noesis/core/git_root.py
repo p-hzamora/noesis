@@ -1,5 +1,6 @@
 """Locating the git repository a command runs in."""
 
+import re
 from pathlib import Path
 
 
@@ -95,3 +96,48 @@ def _find_bare_repository(start: Path) -> Path | None:
         if (directory / "HEAD").is_file() and (directory / "objects").is_dir():
             return directory
     return None
+
+
+_REMOTE_URL: re.Pattern[str] = re.compile(r"^\s*url\s*=\s*(\S+)\s*$")
+_REMOTE_SECTION: re.Pattern[str] = re.compile(r'^\s*\[remote "([^"]+)"\]\s*$')
+_SCHEME: re.Pattern[str] = re.compile(r"^[a-z][a-z0-9+.-]*://", re.IGNORECASE)
+PREFERRED_REMOTE: str = "origin"
+
+
+def canonical_remote(url: str) -> str:
+    """`host/path` of a remote URL: no scheme, no credentials, no port, no `.git`.
+
+    `git@gitlab.com:org/repo.git` and `https://user@gitlab.com/org/repo` are both
+    `gitlab.com/org/repo`.
+    """
+    text: str = url.strip()
+    if _SCHEME.match(text):
+        text = _SCHEME.sub("", text, count=1)
+        authority, _, path = text.partition("/")
+        text = f"{authority.rpartition('@')[2].partition(':')[0]}/{path}"
+    else:  # scp-like: [user@]host:path
+        host, _, path = text.partition(":")
+        text = f"{host.rpartition('@')[2]}/{path}"
+    return text.strip("/").removesuffix(".git")
+
+
+def repository_remote(common_dir: Path) -> str | None:
+    """The canonical URL of the repository's `origin` (else its first remote), or None.
+
+    Read from the `config` file git keeps in the common directory, without running git.
+    """
+    try:
+        lines: list[str] = (common_dir / "config").read_text(encoding="utf-8").splitlines()
+    except OSError, UnicodeDecodeError:
+        return None
+    urls: dict[str, str] = {}
+    current: str | None = None
+    for line in lines:
+        if section := _REMOTE_SECTION.match(line):
+            current = section.group(1)
+        elif line.lstrip().startswith("["):
+            current = None
+        elif current is not None and (url := _REMOTE_URL.match(line)):
+            urls.setdefault(current, url.group(1))
+    chosen: str | None = urls.get(PREFERRED_REMOTE) or next(iter(urls.values()), None)
+    return canonical_remote(chosen) if chosen else None

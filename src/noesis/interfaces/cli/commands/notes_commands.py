@@ -29,7 +29,7 @@ from noesis.bounded_context.notes.domain.value_objects.work_brief import SHORT_S
 from noesis.bounded_context.notes.infrastructure.outbound.curation.apply_input_schema import (
     parse_decisions_strict,
 )
-from noesis.core.git_root import find_common_dir, repository_name
+from noesis.core.git_root import find_common_dir, repository_name, repository_remote
 from noesis.exceptions import (
     EmptyRecallTaskError,
     InvalidWorkBriefError,
@@ -109,11 +109,13 @@ def curate(
     as_json: JsonOption = False,
 ) -> None:
     """Ask the curator what in a work brief is worth keeping, then store it as auto notes."""
+    brief = _load_brief(brief_file)
     command = CurateWorkBriefCommand(
-        brief=_load_brief(brief_file),
+        brief=brief,
         max_attempts=max_attempts,
         park_on_failure=park,
         dry_run=dry_run,
+        remote=_remote_of(Path(brief.repository_path)),
     )
     handlers = _handlers(context)
     stored: CurationResultDto = asyncio.run(handlers.curate.handle(command))
@@ -123,6 +125,12 @@ def curate(
         if dry_run
         else CurationResponse.model_validate(stored)
     )
+
+
+def _remote_of(start: Path) -> str | None:
+    """The canonical remote of the repository at `start`, or None when it has none."""
+    common_dir: Path | None = find_common_dir(start)
+    return repository_remote(common_dir) if common_dir else None
 
 
 def _repository_scope() -> NoteScope:
@@ -197,6 +205,7 @@ def apply(
         commits=tuple(commit or ()),
         session=session[:SHORT_SESSION_LENGTH] if session else None,
         dry_run=dry_run,
+        remote=_remote_of(Path.cwd()),
     )
     stored: CurationResultDto = asyncio.run(
         build_apply(cli_state(context).environment()).handle(command)

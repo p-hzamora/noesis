@@ -3,12 +3,13 @@
 from collections import Counter
 from typing import Self
 
-from pydantic import ConfigDict, model_validator
+from pydantic import ConfigDict, Field, model_validator
 
 from noesis.exceptions import InvalidManifestError
 from noesis.shared_kernel.domain import JsonValue
 from noesis.utils import FrozenObject
 
+from .group_spec import GroupSpec, check_group_name
 from .kind_catalog import KindCatalog
 from .kind_spec import KindSpec
 from .layout_spec import LayoutSpec
@@ -26,6 +27,7 @@ class Manifest(FrozenObject):
         sources: Where notes are read from; exactly one has role `primary`.
         layout: Where new notes go.
         kinds: The kinds of notes that exist.
+        groups: Extra roots for the notes of some repositories, by group name.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -33,6 +35,7 @@ class Manifest(FrozenObject):
     sources: tuple[SourceSpec, ...]
     layout: LayoutSpec
     kinds: tuple[KindSpec, ...]
+    groups: dict[str, GroupSpec] = Field(default_factory=dict)
 
     @model_validator(mode="after")
     def _consistent(self) -> Self:
@@ -58,6 +61,8 @@ class Manifest(FrozenObject):
                     f"The manifest repeats {what} names: {', '.join(repeated)}.",
                     {"duplicates": list[JsonValue](repeated)},
                 )
+        for name in self.groups:
+            check_group_name(name)
         return self
 
     def primary(self) -> SourceSpec:

@@ -54,6 +54,7 @@ class ApplyCurationCommand(FrozenObject):
         commits: Commit SHAs behind the knowledge; may be empty.
         session: Short session id; None when unknown.
         dry_run: Run the policy and report the outcome without writing.
+        remote: Canonical remote of the repository, to place its notes under its group's root.
     """
 
     scope: NoteScope
@@ -63,6 +64,7 @@ class ApplyCurationCommand(FrozenObject):
     commits: tuple[str, ...] = ()
     session: str | None = None
     dry_run: bool = False
+    remote: str | None = None
 
 
 class ApplyCurationHandler(IHandler[ApplyCurationCommand, CurationResultDto]):
@@ -141,7 +143,7 @@ class ApplyCurationHandler(IHandler[ApplyCurationCommand, CurationResultDto]):
         now: datetime = self._clock.now()
         manifest: Manifest = await self._manifest.load()
         catalog: KindCatalog = manifest.catalog()
-        resolver = NotePathResolver(manifest.layout, catalog)
+        resolver = NotePathResolver(manifest.layout, catalog, manifest.groups)
         sources: tuple[NoteSourceRef, ...] = _sources(action)
         outcomes: list[CurationOutcome] = []
         batch: dict[tuple[str, str], Note] = {}  # notes created by earlier decisions of this call
@@ -160,13 +162,15 @@ class ApplyCurationHandler(IHandler[ApplyCurationCommand, CurationResultDto]):
                     existing_auto = batch.get(key)
                     if existing_auto is None:
                         existing_auto, manual_path = await self._find_existing(
-                            uow, resolver, action.scope, draft
+                            uow, resolver, action.scope, draft, action.remote
                         )
                         if action.dry_run and existing_auto is not None:
                             existing_auto = copy.deepcopy(existing_auto)
                     placement = NotePlacement(
                         id=self._ids.new_id(),
-                        path=await self._free_path(uow, resolver, action.scope, draft, claimed),
+                        path=await self._free_path(
+                            uow, resolver, action.scope, draft, claimed, action.remote
+                        ),
                         required_sections=catalog.require(draft.kind).sections,
                     )
                 outcome: CurationOutcome = self._policy.apply(
@@ -190,7 +194,12 @@ class ApplyCurationHandler(IHandler[ApplyCurationCommand, CurationResultDto]):
         return outcomes
 
     async def _find_existing(
-        self, uow: INotesUnitOfWork, resolver: NotePathResolver, scope: NoteScope, draft: NoteDraft
+        self,
+        uow: INotesUnitOfWork,
+        resolver: NotePathResolver,
+        scope: NoteScope,
+        draft: NoteDraft,
+        remote: str | None,
     ) -> tuple[Note | None, NotePath | None]:
         """The auto note (loaded) and the manual note's path with the draft's kind and slug.
 
@@ -210,7 +219,7 @@ class ApplyCurationHandler(IHandler[ApplyCurationCommand, CurationResultDto]):
                 manual_path = path
         if existing_auto is None and manual_path is None:
             at_layout: Note | None = await uow.notes.get(
-                next(iter(resolver.candidates(scope, draft.kind, draft.slug)))
+                next(iter(resolver.candidates(scope, draft.kind, draft.slug, remote)))
             )
             if at_layout is not None and (at_layout.scope, at_layout.kind) == (scope, draft.kind):
                 if at_layout.is_auto:
@@ -226,9 +235,10 @@ class ApplyCurationHandler(IHandler[ApplyCurationCommand, CurationResultDto]):
         scope: NoteScope,
         draft: NoteDraft,
         claimed: set[str],
+        remote: str | None,
     ) -> NotePath:
         """The first layout path (`<slug>.md`, `<slug>-2.md`...) that nothing occupies."""
-        for candidate in resolver.candidates(scope, draft.kind, draft.slug):
+        for candidate in resolver.candidates(scope, draft.kind, draft.slug, remote):
             if candidate.value not in claimed and not await uow.notes.exists(candidate):
                 return candidate
         raise AssertionError("candidates never end")  # pragma: no cover

@@ -40,12 +40,14 @@ class CurateWorkBriefCommand(FrozenObject):
         max_attempts: Curator runs before giving up (2 = one automatic retry).
         park_on_failure: Whether to park the brief for a manual retry when every attempt fails.
         dry_run: Judge and report what would be stored without writing and without parking.
+        remote: Canonical remote of the repository, to place its notes under its group's root.
     """
 
     brief: WorkBriefContract
     max_attempts: int
     park_on_failure: bool
     dry_run: bool = False
+    remote: str | None = None
 
 
 class CurateWorkBriefHandler(IHandler[CurateWorkBriefCommand, CurationResultDto]):
@@ -95,6 +97,7 @@ class CurateWorkBriefHandler(IHandler[CurateWorkBriefCommand, CurationResultDto]
                     commits=brief.commit_shas(),
                     session=brief.short_session(),
                     dry_run=action.dry_run,
+                    remote=action.remote,
                 )
             )
         except NoteStorageError as error:

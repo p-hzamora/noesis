@@ -13,12 +13,15 @@ class LayoutSpec(FrozenObject):
     Attributes:
         repo: Template for the notes of a repository.
         topic: Template for the notes of a learning topic.
+        grouped_repo: Template for the notes of a repository that belongs to a group; `{root}`
+            is the group's root.
     """
 
     repo: str
     topic: str
+    grouped_repo: str = "{root}/repos/{name}/{kind_folder}/{slug}.md"
 
-    @field_validator("repo", "topic")
+    @field_validator("repo", "topic", "grouped_repo")
     @classmethod
     def _valid_template(cls, template: str) -> str:
         if "{slug}" not in template or not template.endswith(".md") or template.startswith("/"):
