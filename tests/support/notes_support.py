@@ -260,8 +260,17 @@ class InMemoryNoteReadRepository(INoteReadRepository):
     async def find_active(self, scope: NoteScope, kind: NoteKind) -> list[NoteSummaryDto]:
         return [n for n in self.notes if n.scope == scope.value and n.kind == kind.value]
 
-    async def find_by_id(self, note_id: NoteId) -> NoteSummaryDto | None:
-        return next((n for n in self.notes if n.id == note_id.value), None)
+    async def find_by_id(
+        self, note_id: NoteId, *, scope: NoteScope | None
+    ) -> NoteSummaryDto | None:
+        return next(
+            (
+                n
+                for n in self.notes
+                if n.id == note_id.value and (scope is None or n.scope == scope.value)
+            ),
+            None,
+        )
 
     async def read_note(self, path: str, *, scope: NoteScope | None) -> NoteContentDto:
         self.read_paths.append(path)
@@ -282,7 +291,12 @@ class InMemoryNoteReadRepository(INoteReadRepository):
     async def list_notes(
         self, *, scope: NoteScope | None, origin: NoteOriginEnum | None
     ) -> list[NoteSummaryDto]:
-        return [note for note in self.notes if origin is None or note.origin == origin.value]
+        return [
+            note
+            for note in self.notes
+            if (origin is None or note.origin == origin.value)
+            and (scope is None or note.scope == scope.value)
+        ]
 
 
 class ScriptedCurator(ICurator):

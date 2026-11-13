@@ -82,9 +82,9 @@ async def test_a_note_in_an_arbitrary_folder_is_found_by_frontmatter(tmp_path: P
         "decision",
     )
 
-    by_id = await reader.find_by_id(NoteId(value=ID_A))
+    by_id = await reader.find_by_id(NoteId(value=ID_A), scope=None)
     assert by_id is not None and by_id.path == "my/own/shelf/whatever.md"
-    assert await reader.find_by_id(NoteId(value=ID_B)) is None
+    assert await reader.find_by_id(NoteId(value=ID_B), scope=None) is None
 
     active = await reader.find_active(NoteScope.parse("repo:demo"), NoteKind(value="decision"))
     assert [n.id for n in active] == [ID_A]
@@ -123,7 +123,7 @@ async def test_multi_source_recall_dedups_by_id_and_primary_wins(tmp_path: Path)
     assert {n.id: n.path for n in found.notes}[ID_A] == "p/shared.md"
     listed = await multi.list_notes(scope=None, origin=None)
     assert sorted(n.id for n in listed) == [ID_A, ID_B]
-    assert (await multi.find_by_id(NoteId(value=ID_B))) is not None  # type: ignore[truthy-bool]
+    assert (await multi.find_by_id(NoteId(value=ID_B), scope=None)) is not None  # type: ignore[truthy-bool]
 
 
 def _apply_handler(vault: Path) -> ApplyCurationHandler:
