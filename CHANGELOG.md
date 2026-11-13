@@ -7,6 +7,15 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed
+
+- Recall resolves, merges and cites notes by stable ID, preserving different records with
+  identical relative paths across sources and rejecting mismatched content. JSON adds
+  `entries[].id` and verified `source_ids` alongside existing paths. Ambiguous legacy path
+  citations are set aside; renamed local notes can resolve by their unchanged ID.
+- Make configuration validation narrow optional settings for strict type checking; isolate
+  capture tests from ambient Codex session identifiers.
+
 ### Added
 
 - `noesis vault doctor` and `noesis vault migrate --plan <file> [--apply]`: restructure a vault

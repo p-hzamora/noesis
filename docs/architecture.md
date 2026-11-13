@@ -1,5 +1,11 @@
 # Architecture
 
+This page describes the running implementation. The
+[knowledge and memory direction](design/knowledge-memory-direction.md) records the verified
+gaps, full capability map and proposed Neo4j/Vectra alternatives. Those storage ownership
+choices remain open. [ADR-0002](adr/0002-recall-record-identity.md) describes the implemented
+first step: recall preserves stable record IDs through resolution and citation checking.
+
 noesis follows tactical DDD with a strict hexagonal (ports and adapters) layout, in the
 context-first topology described in ADR-0001. For what each command does step by step, see
 [workflows/](workflows/README.md); for each command's options and output, see

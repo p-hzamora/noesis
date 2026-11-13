@@ -26,14 +26,14 @@ sequenceDiagram
     end
     H->>H: merge by reciprocal rank, rarer keywords weigh more
     H->>Pol: rank(candidates, today)
-    Pol-->>H: paths, most useful first
+    Pol-->>H: stable IDs, most useful first
     alt no candidate
         H-->>Cmd: synthesis "no_evidence", no agent call
     else --no-synthesis
         H-->>Cmd: RecallDigestDto, trimmed to the budget, no model
     else synthesis (default)
-        loop top `limit` paths
-            H->>RR: read_note(path, scope)
+        loop top `limit` IDs
+            H->>RR: read_by_id(id, scope, path_hint)
             RR-->>H: the whole note (an unreadable one becomes a warning)
         end
         H->>M: mask secrets, cut each note to its share of the input limit
@@ -84,7 +84,7 @@ Obsidian's search (`search_simple`) only returns notes that contain **every** wo
 1. Keeps keywords of 3+ letters without stopwords. A hyphenated name such as `cv-generator` is kept
    whole and also split (`cv-generator`, `generator`); at most 12 queries, earliest first.
 2. Searches each keyword on its own (up to `min(limit*3, 10)` hits each).
-3. Merges the hits by reciprocal rank. Each query counts for `1 / hits`, so a keyword few notes
+3. Merges the hits by stable note ID and reciprocal rank. Each query counts for `1 / hits`, so a keyword few notes
    contain outweighs a generic one, and a note found by several keywords rises.
 4. Re-ranks with the policy below and takes the top `--limit`.
 
@@ -94,7 +94,7 @@ Obsidian's search (`search_simple`) only returns notes that contain **every** wo
 | Recency | halves every 90 days of `updated`, never below a floor; an unknown date gets the floor |
 | Origin | manual outranks auto |
 
-Ties break by merged rank, then path. A note is only down-weighted, never dropped.
+Ties break by merged rank, then stable note ID. A note is only down-weighted, never dropped.
 
 ## What the agent can see and do
 
@@ -201,3 +201,19 @@ A failed briefing is never reported as success and never silently degraded to a 
 - There is no recall check in `noesis doctor` yet.
 
 Back to [workflows](README.md).
+
+## Stable identity and compatibility
+
+Recall entries include `id`; paths remain source-relative display/compatibility fields.
+Two records at the same path in different sources remain separate when their IDs differ.
+Full reads resolve the ID, checking the returned identity and requested scope. Local file
+renames can resolve by the unchanged ID; vault-less MCP uses a checked path hint.
+
+Briefing items retain `sources` (paths) and add `source_ids` (verified IDs). The model is
+asked to cite note IDs. Legacy path citations are accepted only if unambiguous among the
+records read; ambiguous paths and invented IDs cannot ground a statement. Consumers should
+use `source_ids` with `entries[].id` for identity, not filenames.
+
+These checks establish citation membership, not claim truth or authority. They do not yet
+pin a revision, detect a stale embedding, or enforce accepted/superseded lifecycle states.
+See [the engineering direction](../design/knowledge-memory-direction.md) for that work.
