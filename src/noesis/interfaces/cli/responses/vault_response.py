@@ -28,6 +28,8 @@ class VaultDoctorResponse(IRenderableResponse):
         duplicate_projects: Project names found under two roots or more.
         without_paths: Files without a block (only with `--verbose`).
         invalid_paths: Files with an invalid header or block (only with `--verbose`).
+        misplaced: Notes outside the folder the layout places their scope in.
+        misplaced_paths: Those notes (only with `--verbose`).
     """
 
     markdown_files: int
@@ -37,6 +39,8 @@ class VaultDoctorResponse(IRenderableResponse):
     duplicate_projects: tuple[DuplicateProjectResponse, ...]
     without_paths: tuple[str, ...] = ()
     invalid_paths: tuple[str, ...] = ()
+    misplaced: int = 0
+    misplaced_paths: tuple[str, ...] = ()
 
     def render(self) -> str:
         lines: list[str] = [
@@ -45,10 +49,12 @@ class VaultDoctorResponse(IRenderableResponse):
             f"without noesis frontmatter: {self.without_frontmatter}",
             f"invalid frontmatter: {self.invalid_frontmatter}",
             f"projects under two roots: {len(self.duplicate_projects)}",
+            f"misplaced notes: {self.misplaced}",
         ]
         lines += [f"  {p.name}: {', '.join(p.roots)}" for p in self.duplicate_projects]
         lines += [f"without: {path}" for path in self.without_paths]
         lines += [f"invalid: {path}" for path in self.invalid_paths]
+        lines += [f"misplaced: {path}" for path in self.misplaced_paths]
         return "\n".join(lines)
 
 

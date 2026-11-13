@@ -49,7 +49,9 @@ def doctor(
     )
     response = VaultDoctorResponse.model_validate(diagnosis)
     if not verbose:
-        response = response.model_copy(update={"without_paths": (), "invalid_paths": ()})
+        response = response.model_copy(
+            update={"without_paths": (), "invalid_paths": (), "misplaced_paths": ()}
+        )
     output.emit(response)
 
 
