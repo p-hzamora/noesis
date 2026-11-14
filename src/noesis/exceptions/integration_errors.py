@@ -15,11 +15,44 @@ class SkillGuideNotFoundError(InterfaceException):
     __error_code__ = "INTEGRATION_001_SKILL_GUIDE_NOT_FOUND"
 
 
-class ObsidianMcpError(InfrastructureException):
-    """The Obsidian MCP server is unreachable, rejected the call, or answered something unusable."""
-
-    __error_code__ = "INTEGRATION_102_OBSIDIAN_MCP_FAILED"
+# INTEGRATION_102 was the Obsidian MCP failure. The backends were removed (C2, D-018); the code
+# stays reserved and must never be reused.
 
 
-class ObsidianMcpToolError(ObsidianMcpError):
-    """The Obsidian MCP server was reached but the tool refused the call (`isError`)."""
+class GraphStoreUnavailableError(InfrastructureException):
+    """Neo4j cannot be reached, or the connection was lost mid-work (fail closed, D-014).
+
+    Metadata: `uri` (no credentials), `database`, `connect_timeout_seconds`, `phase`
+    (`connect`, `query` or `commit`) and, when lost during commit, `commit_outcome: unknown`.
+    """
+
+    __error_code__ = "INTEGRATION_103_GRAPH_STORE_UNAVAILABLE"
+
+
+class GraphStoreAuthenticationFailedError(InfrastructureException):
+    """Neo4j was reached but rejected the configured user or password."""
+
+    __error_code__ = "INTEGRATION_104_GRAPH_STORE_AUTHENTICATION_FAILED"
+
+
+class GraphStoreBusyError(InfrastructureException):
+    """Neo4j refused the work for a transient reason (lock timeout, deadlock); retrying is safe."""
+
+    __error_code__ = "INTEGRATION_105_GRAPH_STORE_BUSY"
+
+
+class GraphStoreConstraintViolatedError(InfrastructureException):
+    """A write broke a uniqueness constraint.
+
+    Persistence adapters catch it to resolve races (optimistic concurrency, idempotency) and
+    raise their own context's error; it reaches a caller only if an adapter forgot to.
+    Metadata: `label` and `property` when Neo4j names them.
+    """
+
+    __error_code__ = "INTEGRATION_106_GRAPH_STORE_CONSTRAINT_VIOLATED"
+
+
+class GraphStoreQueryFailedError(InfrastructureException):
+    """Neo4j rejected a statement for a reason that is a defect, not an outage (bad Cypher, wrong type)."""
+
+    __error_code__ = "INTEGRATION_107_GRAPH_STORE_QUERY_FAILED"

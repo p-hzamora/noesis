@@ -7,9 +7,9 @@ from noesis.diagnostics.application.dtos import (
     DiagnosticReportDto,
     UpdateCheckDto,
 )
-from noesis.diagnostics.application.enums import UpdateVerdictEnum
-from noesis.diagnostics.application.ports.probes import IEnvironmentProbe, IObsidianMcpProbe
-from noesis.exceptions import ObsidianMcpError
+from noesis.diagnostics.application.enums import GraphStoreStatusEnum, UpdateVerdictEnum
+from noesis.diagnostics.application.ports.graph_store import GraphStoreSnapshot, IGraphStoreProbe
+from noesis.diagnostics.application.ports.probes import IEnvironmentProbe
 from noesis.shared_kernel.application.handlers import IHandler
 from noesis.utils import FrozenObject
 
@@ -27,14 +27,14 @@ class RunDiagnosticsQuery(FrozenObject):
         hooks_settings_file: Agent settings file whose hooks were inspected.
         installed_hook_events: Events with a noesis hook, or None when the settings file
             could not be read.
-        obsidian_mcp_url: Obsidian MCP endpoint to probe, or None when notes are searched
-            on the filesystem (then no MCP call is made).
-        writer_mcp_url: Obsidian MCP endpoint the notes are written to, or None when the
-            writer is the filesystem (then no MCP call is made).
         vault_required: Whether something still uses local files; when False an unset vault
             is not a failure.
         update_package_dir: Folder of the installed package, to check for an update; None
             skips the `update` check.
+        graph_store_steps: Names of the schema steps the store should have applied, in order.
+        graph_store_configured: Whether the store connection is configured (the password is
+            set); when False the `graph_store` check is a warning, not a failure.
+        search_backend: Name of the configured search backend, echoed by the `search_backend` check.
     """
 
     env_file: Path
@@ -43,10 +43,11 @@ class RunDiagnosticsQuery(FrozenObject):
     curator_binary: str
     hooks_settings_file: Path
     installed_hook_events: tuple[str, ...] | None
-    obsidian_mcp_url: str | None = None
-    writer_mcp_url: str | None = None
     vault_required: bool = True
     update_package_dir: Path | None = None
+    graph_store_steps: tuple[str, ...] = ()
+    graph_store_configured: bool = True
+    search_backend: str = "filesystem"
 
 
 class RunDiagnosticsHandler(IHandler[RunDiagnosticsQuery, DiagnosticReportDto]):
@@ -56,11 +57,11 @@ class RunDiagnosticsHandler(IHandler[RunDiagnosticsQuery, DiagnosticReportDto]):
         self,
         *,
         probe: IEnvironmentProbe,
-        obsidian: IObsidianMcpProbe | None = None,
         updates: IHandler[CheckForUpdateQuery, UpdateCheckDto] | None = None,
+        graph_store: IGraphStoreProbe | None = None,
     ) -> None:
+        self._graph_store: IGraphStoreProbe | None = graph_store
         self._probe: IEnvironmentProbe = probe
-        self._obsidian: IObsidianMcpProbe | None = obsidian
         self._updates: IHandler[CheckForUpdateQuery, UpdateCheckDto] | None = updates
 
     async def handle(self, action: RunDiagnosticsQuery) -> DiagnosticReportDto:
@@ -74,11 +75,82 @@ class RunDiagnosticsHandler(IHandler[RunDiagnosticsQuery, DiagnosticReportDto]):
                 "curator", action.curator_binary, "the Claude Code CLI runs the curator"
             ),
             self._check_agent_hooks(action.hooks_settings_file, action.installed_hook_events),
-            await self._check_writer(action),
-            await self._check_search_backend(action),
+            self._check_writer(action),
+            self._check_search_backend(action.search_backend),
+            *await self._check_graph_store(action),
             *await self._check_update(action),
         )
         return DiagnosticReportDto(ok=all(check.ok for check in checks), checks=checks)
+
+    async def _check_graph_store(
+        self, action: RunDiagnosticsQuery
+    ) -> tuple[DiagnosticCheckDto, ...]:
+        """Reachable and initialised passes; unreachable, rejected or missing steps fail.
+
+        An unset password is a warning, not a failure: a person who only uses notes has no
+        store to check, and `record`/`store` name the missing variable when they run.
+        """
+        if not action.graph_store_configured:
+            return (
+                DiagnosticCheckDto(
+                    name="graph_store",
+                    ok=True,
+                    warning=True,
+                    detail="not configured (NOESIS_NEO4J_PASSWORD is not set)",
+                    next_step="Set NOESIS_NEO4J_PASSWORD in your user-side profile to use the "
+                    "record store.",
+                ),
+            )
+        if self._graph_store is None:
+            return ()
+        snapshot: GraphStoreSnapshot = await self._graph_store.inspect()
+        if snapshot.status is GraphStoreStatusEnum.UNREACHABLE:
+            return (
+                DiagnosticCheckDto(
+                    name="graph_store",
+                    ok=False,
+                    detail=f"unreachable at {snapshot.uri}",
+                    next_step=f"Start Neo4j and check NOESIS_NEO4J_URI ({snapshot.uri}).",
+                ),
+            )
+        if snapshot.status is GraphStoreStatusEnum.AUTHENTICATION_FAILED:
+            return (
+                DiagnosticCheckDto(
+                    name="graph_store",
+                    ok=False,
+                    detail=f"reachable at {snapshot.uri}, credentials rejected",
+                    next_step="Check NOESIS_NEO4J_USER and NOESIS_NEO4J_PASSWORD.",
+                ),
+            )
+        if snapshot.status is GraphStoreStatusEnum.ERROR:
+            return (
+                DiagnosticCheckDto(
+                    name="graph_store",
+                    ok=False,
+                    detail=f"reachable at {snapshot.uri}, but inspecting it failed: "
+                    f"{snapshot.message}",
+                    next_step="Run `noesis doctor` again; if it persists check the Neo4j logs.",
+                ),
+            )
+        applied: list[str] = [
+            name for name in action.graph_store_steps if name in snapshot.applied_steps
+        ]
+        missing: list[str] = [
+            name for name in action.graph_store_steps if name not in snapshot.applied_steps
+        ]
+        detail: str = (
+            f"reachable at {snapshot.uri}; schema steps applied: {', '.join(applied) or 'none'}"
+        )
+        if missing:
+            return (
+                DiagnosticCheckDto(
+                    name="graph_store",
+                    ok=False,
+                    detail=f"{detail}; missing: {', '.join(missing)}",
+                    next_step="Run `noesis store init`.",
+                ),
+            )
+        return (DiagnosticCheckDto(name="graph_store", ok=True, detail=detail),)
 
     async def _check_update(self, action: RunDiagnosticsQuery) -> tuple[DiagnosticCheckDto, ...]:
         """Warn-only: anything but up to date is worth knowing about but never fails the run."""
@@ -174,92 +246,19 @@ class RunDiagnosticsHandler(IHandler[RunDiagnosticsQuery, DiagnosticReportDto]):
             next_step="Run `noesis integrate claude-code install` to enable capture.",
         )
 
-    async def _check_writer(self, action: RunDiagnosticsQuery) -> DiagnosticCheckDto:
-        """Whether the configured writer can store notes: the MCP accepts a probe write and delete."""
-        if action.writer_mcp_url is None:
-            return DiagnosticCheckDto(
-                name="writer",
-                ok=True,
-                detail=(
-                    f"filesystem (files under {action.vault_dir}; see the vault check)"
-                    if action.vault_dir
-                    else "filesystem (NOESIS_VAULT_DIR is not set; see the vault check)"
-                ),
-            )
-        url: str = action.writer_mcp_url
-        if self._obsidian is None:
-            return DiagnosticCheckDto(
-                name="writer",
-                ok=False,
-                detail=f"obsidian-mcp writer at {url} has no probe wired",
-                next_step="Report this: the diagnostics were built without an Obsidian MCP probe.",
-            )
-        try:
-            await self._obsidian.write_probe()
-        except ObsidianMcpError as error:
-            return DiagnosticCheckDto(
-                name="writer",
-                ok=False,
-                detail=f"obsidian-mcp writer at {url} failed: {error.message}",
-                next_step=(
-                    "Start Obsidian with its MCP server, or check NOESIS_OBSIDIAN_MCP_URL, "
-                    "NOESIS_OBSIDIAN_MCP_TOKEN and write permission."
-                ),
-            )
+    @staticmethod
+    def _check_writer(action: RunDiagnosticsQuery) -> DiagnosticCheckDto:
+        """The writer stores files under the vault; the vault check says whether they can land."""
         return DiagnosticCheckDto(
-            name="writer", ok=True, detail=f"obsidian-mcp at {url} accepted a write"
-        )
-
-    async def _check_search_backend(self, action: RunDiagnosticsQuery) -> DiagnosticCheckDto:
-        """Whether Obsidian's MCP answers and serves the folder `NOESIS_VAULT_DIR` points at.
-
-        Obsidian does not tell which folder it serves, so the root listings are compared:
-        the same non-hidden names on both sides means the same vault.
-        """
-        if action.obsidian_mcp_url is None or self._obsidian is None:
-            return DiagnosticCheckDto(
-                name="search_backend",
-                ok=True,
-                detail="filesystem (Obsidian MCP not used)",
-                next_step="Set NOESIS_SEARCH_BACKEND=obsidian-mcp to search through Obsidian.",
-            )
-        url: str = action.obsidian_mcp_url
-        try:
-            served: set[str] = {
-                name for name in await self._obsidian.list_root() if not name.startswith(".")
-            }
-        except ObsidianMcpError as error:
-            return DiagnosticCheckDto(
-                name="search_backend",
-                ok=False,
-                detail=f"obsidian-mcp unreachable at {url}: {error.message}",
-                next_step=(
-                    "Start Obsidian with its MCP server (searches use files meanwhile), "
-                    "or check NOESIS_OBSIDIAN_MCP_URL and NOESIS_OBSIDIAN_MCP_TOKEN."
-                ),
-            )
-        if action.vault_dir is None:
-            return DiagnosticCheckDto(
-                name="search_backend",
-                ok=True,
-                detail=f"obsidian-mcp reachable at {url} (vault not compared: NOESIS_VAULT_DIR is not set)",
-            )
-        local: set[str] = {
-            name for name in self._probe.list_entries(action.vault_dir) if not name.startswith(".")
-        }
-        if served != local:
-            differing: list[str] = sorted(served ^ local)[:5]
-            return DiagnosticCheckDto(
-                name="search_backend",
-                ok=False,
-                detail=(
-                    f"obsidian-mcp at {url} serves a different vault than {action.vault_dir} "
-                    f"(entries only on one side: {', '.join(differing)})"
-                ),
-                next_step="Open the vault of NOESIS_VAULT_DIR in Obsidian, or point NOESIS_VAULT_DIR at the vault Obsidian serves.",
-            )
-        return DiagnosticCheckDto(
-            name="search_backend",
+            name="writer",
             ok=True,
-            detail=f"obsidian-mcp reachable at {url}, serving {action.vault_dir}",
+            detail=(
+                f"filesystem (files under {action.vault_dir}; see the vault check)"
+                if action.vault_dir
+                else "filesystem (NOESIS_VAULT_DIR is not set; see the vault check)"
+            ),
         )
+
+    @staticmethod
+    def _check_search_backend(backend: str) -> DiagnosticCheckDto:
+        return DiagnosticCheckDto(name="search_backend", ok=True, detail=backend)

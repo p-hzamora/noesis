@@ -23,6 +23,7 @@ from .configurations import (
     CaptureSettings,
     ClaudeCodeSettings,
     CuratorSettings,
+    KnowledgeSettings,
     NotesSettings,
     RecallRuntimeEnum,
     RecallSettings,
@@ -44,6 +45,7 @@ class Environment:
         capture: Capture thresholds.
         curator: Curator run settings.
         recall: Recall agent settings (`notes recall` briefings).
+        knowledge: Neo4j connection and active knowledge space (`record`, `store`).
         identity: Session ids found in the process environment (never in the `.env` file).
     """
 
@@ -53,6 +55,7 @@ class Environment:
     capture: CaptureSettings
     curator: CuratorSettings
     recall: RecallSettings
+    knowledge: KnowledgeSettings
     identity: SessionIdentitySettings
 
 
@@ -77,7 +80,15 @@ def load_environment(env_file: Path | None = None) -> Environment:
     capture: CaptureSettings | None = _load(CaptureSettings, path, problems)
     curator: CuratorSettings | None = _load(CuratorSettings, path, problems)
     recall: RecallSettings | None = _load(RecallSettings, path, problems)
-    if runtime is None or notes is None or capture is None or curator is None or recall is None:
+    knowledge: KnowledgeSettings | None = _load(KnowledgeSettings, path, problems)
+    if (
+        runtime is None
+        or notes is None
+        or capture is None
+        or curator is None
+        or recall is None
+        or knowledge is None
+    ):
         raise InvalidConfigurationError(
             f"Invalid configuration in {path} or the environment.",
             {"env_file": str(path), "problems": problems},
@@ -90,6 +101,7 @@ def load_environment(env_file: Path | None = None) -> Environment:
         capture=capture,
         curator=curator,
         recall=recall,
+        knowledge=knowledge,
         identity=SessionIdentitySettings(),
     )
 
@@ -121,6 +133,7 @@ def _load[S: AppBaseSettings](
 __all__ = [
     "ClaudeCodeSettings",
     "Environment",
+    "KnowledgeSettings",
     "RecallRuntimeEnum",
     "SessionIdentitySettings",
     "default_env_file",

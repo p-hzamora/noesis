@@ -1,0 +1,1 @@
+"""Knowledge outbound ports."""

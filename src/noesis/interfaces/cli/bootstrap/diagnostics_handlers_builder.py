@@ -13,17 +13,15 @@ from noesis.diagnostics.application.handlers.queries import (
     RunDiagnosticsHandler,
     RunDiagnosticsQuery,
 )
-from noesis.diagnostics.infrastructure.outbound.probes import (
-    ObsidianMcpProbeAdapter,
-    SystemEnvironmentProbeAdapter,
-)
+from noesis.diagnostics.application.ports.graph_store import IGraphStoreProbe
+from noesis.diagnostics.infrastructure.outbound.graph_store import Neo4jGraphStoreProbeAdapter
+from noesis.diagnostics.infrastructure.outbound.probes import SystemEnvironmentProbeAdapter
 from noesis.diagnostics.infrastructure.outbound.updates import GitCheckoutInspectorAdapter
 from noesis.exceptions import AgentSettingsInvalidError
-from noesis.shared_kernel.enums import SearchEngineEnum, WriterBackendEnum
 
 from .agent_hooks_handlers_builder import build_agent_hooks
+from .knowledge_handlers_builder import registered_schema_step_names
 from .notes_handlers_builder import needs_vault
-from .obsidian_mcp_client_builder import build_obsidian_mcp_client
 
 UPDATE_CHECK_TIMEOUT_SECONDS: float = (
     15.0  # `noesis update check`: the user asked, so wait for the network
@@ -50,30 +48,22 @@ async def run_update_check() -> UpdateCheckDto:
     )
 
 
-def build_diagnostics(environment: Environment | None = None) -> RunDiagnosticsHandler:
+def build_diagnostics(environment: Environment) -> RunDiagnosticsHandler:
     """Wire the diagnostics handler with the probes of the real system.
 
-    The Obsidian MCP probe is wired only when `NOESIS_SEARCH_BACKEND=obsidian-mcp` or
-    `NOESIS_WRITER_BACKEND=mcp`, so the default configuration never makes an MCP call.
+    The graph store probe is built only when the password is set; building it opens no
+    connection (the handler's query decides whether it runs).
     """
-    obsidian: ObsidianMcpProbeAdapter | None = None
-    if environment is not None and (uses_obsidian_mcp(environment) or uses_mcp_writer(environment)):
-        obsidian = ObsidianMcpProbeAdapter(build_obsidian_mcp_client(environment))
+    graph_store: IGraphStoreProbe | None = (
+        Neo4jGraphStoreProbeAdapter(environment.knowledge.neo4j_connection())
+        if environment.knowledge.neo4j_password is not None
+        else None
+    )
     return RunDiagnosticsHandler(
         probe=SystemEnvironmentProbeAdapter(),
-        obsidian=obsidian,
         updates=build_update_check(DOCTOR_UPDATE_TIMEOUT_SECONDS),
+        graph_store=graph_store,
     )
-
-
-def uses_obsidian_mcp(environment: Environment) -> bool:
-    """Whether notes are searched through Obsidian's MCP server."""
-    return environment.notes.search_backend is SearchEngineEnum.OBSIDIAN_MCP
-
-
-def uses_mcp_writer(environment: Environment) -> bool:
-    """Whether notes are written through Obsidian's MCP server."""
-    return environment.notes.writer_backend is WriterBackendEnum.MCP
 
 
 async def run_diagnostics(
@@ -108,11 +98,10 @@ async def run_diagnostics(
         curator_binary=environment.curator.claude_bin,
         hooks_settings_file=settings_file,
         installed_hook_events=installed_events,
-        obsidian_mcp_url=environment.notes.obsidian_mcp_url
-        if uses_obsidian_mcp(environment)
-        else None,
-        writer_mcp_url=environment.notes.obsidian_mcp_url if uses_mcp_writer(environment) else None,
         vault_required=needs_vault(environment),
         update_package_dir=installed_package_dir(),
+        graph_store_steps=registered_schema_step_names(),
+        graph_store_configured=environment.knowledge.neo4j_password is not None,
+        search_backend=environment.notes.search_backend.value,
     )
     return await build_diagnostics(environment).handle(query)

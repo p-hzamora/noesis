@@ -22,6 +22,13 @@ from .diagnostics_handlers_builder import (
     run_diagnostics,
     run_update_check,
 )
+from .knowledge_handlers_builder import (
+    KnowledgeHandlers,
+    build_knowledge,
+    open_knowledge,
+    registered_schema_step_names,
+    with_knowledge,
+)
 from .notes_handlers_builder import (
     APPLY_FAILED_FOLDER,
     PARKED_FOLDER,
@@ -34,12 +41,12 @@ from .notes_handlers_builder import (
     needs_vault,
     require_vault,
 )
-from .obsidian_mcp_client_builder import build_obsidian_mcp_client
 from .vault_handlers_builder import VaultHandlers, build_vault
 
 __all__ = [
     "AgentHooksHandlers",
     "CaptureHandlers",
+    "KnowledgeHandlers",
     "NotesHandlers",
     "VaultHandlers",
     "APPLY_FAILED_FOLDER",
@@ -53,8 +60,8 @@ __all__ = [
     "build_capture",
     "build_curator",
     "build_diagnostics",
+    "build_knowledge",
     "build_notes",
-    "build_obsidian_mcp_client",
     "build_update_check",
     "build_vault",
     "build_unit_of_work_factory",
@@ -62,7 +69,10 @@ __all__ = [
     "curator_system_prompt",
     "installed_package_dir",
     "needs_vault",
+    "open_knowledge",
+    "registered_schema_step_names",
     "require_vault",
     "run_diagnostics",
     "run_update_check",
+    "with_knowledge",
 ]

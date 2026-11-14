@@ -33,6 +33,7 @@ def _view(environment: Environment) -> ConfigShowResponse:
             "capture": environment.capture.model_dump(mode="json"),
             "curator": environment.curator.model_dump(mode="json"),
             "recall": environment.recall.model_dump(mode="json"),
+            "knowledge": environment.knowledge.model_dump(mode="json"),
         },
     )
 
