@@ -8,7 +8,7 @@ license-files = ["LICENSE"]
 authors = [{ name = "Pablo Hernandez" }]
 requires-python = ">=3.14,<4"
 dependencies = [
-    "mcp>=1.12,<2",
+    "neo4j>=6.4,<7",
     "pydantic>=2.12,<3",
     "pydantic-settings>=2.11,<3",
     "pyyaml>=6.0.2,<7",
@@ -26,6 +26,7 @@ dev = [
     "pytest-asyncio>=1.3",
     "pytest-cov>=7",
     "ruff>=0.14",
+    "testcontainers[neo4j]>=4.15",
     "types-pyyaml>=6.0",
 ]
 
@@ -73,6 +74,7 @@ markers = [
     "unit: fast, isolated, no I/O beyond tmp_path",
     "integration: exercises a real adapter (files, git, subprocess)",
     "architecture: enforces dependency rules",
+    "neo4j: needs Docker; runs against a pinned Neo4j container (testcontainers)",
 ]
 filterwarnings = ["error"]
 
@@ -121,6 +123,7 @@ source_modules = [
     "noesis.shared_kernel.domain",
     "noesis.bounded_context.notes.domain",
     "noesis.bounded_context.capture.domain",
+    "noesis.bounded_context.knowledge.domain",
 ]
 forbidden_modules = ["typer", "subprocess", "pydantic_settings", "noesis.core"]
 allow_indirect_imports = true
@@ -152,6 +155,12 @@ source_modules = ["noesis.bounded_context"]
 forbidden_modules = ["noesis.interfaces", "noesis.core", "typer"]
 
 [[tool.importlinter.contracts]]
+name = "Knowledge layers point inward"
+type = "layers"
+containers = ["noesis.bounded_context.knowledge"]
+layers = ["infrastructure", "application", "domain"]
+
+[[tool.importlinter.contracts]]
 name = "Capture layers point inward"
 type = "layers"
 layers = [
@@ -163,7 +172,11 @@ layers = [
 [[tool.importlinter.contracts]]
 name = "Bounded contexts are independent (they share only the kernel's contracts)"
 type = "independence"
-modules = ["noesis.bounded_context.capture", "noesis.bounded_context.notes"]
+modules = [
+    "noesis.bounded_context.capture",
+    "noesis.bounded_context.knowledge",
+    "noesis.bounded_context.notes",
+]
 
 [[tool.importlinter.contracts]]
 name = "Domain and application layers stay free of I/O libraries"
@@ -173,6 +186,28 @@ source_modules = [
     "noesis.bounded_context.notes.application",
     "noesis.bounded_context.capture.domain",
     "noesis.bounded_context.capture.application",
+    "noesis.bounded_context.knowledge.domain",
+    "noesis.bounded_context.knowledge.application",
     "noesis.diagnostics.application",
 ]
 forbidden_modules = ["yaml", "subprocess", "shutil", "tempfile", "noesis.shared_kernel.infrastructure"]
+
+[[tool.importlinter.contracts]]
+name = "The graph driver stays in infrastructure"
+type = "forbidden"
+source_modules = [
+    "noesis.bounded_context.knowledge.domain",
+    "noesis.bounded_context.knowledge.application",
+    "noesis.bounded_context.notes.domain",
+    "noesis.bounded_context.notes.application",
+    "noesis.bounded_context.capture.domain",
+    "noesis.bounded_context.capture.application",
+    "noesis.diagnostics.application",
+]
+forbidden_modules = ["neo4j"]
+
+[[tool.importlinter.contracts]]
+name = "Kernel contracts import no bounded context"
+type = "forbidden"
+source_modules = ["noesis.shared_kernel.contracts"]
+forbidden_modules = ["noesis.bounded_context"]

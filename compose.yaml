@@ -1,0 +1,31 @@
+# Local Neo4j for noesis's record store (C2).
+#
+# Neo4j Community, pinned to an exact LTS tag (D-023). The test suite reads the image tag from
+# this file (tests/support/neo4j_container.py), so tests and local use cannot drift: change the
+# tag here only.
+#
+# Start:   NOESIS_NEO4J_PASSWORD='<8+ characters>' docker compose up -d
+# Stop:    docker compose down          (data stays in the `neo4j-data` volume)
+#
+# The password is never committed. Put the same value in your user-side noesis profile as
+# NOESIS_NEO4J_PASSWORD (ADR-0001 Amendment 3), with NOESIS_NEO4J_URI=bolt://127.0.0.1:7687
+# and NOESIS_NEO4J_USER=neo4j. NEO4J_AUTH only sets the password when the volume is empty;
+# change it later with `ALTER CURRENT USER SET PASSWORD` in cypher-shell.
+# Ports listen on 127.0.0.1 only. Backups: stop the service, then `neo4j-admin database dump`.
+
+name: noesis
+
+services:
+  neo4j:
+    image: neo4j:5.26.33-community
+    environment:
+      NEO4J_AUTH: neo4j/${NOESIS_NEO4J_PASSWORD:?set NOESIS_NEO4J_PASSWORD (at least 8 characters)}
+    ports:
+      - "127.0.0.1:7474:7474" # HTTP browser
+      - "127.0.0.1:7687:7687" # Bolt
+    volumes:
+      - neo4j-data:/data
+    restart: unless-stopped
+
+volumes:
+  neo4j-data:
