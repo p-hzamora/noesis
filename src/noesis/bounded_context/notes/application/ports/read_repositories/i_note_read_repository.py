@@ -61,8 +61,8 @@ class INoteReadRepository(abc.ABC):
     ) -> NoteContentDto:
         """Resolve current content by identity, checking the record actually read.
 
-        Compatibility implementation for document adapters. A hint permits vault-less MCP
-        reads when no ID listing exists; it is never trusted as identity. Adapters with
+        Compatibility implementation for document adapters. A hint permits reads when no ID
+        listing exists; it is never trusted as identity. Adapters with
         native ID lookup can override this operation without using a path.
         """
         summary: NoteSummaryDto | None = await self.find_by_id(note_id, scope=scope)

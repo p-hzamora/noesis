@@ -31,3 +31,9 @@ class CuratorPromptUnreadableError(CoreException):
     """The configured curator system prompt file cannot be read."""
 
     __error_code__ = "CORE_005_CURATOR_PROMPT_UNREADABLE"
+
+
+class RemovedBackendError(CoreException):
+    """A setting names a storage or search backend that noesis no longer ships."""
+
+    __error_code__ = "CORE_006_REMOVED_BACKEND"

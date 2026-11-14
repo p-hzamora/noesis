@@ -36,7 +36,6 @@ from noesis.bounded_context.notes.domain.value_objects import (
 from noesis.exceptions import (
     DomainException,
     NoteStorageError,
-    ObsidianMcpError,
     RecallAgentFailedError,
 )
 from noesis.shared_kernel.application.handlers import IHandler
@@ -237,7 +236,7 @@ class RecallNotesHandler(IHandler[RecallNotesQuery, RecallDigestDto]):
                 note: NoteContentDto = await self._read_repository.read_by_id(
                     NoteId(value=selected_note.id), scope=scope, path_hint=path
                 )
-            except (NoteStorageError, ObsidianMcpError) as error:
+            except NoteStorageError as error:
                 warnings.append(f"Could not read {path}: {error.args[0]}")
                 continue
             content, hidden = SecretRedactor.redact(note.content)

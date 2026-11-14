@@ -52,7 +52,7 @@ class NoteSearchResponse(NoteListResponse):
 
     Attributes:
         backend: The implemented backend that produced `notes`, which is
-            `filesystem` after a fallback even when `obsidian-mcp` is configured.
+            `filesystem` after a fallback even when `vectra` is configured.
     """
 
     backend: SearchEngineEnum
@@ -62,7 +62,7 @@ class NoteSearchResponse(NoteListResponse):
 
 
 class NoteSearchFallbackResponse(NoteSearchResponse):
-    """`noesis notes search` when Obsidian could not answer and files were searched instead.
+    """`noesis notes search` when the configured backend could not answer and files were searched instead.
 
     Only this variant carries `notice`.
 

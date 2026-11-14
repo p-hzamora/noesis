@@ -4,7 +4,7 @@ Isolated like the curator, and stricter: no tools (`--tools ""`), no MCP servers
 (`--strict-mcp-config` with none given), no user or project settings (`--setting-sources ""`,
 so no hooks or plugins), no saved session and a budget cap. The agent never touches the vault:
 noesis reads the notes, masks secrets and sends their text on stdin, so what the agent can
-see is exactly what was sent. `NOESIS_OBSIDIAN_MCP_TOKEN` is removed from its environment.
+see is exactly what was sent. Variables named in `WITHHELD_VARIABLES` are removed from its environment.
 """
 
 import asyncio
@@ -24,7 +24,7 @@ from .recall_response_schema import RESPONSE_JSON_SCHEMA, RecallBriefingModel
 
 SYSTEM_PROMPT_RESOURCE: str = "recall_system.md"
 RECURSION_GUARD: Mapping[str, str] = {"NOESIS_HOOK": "1"}
-WITHHELD_VARIABLES: frozenset[str] = frozenset({"NOESIS_OBSIDIAN_MCP_TOKEN"})
+WITHHELD_VARIABLES: frozenset[str] = frozenset({"NOESIS_NEO4J_PASSWORD"})
 ERROR_TAIL_LENGTH: int = 300
 WORDS_PER_TOKEN: float = 0.75
 

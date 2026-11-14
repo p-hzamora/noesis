@@ -14,17 +14,16 @@ from noesis.bounded_context.notes.domain.value_objects import (
     NoteOriginEnum,
     NoteScope,
 )
-from noesis.exceptions import ObsidianMcpError
 
 
 class FallbackNoteReadRepositoryAdapter(INoteReadRepository):
     """Searches with `preferred`; when it fails, searches with `fallback` instead.
 
-    `fails_with` names the errors that mean "preferred is unavailable" (Obsidian's MCP server
-    unreachable by default; a vectra collection that cannot answer for the vectra backend).
+    `fails_with` names the errors that mean "preferred is unavailable" (for the vectra backend,
+    a vectra collection that cannot answer).
 
     After the first failure the preferred repository is not tried again by this instance, so
-    one process pays the unreachable-server timeout once, and `on_fallback` fires once.
+    one process pays the failure once, and `on_fallback` fires once.
     """
 
     def __init__(
@@ -33,7 +32,7 @@ class FallbackNoteReadRepositoryAdapter(INoteReadRepository):
         fallback: INoteReadRepository,
         *,
         on_fallback: Callable[[Exception], None],
-        fails_with: tuple[type[Exception], ...] = (ObsidianMcpError,),
+        fails_with: tuple[type[Exception], ...],
     ) -> None:
         self._preferred: INoteReadRepository = preferred
         self._fallback: INoteReadRepository = fallback
@@ -59,17 +58,17 @@ class FallbackNoteReadRepositoryAdapter(INoteReadRepository):
     async def list_notes(
         self, *, scope: NoteScope | None, origin: NoteOriginEnum | None
     ) -> list[NoteSummaryDto]:
-        """Always the fallback: listing never goes through Obsidian."""
+        """Always the fallback: listing never goes through the preferred repository."""
         return await self._fallback.list_notes(scope=scope, origin=origin)
 
     async def find_active(self, scope: NoteScope, kind: NoteKind) -> list[NoteSummaryDto]:
-        """Always the fallback: lookups never go through Obsidian."""
+        """Always the fallback: lookups never go through the preferred repository."""
         return await self._fallback.find_active(scope, kind)
 
     async def find_by_id(
         self, note_id: NoteId, *, scope: NoteScope | None
     ) -> NoteSummaryDto | None:
-        """Always the fallback: lookups never go through Obsidian."""
+        """Always the fallback: lookups never go through the preferred repository."""
         return await self._fallback.find_by_id(note_id, scope=scope)
 
     async def read_note(self, path: str, *, scope: NoteScope | None) -> NoteContentDto:

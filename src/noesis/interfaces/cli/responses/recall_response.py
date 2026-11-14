@@ -83,7 +83,7 @@ class RecallResponse(IRenderableResponse):
         considered: How many notes the search returned and the ranking looked at.
         omitted: How many of those are not in `entries` (past the limit or over the budget).
         backend: The implemented backend that produced the notes, which is `filesystem`
-            after a fallback even when `obsidian-mcp` is configured.
+            after a fallback even when `vectra` is configured.
         synthesis: `briefing` (an agent wrote `briefing`), `no_evidence` (nothing found, no
             agent ran) or `digest` (`--no-synthesis`).
         briefing: The briefing; null unless `synthesis` is `briefing`.
@@ -119,7 +119,7 @@ class RecallResponse(IRenderableResponse):
 
 
 class RecallFallbackResponse(RecallResponse):
-    """`noesis notes recall` when Obsidian could not answer and files were searched instead.
+    """`noesis notes recall` when the configured backend could not answer and files were searched instead.
 
     Only this variant carries `notice`.
 

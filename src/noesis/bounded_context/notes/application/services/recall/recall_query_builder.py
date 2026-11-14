@@ -119,7 +119,7 @@ class RecallQueryBuilder:
     def queries(task: str, *, max_queries: int = MAX_QUERIES) -> tuple[str, ...]:
         """One search query per keyword of `task`, because a search wants every word of a query.
 
-        Obsidian's simple search answers only notes that contain all the words, so the whole
+        A simple search answers only notes that contain all the words, so the whole
         sentence as one query finds nothing. Searching the keywords one at a time and merging the
         hits finds the notes that share any of them. A hyphenated name such as `cv-generator` is
         kept whole (that is how notes write it) before its parts, so the part `cv`, too short to

@@ -53,12 +53,8 @@ from noesis.bounded_context.notes.infrastructure.outbound.storage import (
     FilesystemNoteReadRepositoryAdapter,
     FilesystemNoteRepositoryAdapter,
     FilesystemNotesUnitOfWorkAdapter,
-    McpNoteRepositoryAdapter,
-    McpNotesUnitOfWorkAdapter,
     MultiSourceNoteReadRepositoryAdapter,
-    ObsidianMcpNoteReadRepositoryAdapter,
     SourceReader,
-    UnavailableNoteReadRepositoryAdapter,
     VectraNoteReadRepositoryAdapter,
     VectraNoteRepositoryAdapter,
     VectraNotesUnitOfWorkAdapter,
@@ -75,12 +71,9 @@ from noesis.exceptions import (
 from noesis.shared_kernel.enums import SearchEngineEnum, WriterBackendEnum
 from noesis.shared_kernel.infrastructure.outbound.clock import SystemClockAdapter
 
-from .obsidian_mcp_client_builder import build_obsidian_mcp_client
-
 PARKED_FOLDER: tuple[str, ...] = ("notes", "parked")
 APPLY_FAILED_FOLDER: tuple[str, ...] = ("notes", "apply-failed")
 CLAUDE_EFFORT_LEVELS: tuple[str, ...] = ("low", "medium", "high", "xhigh", "max")  # `claude --help`
-MCP_FALLBACK_NOTICE: str = "Obsidian MCP unreachable, searched files instead"
 VECTRA_FALLBACK_NOTICE: str = "vectra could not search, searched files instead"
 VECTRA_SYNC_NOTICE: str = "Notes written, but vectra could not index them; run `vectra sync`"
 
@@ -235,15 +228,12 @@ def build_read_repository(
 ) -> INoteReadRepository:
     """The note read repository for `NOESIS_SEARCH_BACKEND`, independent of the writer.
 
-    `filesystem` (default) never touches the network. `obsidian-mcp` searches through Obsidian
-    and degrades to the filesystem, appending one notice to `notices`, when it is unreachable.
-    Without a vault (`vault` is None: writer `mcp` and search `obsidian-mcp`) there is nothing
-    to fall back to: a search failure is raised and `notes list` fails with
-    `VaultNotConfiguredError`. The same repository serves `notes search`, `notes list`
-    and the curator's related-notes lookup.
+    `filesystem` (default) never touches the network. `vectra` searches the collection and
+    degrades to the filesystem, appending one notice to `notices`, when vectra fails. The same
+    repository serves `notes search`, `notes list` and the curator's related-notes lookup.
 
     Raises:
-        VaultNotConfiguredError: Search is `filesystem` and `vault` is None.
+        VaultNotConfiguredError: `vault` is None.
     """
     backend: SearchEngineEnum = environment.notes.search_backend
     match backend:
@@ -251,20 +241,6 @@ def build_read_repository(
             if vault is None:
                 raise _vault_not_configured()
             return FilesystemNoteReadRepositoryAdapter(vault, mapper)
-        case SearchEngineEnum.OBSIDIAN_MCP:
-            client = build_obsidian_mcp_client(environment)
-            if vault is None:
-                return ObsidianMcpNoteReadRepositoryAdapter(
-                    client,
-                    mapper,
-                    listing=UnavailableNoteReadRepositoryAdapter(_vault_not_configured),
-                )
-            files = FilesystemNoteReadRepositoryAdapter(vault, mapper)
-            return FallbackNoteReadRepositoryAdapter(
-                ObsidianMcpNoteReadRepositoryAdapter(client, mapper, listing=files),
-                files,
-                on_fallback=lambda _error: notices.append(MCP_FALLBACK_NOTICE),
-            )
         case SearchEngineEnum.VECTRA:
             if vault is None:
                 raise _vault_not_configured()
@@ -323,7 +299,7 @@ def with_declared_sources(
     """`primary` alone, or merged with the manifest's other sources.
 
     The primary keeps following the environment (`NOESIS_SEARCH_BACKEND`). Every other source
-    is one more `INoteReadRepository`, whatever its role: a `filesystem` or `obsidian` source
+    is one more `INoteReadRepository`, whatever its role: a `filesystem` source
     reads its `path` (relative to the vault) as files; a `vector` source is the vectra
     collection named after the source, indexing that same `path`, and degrades to its files
     when vectra cannot answer. Without a vault, or without a `client` for a `vector` source,
@@ -357,8 +333,7 @@ def build_unit_of_work_factory(
     """The factory of units of work for `NOESIS_WRITER_BACKEND`.
 
     `filesystem` writes files under the vault (so it needs one, checked now, before the
-    curator spends budget); `mcp` writes through Obsidian's MCP server; `vectra` writes the
-    files and then syncs them into `NOESIS_VECTRA_COLLECTION`, appending one notice to
+    curator spends budget); `vectra` writes the files and then syncs them into `NOESIS_VECTRA_COLLECTION`, appending one notice to
     `notices` when the sync fails (the notes are written all the same).
 
     Raises:
@@ -371,9 +346,6 @@ def build_unit_of_work_factory(
             return lambda: FilesystemNotesUnitOfWorkAdapter(
                 FilesystemNoteRepositoryAdapter(vault, mapper)
             )
-        case WriterBackendEnum.MCP:
-            client = build_obsidian_mcp_client(environment)
-            return lambda: McpNotesUnitOfWorkAdapter(McpNoteRepositoryAdapter(client, mapper))
         case WriterBackendEnum.VECTRA:
             root: Path = require_vault(environment)
             vectra: VectraCliClient = build_vectra_client(environment)
