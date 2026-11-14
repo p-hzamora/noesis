@@ -126,11 +126,12 @@ noesis [--env-file <path>] notes search "<words>" --repo <repo> --json   # best 
 noesis [--env-file <path>] notes list --repo <repo> --origin auto --json  # auto | manual
 ```
 
-If the user set `NOESIS_SEARCH_BACKEND=obsidian-mcp`, search goes through Obsidian (it also finds
-notes noesis did not write; those have `kind: null`). When Obsidian is closed the same command
-still exits 0 with file results and the message `Obsidian MCP unreachable, searched files instead`
-(in `--json`, as `result.notice`): tell the user, do not retry. `noesis doctor` shows whether the
-MCP answers and serves the vault of `NOESIS_VAULT_DIR`.
+Search scans the vault's Markdown files by default. With `NOESIS_SEARCH_BACKEND=vectra` it
+searches a vectra collection and, when vectra fails, the same command still exits 0 with file
+results and the message `vectra could not search, searched files instead` (in `--json`, as
+`result.notice`): tell the user, do not retry. The values `obsidian-mcp` (search) and `mcp`
+(writer) were removed; a configuration naming one fails with `CORE_006_REMOVED_BACKEND` and its
+`next_steps` say to use `filesystem`.
 
 Results carry each note's `path`. For the full text, read that file under the vault
 folder (`noesis [--env-file <path>] config show --json` -> `settings.notes.vault_dir`).
@@ -161,8 +162,8 @@ task. It takes up to about a minute and calls a model, so run it once.
   - `no_evidence`: nothing in the vault matched. Say so and go on. Do not retry with other wording.
   - `digest`: only with `--no-synthesis`; `entries` are pointers and snippets, no model ran.
 - Tell the user which notes you relied on (their `sources`) and keep inferences labelled as such.
-  Check `result.warnings` (notes unreadable, text cut, secrets masked) and `notice` (Obsidian was
-  unreachable and files were searched); mention them, do not retry.
+  Check `result.warnings` (notes unreadable, text cut, secrets masked) and `notice` (the search backend
+  failed and files were searched); mention them, do not retry.
 - `--limit` (1..20, default 5) is how many notes are read; `--budget-tokens` (default 1000, `0`
   none) is the length asked of the briefing. `--no-synthesis` lists the best notes only, with no
   model and no cost.
@@ -207,6 +208,52 @@ sent is kept, so nothing is lost: `error.metadata` has `rejected` (entry `index`
 and run `apply` again with `--decisions-file <payload_path>`. If the record itself cannot be
 kept, the payload is in `error.metadata.raw_payload`.
 
+## The record store (Neo4j)
+
+`record` and `store` keep structured records in a local Neo4j database, separate from the vault.
+They need `NOESIS_NEO4J_PASSWORD` in the user's profile or environment; never put it in a file
+inside a repository. Run from inside the repository: the record's project defaults to its name.
+
+```bash
+noesis store init --json                                  # once: applies schema steps, creates the default space
+noesis record capture --type knowledge --title "<short>" --body "<text>" --subtype decision \
+  --source commit:<full sha> --tag area:billing --idempotency-key <key> --json
+noesis record capture --type experience --body "<what happened>" --subtype failure \
+  --source agent_session:<id> --occurred <ISO time> --idempotency-key <key> --json
+noesis record revise <ID> --expected-revision <N> --body "<new text>" --idempotency-key <key> --json
+noesis record get <ID> [--revision <N>] --json
+```
+
+- `--idempotency-key` is required on every `record capture` and `record revise` (a missing one is
+  exit 2 and nothing is touched). Make it deterministic from the work (for example
+  `<session id>-<commit sha>-<slug>`), not random: a retry must repeat it. The same key and request
+  returns the first record (`result.replayed: true`) without writing; the same key with another
+  request fails with `KNOWLEDGE_203_IDEMPOTENCY_KEY_REUSED` (pick a new key only if you really
+  changed the request).
+- On `INTEGRATION_103_GRAPH_STORE_UNAVAILABLE` the outcome may be unknown
+  (`error.metadata.commit_outcome: unknown`): retry with the same key; if the record exists you get
+  it back, otherwise it is written once. Do not report the record as stored until a call succeeds.
+  Never loop: tell the user to start Neo4j and run `noesis doctor`.
+- At least one source is required: `--source <kind>:<locator>` (repeatable; kinds `commit` with the
+  full sha, `agent_session`, `file_version` as `vault://<vault_key>/<path>`, `url`, `work_brief`) and
+  `--source-id <ULID>` for a source already stored. `--body -` reads the text from stdin; the body
+  is never read from stdin implicitly.
+- The actor is set by noesis: `agent` when you run inside a harness, never a flag. Do not try to
+  pass yourself off as the user.
+- Knowledge is captured as `proposed`; a person decides later. `record revise` works on proposed
+  knowledge only and needs `--expected-revision` (the head from `record get`):
+  `KNOWLEDGE_202_REVISION_CONFLICT` means someone else revised it, so `record get`, re-apply, retry
+  with a new key. Experiences cannot be revised (`KNOWLEDGE_207_RECORD_NOT_REVISABLE`).
+- `noesis store init` is for a person or setup step, and only when `KNOWLEDGE_204_STORE_NOT_INITIALISED`
+  says so (its `next_steps` name the command; run it if the user agrees). Its result lists
+  `applied_steps`, `already_applied_steps` and the `default_space`; there is no schema version.
+- Codes you may meet (all exit 1): `INTEGRATION_103` store unreachable, `INTEGRATION_104` wrong
+  user or password (tell the user; do not retry), `INTEGRATION_105` busy (retry once with the same
+  key), `INTEGRATION_106`/`INTEGRATION_107` store defects (report them), `KNOWLEDGE_201` unknown
+  id or another space, `KNOWLEDGE_202` stale revision, `KNOWLEDGE_203` key reused,
+  `KNOWLEDGE_204` store not initialised, `KNOWLEDGE_205` a `--source-id` not in the space,
+  `KNOWLEDGE_207` not revisable, `KNOWLEDGE_208` space missing (`store init`).
+
 ## Failed curations
 
 ```bash
@@ -216,7 +263,7 @@ noesis [--env-file <path>] notes retry <TICKET> --json   # retry one, in the for
 
 `notes curate --dry-run` runs the curator and shows what it would store, without writing and
 without parking. A brief is parked when the curator keeps failing and also when storing the notes fails (vault
-folder not writable, Obsidian's MCP unreachable): both are `NOTES_201_CURATION_FAILED` with a
+folder not writable): both are `NOTES_201_CURATION_FAILED` with a
 `ticket` in `error.metadata`. Follow its `next_steps`: fix the cause, then `notes retry
 <TICKET>`. A storage failure may carry `written` and `not_written` paths (some notes were stored
 before it failed); retry overwrites them all, so do not write notes by hand.
@@ -224,15 +271,13 @@ before it failed); retry overwrites them all, so do not write notes by hand.
 ## Where notes are stored
 
 `NOESIS_WRITER_BACKEND` selects the writer: `filesystem` (default; files under
-`NOESIS_VAULT_DIR`, which can be an NFS mount) or `mcp` (through Obsidian's MCP server, using the
-`NOESIS_OBSIDIAN_MCP_*` settings). Search follows `NOESIS_SEARCH_BACKEND` independently. The
-vault folder is only required where files are used (not with writer `mcp` + search
-`obsidian-mcp`, except for `notes list`).
+`NOESIS_VAULT_DIR`, which can be an NFS mount) or `vectra` (files, then synced into a vectra
+collection). Search follows `NOESIS_SEARCH_BACKEND` independently. The vault folder is required.
 
 ## Setup and diagnosis
 
 ```bash
-noesis [--env-file <path>] doctor --json                       # vault, state dir, git, curator CLI, hooks, writer, search backend, update (warn only)
+noesis [--env-file <path>] doctor --json                       # vault, state dir, git, curator CLI, hooks, writer, search backend, graph_store (Neo4j reachable + schema steps; warn only without a password), update (warn only)
 noesis [--env-file <path>] config show --json                  # effective settings and their file
 noesis [--env-file <path>] config init --vault-dir <folder>    # create the env file (default ~/.config/noesis/.env)
 noesis update check --json                             # behind / ahead / diverged / up_to_date / unknown vs origin; exit 0 always

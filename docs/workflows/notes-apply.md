@@ -12,7 +12,7 @@ sequenceDiagram
     participant Boot as build_apply
     participant H as ApplyCurationHandler
     participant Pol as AutoCurationPolicy (domain)
-    participant UoW as INotesUnitOfWork<br/>(files, or Obsidian MCP: NOESIS_WRITER_BACKEND)
+    participant UoW as INotesUnitOfWork<br/>(files, or files + vectra sync: NOESIS_WRITER_BACKEND)
     participant Log as IApplyFailureLog<br/>(JsonFileApplyFailureLogAdapter)
 
     Cmd->>Git: repository root of the working directory

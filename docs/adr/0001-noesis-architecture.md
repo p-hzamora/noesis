@@ -228,3 +228,36 @@ Decisions:
 Capture is unchanged except for the command string its detached publisher spawns (`notes
 curate`). The hook entries in Claude Code's settings (`noesis ... hook claude-code`) are
 untouched.
+
+## Amendment 6 (2026-11-14): the Obsidian MCP backends are removed
+
+Chunk C2 (`c2-core-model-neo4j-store`, decisions D-018 and D-019) retires everything that
+reached the vault through Obsidian's MCP server, because noesis is meant to replace proprietary
+programs and the new store does not need them. This amendment only records the removal; the
+text above, including Amendment 2, stays as it was written and describes what was true then.
+
+Removed: `SearchEngineEnum.OBSIDIAN_MCP` (`obsidian-mcp`) and `WriterBackendEnum.MCP` (`mcp`);
+the MCP note repository, unit of work and read adapters; `ObsidianMcpClient` and
+`build_obsidian_mcp_client`; the `obsidian_mcp_url`, `obsidian_mcp_token` and
+`obsidian_mcp_timeout_seconds` settings (`NOESIS_OBSIDIAN_MCP_*`); the doctor probe and the
+`mcp` branches of the `writer` and `search_backend` checks; `ObsidianMcpError` and
+`ObsidianMcpToolError`; the token entry in the recall agent's withheld variables.
+
+Effect on Amendment 2: D-007 (client builder), D-008, D-009, D-010, D-011 and D-014 (doctor
+probe) described only the MCP backend and no longer apply; D-006 now lists `filesystem` and
+`vectra`. Rules R3, R7 and R9 are retired; R4 loses its MCP clause; R6 no longer has an MCP
+exception (every remaining backend uses the vault folder).
+
+Decisions:
+
+- **D-024** A setting that names a removed value (`NOESIS_SEARCH_BACKEND=obsidian-mcp`,
+  `NOESIS_WRITER_BACKEND=mcp`) fails at settings validation with `RemovedBackendError`
+  (`CORE_006_REMOVED_BACKEND`, exit 1) whose next step says to use `filesystem`. The leftover
+  `NOESIS_OBSIDIAN_MCP_*` variables are ignored.
+- **D-025** `INTEGRATION_102_OBSIDIAN_MCP_FAILED` stays reserved and is never reused.
+- **D-026** The `doctor` checks `writer` and `search_backend` keep their names and report
+  `filesystem`; no check mentions Obsidian.
+
+Not removed: `FallbackNoteReadRepositoryAdapter` (the Vectra fallback uses it; its default
+`fails_with` is gone, callers pass the errors). The `obsidian` manifest source type and the
+Obsidian-vault wording for a plain folder are untouched.

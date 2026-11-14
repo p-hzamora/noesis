@@ -8,10 +8,10 @@ sequenceDiagram
     participant H as CurateWorkBriefHandler
     participant A as ApplyCurationHandler
     participant Map as WorkBriefMapper
-    participant Read as INoteReadRepository<br/>(filesystem keyword search, or Obsidian MCP<br/>with filesystem fallback)
+    participant Read as INoteReadRepository<br/>(filesystem keyword search, or vectra<br/>with filesystem fallback)
     participant Cur as ICurator<br/>(ClaudeCliCuratorAdapter)
     participant Pol as AutoCurationPolicy (domain)
-    participant UoW as INotesUnitOfWork<br/>(files, or Obsidian MCP: NOESIS_WRITER_BACKEND)
+    participant UoW as INotesUnitOfWork<br/>(files, or files + vectra sync: NOESIS_WRITER_BACKEND)
     participant Q as IParkedCurationQueue
 
     Cmd->>Cmd: load F as WorkBriefContract (else INVALID_WORK_BRIEF)
@@ -20,7 +20,7 @@ sequenceDiagram
     H->>Map: to_domain(contract)
     Map-->>H: WorkBrief (scope, search_text, provenance)
     H->>Read: search(brief.search_text(), scope, limit=8)
-    Read-->>H: related NoteSummaryDto[]<br/>(never fails: MCP errors fall back to files)
+    Read-->>H: related NoteSummaryDto[]<br/>(never fails: vectra errors fall back to files)
     loop up to max_attempts
         H->>Cur: judge(brief, related)
         Cur-->>H: CurationDecision[] or CuratorFailedError
@@ -36,7 +36,7 @@ sequenceDiagram
             Pol-->>A: created / updated / skipped (manual note wins)
             A->>UoW: notes.save(note)
         end
-        A->>UoW: commit (MCP: validate all, send one by one, not atomic)
+        A->>UoW: commit (files written one by one, not atomic)
         alt NoteStorageError (lookup or commit)
             A-->>H: NoteStorageError (curate's apply has no failure log)
             H->>Q: park(contract, error) -> ticket

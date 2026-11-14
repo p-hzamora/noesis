@@ -12,6 +12,11 @@ to hand over. Knows sessions, commits, and transcripts; knows nothing about note
 Owns a note from its creation through validation to storing it or not. Knows notes,
 curation, and storage; knows nothing about agent sessions.
 
+**Knowledge** (bounded context):
+Owns records and their history: spaces, projects, sources, immutable revisions, and the Neo4j
+store that holds them. Knows records and ids; knows nothing about files, notes or agent sessions.
+Distinct from the **Knowledge** record type below.
+
 **Capture session**:
 One agent session that the user switched on for capture. Holds the commits waiting to be
 handed over and how far the transcript has been read.
@@ -93,3 +98,60 @@ e.g. a gitignored `company/<org>`; scope stays `repo:<name>`, only the folder ch
 is decided by a remote glob (recommended: glob only, the file is pushed with the vault) or a
 `repos` list. `vault doctor` has no remotes, so it infers membership from the group root a
 repository's notes sit under (`{root}/repos/<name>/`).
+
+**Record**:
+Anything the knowledge store keeps under a ULID that is unique across all record types: a
+knowledge item, an experience, an assertion, a source, a project or a catalog entry. A record
+belongs to exactly one knowledge space, fixed at creation.
+
+**Knowledge space**:
+The top-level container of records, a node in the one database (`NOESIS_KNOWLEDGE_SPACE`, default
+`personal`). Its key is unique; every record, project and idempotency key lives in one. An id from
+another space is "not found". Separate trust domains are separate Neo4j instances.
+
+**Project**:
+A named anchor inside a space (key unique within the space), created on capture from the git root
+name. It scopes applicability; it does not own records.
+
+**Revision**:
+One immutable, numbered version of a knowledge item, 1..n without gaps, each with an actor and at
+least one source. Only the head revision number is stored on the record and doubles as the
+optimistic-concurrency token: `record revise` must name the expected head.
+
+**Source**:
+Write-once evidence a record cites, kept before the records that use it: a `file_version`,
+`commit`, `agent_session`, `url` or `work_brief`, with a locator and an optional digest. Its
+natural key (space, kind, locator, digest) is unique.
+
+**Ownership** (file-owned / graph-owned):
+Who holds the text of a knowledge item, fixed at creation. A file-owned item keeps its text in a
+file and its revisions record only the content hash, the file-version source id and the title as
+read. A graph-owned item keeps title and body in its revisions, after secret redaction.
+
+**Knowledge** (record type):
+A statement of guidance with a subtype, an applicability (optional project plus tags), a status
+(`proposed`, `accepted`, `superseded`, `retracted`) and numbered revisions. Starts `proposed`; it may
+be revised only while `proposed`.
+
+**Experience**:
+A write-once record of something that happened (`observation`, `outcome`, `failure`) with at least
+one source. It has no status and no revisions.
+
+**Assertion**:
+An immutable claim between two records (`supports`, `contradicts`, `supersedes`, `recommends`) with
+evidence and a rationale; only its status changes. Modelled in the domain, stored by a later chunk.
+
+**Catalog entry**:
+A record of a tool agents may use (`skill`, `agent`, `cli_tool`, `mcp_server`) with append-only
+revisions of purpose, version, prerequisites and location. Availability is never a property.
+Modelled in the domain, stored by a later chunk.
+
+**Idempotency key**:
+The caller's required token on every mutating `record` command. The same key and request returns the
+original result without writing; the same key with a different request is rejected. Kept
+indefinitely in the ledger.
+
+**Schema step**:
+A named, additive, idempotent change to the store's schema (`core` is the first). `noesis store
+init` applies every registered step once and records it; a command may require a step by name.
+There is no numeric schema version.

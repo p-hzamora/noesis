@@ -77,9 +77,9 @@ Default output is the briefing as Markdown, then the notes it was written from:
 
 ## Finding the notes
 
-Obsidian's search (`search_simple`) only returns notes that contain **every** word of the query
-(checked against a live vault: the whole task sentence found nothing, `cv-generator` alone found
-24 notes). So recall does not send the sentence. It:
+A simple keyword search only returns notes that contain **every** word of the query (checked
+against a live vault: the whole task sentence found nothing, `cv-generator` alone found 24
+notes). So recall does not send the sentence. It:
 
 1. Keeps keywords of 3+ letters without stopwords. A hyphenated name such as `cv-generator` is kept
    whole and also split (`cv-generator`, `generator`); at most 12 queries, earliest first.
@@ -111,8 +111,7 @@ Ties break by merged rank, then stable note ID. A note is only down-weighted, ne
 - **Secrets.** Private-key blocks, well-known token shapes (`sk-…`, `ghp_…`, `AKIA…`, `xox…`),
   bearer tokens and `password|secret|token|api_key = value` assignments become `[REDACTED]` before
   sending, and the count is reported as a warning. This is a safety net, not a guarantee: a secret
-  with no recognisable shape or name passes. `NOESIS_OBSIDIAN_MCP_TOKEN` is removed from the
-  agent's environment.
+  with no recognisable shape or name passes.
 - **Untrusted text.** Notes are data; the packaged instructions tell the agent not to obey them,
   and a note cannot close its own `<note>` block. With no tools, an injected note can at worst
   skew the briefing, which is why citations are checked.
@@ -184,8 +183,7 @@ only passes it on. The model the CLI reports is shown as `briefing.model`.
 | no keywords left in the task | `NOTES_204_NO_RECALL_TERMS`, exit 1 |
 | blank task, `--limit` or `--budget-tokens` out of range | usage error, exit 2 |
 | vault not configured | `CORE_002_VAULT_NOT_CONFIGURED`, exit 1 |
-| Obsidian unreachable, vault set | files searched and read, exit 0, `Obsidian MCP unreachable, searched files instead` as `notice` |
-| Obsidian unreachable, no vault | `INTEGRATION_102_OBSIDIAN_MCP_FAILED`, exit 1 (never `no_evidence`) |
+| vectra fails, vault set | files searched and read, exit 0, `vectra could not search, searched files instead` as `notice` |
 | agent missing, failed, timed out, wrong model or effort, or unusable answer | `NOTES_103_RECALL_AGENT_FAILED`, exit 1, `metadata.candidates` lists the notes that would have been read, next step `--no-synthesis` |
 | notes found but none readable | `NOTES_102_NOTE_STORAGE_FAILED`, exit 1 |
 | some notes unreadable | exit 0, a `warnings` entry per note |
@@ -197,7 +195,7 @@ A failed briefing is never reported as success and never silently degraded to a 
 - The agent cannot search on its own: it sees the top `--limit` notes noesis chose. If the right
   note ranks lower, raise `--limit` (a higher limit reads more notes and costs more).
 - Citations are checked to name a note that was read, not that the note supports the claim.
-- Obsidian's score sign and order were not verified; noesis keeps the engine's order.
+- The search engine's score sign and order were not verified; noesis keeps the engine's order.
 - There is no recall check in `noesis doctor` yet.
 
 Back to [workflows](README.md).
@@ -207,7 +205,7 @@ Back to [workflows](README.md).
 Recall entries include `id`; paths remain source-relative display/compatibility fields.
 Two records at the same path in different sources remain separate when their IDs differ.
 Full reads resolve the ID, checking the returned identity and requested scope. Local file
-renames can resolve by the unchanged ID; vault-less MCP uses a checked path hint.
+renames can resolve by the unchanged ID; a checked path hint is accepted when no ID listing exists.
 
 Briefing items retain `sources` (paths) and add `source_ids` (verified IDs). The model is
 asked to cite note IDs. Legacy path citations are accepted only if unambiguous among the

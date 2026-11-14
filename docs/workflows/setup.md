@@ -9,8 +9,6 @@ flowchart LR
     rd -->|installed hook events as plain values| hs[GetAgentHooksStatusHandler]
     rd --> dh[RunDiagnosticsHandler]
     dh --> probe[SystemEnvironmentProbeAdapter]
-    dh -.->|"only when search is obsidian-mcp or writer is mcp"| mp[ObsidianMcpProbeAdapter]
-    mp -->|"vault_list root; write and delete noesis-doctor-probe.md"| obs[("Obsidian MCP")]
     probe --> checks["env file, vault dir, state dir,<br/>curator binary, Claude Code hooks,<br/>writer, search backend"]
     dh --> upd["CheckForUpdateHandler → ICheckoutInspector (git)"]
     upd --> checks
@@ -23,17 +21,11 @@ flowchart LR
     sg["skills get NAME"] --> guides
 ```
 
-The `writer` check (between `claude_code_hooks` and `search_backend`) is ok with no MCP call
-on the default `filesystem` writer; with `NOESIS_WRITER_BACKEND=mcp` it writes and deletes
-`noesis-doctor-probe.md` at the vault root and fails (exit 1) when the server is unreachable or
-refuses the write or the delete. The `vault` check fails on an unset vault only when a vault is required (writer or
-search on `filesystem`).
-
-The `search_backend` check makes no MCP call on the default `filesystem` backend. With
-`obsidian-mcp` it lists the root of the vault Obsidian serves and compares the non-hidden
-entry names with `NOESIS_VAULT_DIR`: unreachable server or a different vault fails the check
-(exit 1) with a next step. Obsidian does not report which folder it serves, so equal root
-listings are the evidence of "same vault".
+The `writer` check (between `claude_code_hooks` and `search_backend`) reports the filesystem
+writer and makes no write; the `vault` check says whether files can land. The `vault` check
+fails on an unset vault only when a vault is required. The `search_backend` check reports
+`filesystem`. No check mentions Obsidian: the Obsidian MCP backends were removed, and a
+configuration that still names one fails before `doctor` runs, with `CORE_006_REMOVED_BACKEND`.
 
 The last check, `update`, compares the noesis checkout's git HEAD with origin's default
 branch (the same query as `noesis update check`, with a 3 s budget). It never fails the

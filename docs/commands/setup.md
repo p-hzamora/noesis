@@ -5,7 +5,7 @@ the skill: [install](../install.md).
 
 | Command | Does | Options |
 |---|---|---|
-| `doctor` | Check configuration, folders and required executables (vault, state dir, git, curator CLI, hooks, writer, search backend, update). Exit 1 if anything fails. | |
+| `doctor` | Check configuration, folders and required executables (vault, state dir, git, curator CLI, hooks, writer, search backend, graph store, update). Exit 1 if anything fails. The `graph_store` check reports Neo4j reachable with its applied schema steps; unreachable, rejected credentials or a missing step fail it (`noesis store init` is the fix for a missing step); an unset `NOESIS_NEO4J_PASSWORD` is only a warning. | |
 | `config show` | Print the effective settings and the file they were read from. | |
 | `config init` | Write a commented configuration file to `~/.config/noesis/.env` (or `--env-file`). | `--vault-dir <path>` writes `NOESIS_VAULT_DIR`; `--force` overwrites an existing file |
 | `skills list` | List the guides this noesis version ships. | |

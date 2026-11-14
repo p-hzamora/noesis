@@ -22,3 +22,4 @@ Legend used in every diagram:
 8. [`notes recall TASK`](notes-recall.md)
 9. [`integrate claude-code install | uninstall | status`](integrate-claude-code.md)
 10. [`doctor`, `config`, `skills`](setup.md)
+11. [Running the knowledge store (Neo4j): compose, password, `store init`, backups](store.md)

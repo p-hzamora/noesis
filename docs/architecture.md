@@ -11,15 +11,23 @@ context-first topology described in ADR-0001. For what each command does step by
 [workflows/](workflows/README.md); for each command's options and output, see
 [commands/](commands/README.md).
 
+Project-wide rules, one section each, are in [architecture-rules.md](architecture-rules.md).
+
 ```text
 src/noesis/
   core/            settings (pydantic-settings, one AppBaseSettings policy) and env loading
   exceptions/      AppException tree, error codes, exit codes
   shared_kernel/   entity/aggregate/value-object/event/specification bases, IHandler,
                    IUnitOfWork, IClock, BaseDto, shared adapters, published contracts
+                   (`contracts/<publisher>/`), the shared Neo4j client
+                   (`infrastructure/outbound/neo4j/`)
   bounded_context/
     capture/       sessions, commits, gating, work briefs, agent hooks (see below)
     notes/         notes, curation, storage (see below)
+    knowledge/     records, spaces, projects, revisions, Neo4j record store (see below)
+      domain/          aggregates, value objects, events, repository ports
+      application/     handlers, DTOs, ports (unit of work, ledger, schema, read, ids), services
+      infrastructure/  outbound/persistence (Neo4j adapters, mappers), outbound/ids
   diagnostics/     host-level checks behind `noesis doctor` (not a bounded context, not kernel)
     application/     RunDiagnosticsHandler, CheckForUpdateHandler, assess_update (policy),
                      IEnvironmentProbe, ICheckoutInspector, DiagnosticReportDto, UpdateCheckDto
@@ -35,12 +43,73 @@ Rules (enforced by import-linter, see `pyproject.toml`):
 - `diagnostics` knows no bounded context and no settings: the composition root hands it plain
   values (paths, binary name, installed hook events).
 - The domain imports no delivery framework, no subprocess, no settings.
-- Bounded contexts never import each other; Capture hands Notes a versioned work-brief
-  contract across a process boundary.
+- Bounded contexts never import each other (`capture`, `knowledge`, `notes` are an independence
+  contract); Capture hands Notes a versioned work-brief contract across a process boundary.
+- `shared_kernel.contracts` imports no bounded context.
+- The `neo4j` driver is imported only by infrastructure; no domain or application layer imports it.
 
 Output contract of the CLI: `emit()` prints either text or the JSON envelope; deliberate
 errors are `AppException`s with a stable `__error_code__`, an `__exit_code__`, and
 `next_steps`.
+
+## Knowledge context
+
+`knowledge` is the new record store beside `notes` (ADR-0003). It is additive: Notes and Capture
+are unchanged and later chunks move behaviour across. Notes model documents and paths; Knowledge
+models records, revisions and spaces and keeps them in Neo4j.
+
+```text
+CaptureKnowledgeHandler / CaptureExperienceHandler            (`record capture`)
+  ├─ IIdempotencyLedger.get(space, key)            read first: replay the result or reject a reused key
+  ├─ ensure project (by key), ensure each Source (by natural key)   one unit of work each
+  └─ IKnowledgeUnitOfWork: repository.add(new aggregate) + ledger entry + commit   one aggregate per transaction
+ReviseKnowledgeHandler                                        (`record revise`)
+  └─ IKnowledgeUnitOfWork: lock record, check status `proposed` and expected head, append revision n+1, ledger, commit
+GetRecordHandler -> IRecordReadRepository.get_by_id(id, space_id)  (`record get`; another space's id is "not found")
+InitialiseStoreHandler -> IStoreSchema.apply_step(...)        (`store init`)
+```
+
+| Piece | Where | Notes |
+|---|---|---|
+| Aggregates | `domain/entities/` | Seven roots, each with its own repository and transaction, referencing each other by id: `KnowledgeSpace`, `Project`, `Source` (write-once), `Knowledge` (immutable numbered revisions, status `proposed` at creation, revise only while `proposed`), `Experience` (write-once, at least one source), `Assertion` and `CatalogEntry` (types only: storage arrives with later chunks). |
+| Ownership | `Knowledge.ownership` | `file`-owned revisions carry only the content hash, the file-version `Source` id and the title as read, never editable text; `graph`-owned revisions carry title and body (after redaction). Fixed at creation. |
+| Value objects | `domain/value_objects/` | `RecordId` (ULID, unique across record types; existing frontmatter ULIDs accepted), `SpaceId`, `Key`, `Revision`, `ContentHash`, `Applicability`, `Tag`, `Actor`, `Slug`. |
+| Domain events | `domain/events/` | Past tense, internal to the context; no outbox yet. |
+| Repository ports | `domain/repositories/` | `IKnowledgeSpaceRepository`, `IProjectRepository`, `ISourceRepository`, `IKnowledgeRepository`, `IExperienceRepository`. |
+| Unit of work | `application/ports/uow/IKnowledgeUnitOfWork` | One explicit transaction, explicit commit, rollback on exit without commit. Exposes `spaces`, `projects`, `sources`, `knowledge`, `experiences` and the ledger. Later chunks add members only. |
+| Idempotency ledger | `application/ports/ledger/` | `IIdempotencyLedger` keeps one `LedgerEntry` per (space, key): command name (an open set), request fingerprint, record id, revision, extra result data. Same key and request replays the result without writing; same key and another request is `KNOWLEDGE_203_IDEMPOTENCY_KEY_REUSED`. Keys are kept indefinitely. |
+| Read port | `application/ports/read_repositories/IRecordReadRepository` | `get_by_id`, `get_revision`, returning DTOs, within a space. |
+| Schema steps | `application/ports/schema/IStoreSchema`, `services/schema_steps.py` | `store init` applies an ordered list of named, idempotent steps and records them in `:StoreMeta`; Knowledge registers `core`. A command may `require_steps(...)` and fails with `StoreNotInitialisedError` naming the missing step. There is no numeric schema version. |
+| Services | `application/services/` | `SecretRedactor` (Knowledge's own), idempotency fingerprinting, `RecordReferenceResolver` (existence and same-space checks are made first in the handlers; the adapters re-check inside the write transaction as defence in depth). |
+| Neo4j adapters | `knowledge/infrastructure/outbound/persistence/` | Unit of work, repositories, ledger, read repository and schema adapters with node mappers (spaces are nodes in one database). Only single-property uniqueness constraints (Community edition). Revise moves head n to n+1; the uniqueness constraint on the revision key is the concurrency guard. |
+| Neo4j client | `shared_kernel/infrastructure/outbound/neo4j/` | `Neo4jClient` builds the async driver lazily per invocation, closes it when the command ends, and translates driver errors into typed ones; `Neo4jConnectionSettings` is its only input. Any context's adapters may use it. |
+| Settings | `core/configurations/knowledge_settings.py` | `KnowledgeSettings`, read as `load_environment().knowledge`: `NOESIS_NEO4J_URI`, `NOESIS_NEO4J_USER`, `NOESIS_NEO4J_PASSWORD` (secret, user-side profile only), `NOESIS_NEO4J_DATABASE`, `NOESIS_NEO4J_CONNECT_TIMEOUT_SECONDS` (default 5), `NOESIS_KNOWLEDGE_SPACE` (default `personal`). `neo4j_connection()` builds the client's settings and names the variable when the password is missing. |
+| CLI | `commands/record_commands.py`, `commands/store_commands.py`, `bootstrap/knowledge_handlers_builder.py`, `interfaces/cli/actor.py` | `open_knowledge` builds one `Neo4jClient` from `KnowledgeSettings.neo4j_connection()` per invocation (no connection until the first query), wires the handlers and closes the client when the command's `asyncio.run` ends. Usage errors (a missing `--idempotency-key`, source, title) are raised by the command before settings are loaded, so they exit 2 with no I/O. The actor is resolved in `interfaces/cli/actor.py` from `Environment.identity` and never from an option: any harness marker (`CLAUDECODE`, `CLAUDE_CODE_SESSION_ID`, `AI_AGENT`, `CODEX_THREAD_ID`, `CODEX_SESSION_ID`, `NOESIS_SESSION_ID`) means `agent`, none means `user`. The marker variables are listed once, in `core/configurations/session_identity_settings.py`, which Capture's session chain also reads. |
+
+**Fail closed.** When Neo4j cannot be reached, every store command fails with
+`INTEGRATION_103_GRAPH_STORE_UNAVAILABLE` (exit 1, next steps), before any side effect and within
+the connect timeout. There is no fallback, no partial result and no cached answer. The shared
+client raises the same code for later retrieval. A wrong password is
+`INTEGRATION_104_GRAPH_STORE_AUTHENTICATION_FAILED`. Driver exceptions are caught only in the
+shared client.
+
+**Extension points.** Later chunks extend Knowledge additively: new unit-of-work members, new
+schema steps registered in the composition root, new error blocks, labels and edges. The names
+below are reserved (a later chunk never changes the meaning of an existing member, label or code).
+
+| Kind | Reserved | For |
+|---|---|---|
+| Unit-of-work members | `changes`; `assertions`, `record_references`; `catalog_entries`; `link_sets`; `consolidations`, `consolidation_guard` | change feed; review; catalog; import links; consolidation |
+| Labels | `:Change`, `:ChangeCounter`, `Index*` prefix | change feed and indexing |
+| Labels | `:LinkSet` | file import |
+| Labels | `:Decision` | review |
+| Labels | `:Consolidation`, `:ConsolidationMembership` | consolidation |
+| Edges | `LINKS_TO`, `EMBEDS` (import); `DECIDES` (review); `CONSOLIDATES`, `PRODUCED`, `OF` (consolidation); `SUBJECT`, `OBJECT`, `EVIDENCED_BY` (assertions) | - |
+| Error blocks, `KNOWLEDGE` | 020-029 and 220-229 (review); x61-x69 (catalog); 14x and 24x (work briefs); x9x (consolidation) | C2's own codes stay outside these |
+
+Other points: the ledger command name is an open set; a Source's observed time is set by
+Knowledge's clock, never by the caller; `revise` locks the record node before checking status and
+head; contracts for other contexts follow the [integration rule](architecture-rules.md).
 
 ## Notes context
 
@@ -76,37 +145,32 @@ drafts written by a person or an agent ──► ApplyCurationHandler      (`not
 | `apply_input_schema.py` | same folder | Strict reader of `notes apply` input. Reuses the curator's entry model but never downgrades: every flawed entry is reported with its index, and any one fails the call before anything is written. |
 | `curator_response_schema.py` | same folder | Anti-corruption layer: pydantic schema sent to the CLI, translated into domain decisions; malformed entries become reported skips. |
 | Filesystem adapters | `infrastructure/outbound/storage/` | Markdown + YAML frontmatter under `NOESIS_VAULT_DIR`; each file is written atomically, staged notes are written on commit (not all-or-nothing across files; a retry overwrites). Works for Obsidian vaults, plain folders and NFS (a mount). The default writer (`NOESIS_WRITER_BACKEND=filesystem`). |
-| MCP writer | `infrastructure/outbound/storage/` | `McpNoteRepositoryAdapter` + `McpNotesUnitOfWorkAdapter` implement `INoteRepository` / `INotesUnitOfWork` over Obsidian's MCP server (`vault_read`, `vault_list`, `vault_write`) with the same `NoteMapper`, so the Markdown is byte-identical to the filesystem writer's. Stages on `save`, sends on `commit`. Selected by `NOESIS_WRITER_BACKEND=mcp` in `build_unit_of_work_factory`; reuses `NOESIS_OBSIDIAN_MCP_*`. See [Writer backend](#writer-backend). |
-| Obsidian MCP search | `infrastructure/outbound/storage/` | `ObsidianMcpNoteReadRepositoryAdapter` implements `INoteReadRepository` over the official `mcp` SDK (streamable HTTP, client in `shared_kernel/infrastructure/outbound/mcp/`); `FallbackNoteReadRepositoryAdapter` degrades to the filesystem adapter on `ObsidianMcpError`. Selected by `NOESIS_SEARCH_BACKEND` in `build_notes` (default `filesystem`: no MCP call). Read side only; the curate handler shares it (so related notes come from Obsidian too, with the same fallback); `list` always reads files, and writes follow `NOESIS_WRITER_BACKEND`, not the search backend. See [notes workflow](workflows/notes.md#search-backend). |
+| Search backend selection | `interfaces/cli/bootstrap/notes_handlers_builder.py` | `NOESIS_SEARCH_BACKEND` (`filesystem` default, or `vectra`) is chosen in `build_read_repository`; `FallbackNoteReadRepositoryAdapter` degrades the Vectra reader to the filesystem adapter on `NoteStorageError`. The curate handler shares the reader; `list` always reads files, and writes follow `NOESIS_WRITER_BACKEND`, not the search backend. A configuration naming a removed value fails with `RemovedBackendError` (`CORE_006`) at settings validation. See [notes workflow](workflows/notes.md#search-backend). |
 | Failure log | `infrastructure/outbound/failures/` | `JsonFileApplyFailureLogAdapter`: for each failed `notes apply`, `<state>/notes/apply-failed/<ticket>.json` (report) and `<ticket>.payload.json|txt` (the input, verbatim, ready to re-apply). Failures never park a brief: only `curate` parks. |
 | Parked queue | `infrastructure/outbound/queue/` | One JSON file per failed brief under `$NOESIS_STATE_DIR/notes/parked/`. A brief is parked when the curator keeps failing and when storing the notes fails (`NoteStorageError`); both surface as `NOTES_201`. |
 
 ### Writer backend
 
-`NOESIS_WRITER_BACKEND` (`filesystem` default, or `mcp`) chooses where curated notes are stored.
-Rules, recorded here and in ADR-0001 Amendment 2:
+`NOESIS_WRITER_BACKEND` (`filesystem` default, or `vectra`) chooses where curated notes are stored.
+Rules, recorded here and in ADR-0001 Amendment 2 (R3, R7 and R9 were retired with the Obsidian MCP
+backends, ADR-0001 Amendment 6):
 
 - R1. The writer is chosen by a composition-root function (`build_unit_of_work_factory` in
   `interfaces/cli/bootstrap/notes_handlers_builder.py`, `match` + `assert_never`) from
   `NOESIS_WRITER_BACKEND`. There is no application-layer resolver.
 - R2. `uow.notes` reads from the backend it writes (the manual-wins lookup sees the same notes the
   writer stores). Search, `list` and the curator's related notes follow `NOESIS_SEARCH_BACKEND`.
-- R3. The MCP writer opens one MCP session per operation (one `get`, one `commit`).
-  `ObsidianMcpToolError` (a subtype of `ObsidianMcpError`) separates "the tool said no" from
-  "unreachable".
-- R4. Only `NoteStorageError` leaves a writer. MCP `commit` renders and validates every note
-  first (nothing is sent if one fails), then sends them one at a time. It is not atomic across
-  notes and is convergent on retry; the error lists the `written` and `not_written` paths.
+- R3. Retired (it governed the MCP writer's sessions).
+- R4. Only `NoteStorageError` leaves a writer. `commit` is not atomic across notes and is
+  convergent on retry; the error lists the `written` and `not_written` paths.
 - R5. A storage failure parks the brief and fails with `NOTES_201`; `--no-park` keeps
   `NOTES_102`. `notes retry` keeps the ticket when storage fails again.
-- R6. A vault is required only where files are used (`needs_vault`: writer or search is
-  `filesystem`). `notes list` always needs it; without a vault there is no MCP-to-files
-  search fallback.
-- R7. Search and writer share `NOESIS_OBSIDIAN_MCP_*` and one client builder
-  (`build_obsidian_mcp_client`), the only place that unwraps the token.
+- R6. A vault is required where files are used (`needs_vault`: writer or search is
+  `filesystem` or `vectra`, which is every remaining backend). `notes list` always needs it.
+- R7. Retired (it governed the MCP client builder and its token).
 - R8. `NoteMapper` is the single note renderer/parser, in infrastructure
   `storage/mappers/`; every writer and reader uses it.
-- R9. The `doctor` writer probe writes `noesis-doctor-probe.md` at the vault root, then deletes it.
+- R9. Retired (the doctor no longer writes a probe file).
 
 Tuning the curator: read the `skipped` list of `noesis notes curate --json`, copy
 `prompts/curator_system.md` to a file of your own, edit it, and point
@@ -160,7 +224,7 @@ noesis integrate claude-code install|uninstall|status
 | `noesis hook claude-code` | `interfaces/cli/commands/hook_commands.py` + Capture `infrastructure/inbound/claude_code/` | Inbound adapter. The CLI command keeps the process concerns: the `NOESIS_HOOK=1` guard (set for the curator's own run), reading stdin, exiting 0 always, the error log at `<state>/capture/hook-errors.log`, and dispatching to the handler. Payload model and router (the anti-corruption layer) live in Capture. |
 | `noesis integrate claude-code` | `commands/integrate_commands.py`, Capture `application/handlers/` and `infrastructure/outbound/agent_hooks/` | Adds, removes, or reports the three hooks in Claude Code's settings. Preview by default, `--yes` writes after a timestamped backup; foreign hooks are never touched. The CLI does no file I/O. `claude_code_hook_settings.py` holds `HOOK_SPECS` and the pure `with_noesis`/`without_noesis`/`installed_commands` functions. |
 | Settings location | `core/configurations/claude_code_settings.py` | `ClaudeCodeSettings.config_dir` (`CLAUDE_CONFIG_DIR`, default `~/.claude`); `settings_file` is `<config_dir>/settings.json`. Bounded contexts cannot import `noesis.core`, so `bootstrap.build_agent_hooks` injects the resolved path; `--settings` overrides it. |
-| `noesis doctor` | `commands/doctor_commands.py`, `noesis/diagnostics/` | `bootstrap.run_diagnostics` builds a `RunDiagnosticsQuery` of primitives (env file, vault dir, state dir, curator binary, installed hook events from `GetAgentHooksStatusQuery`, the MCP URLs to probe, and whether a vault is required); `RunDiagnosticsHandler` applies the rules through `IEnvironmentProbe`; `format_report` renders the text. An unreadable agent settings file becomes a failed `claude_code_hooks` check. The `writer` check sits between `claude_code_hooks` and `search_backend`: `filesystem` makes no MCP call; `mcp` writes then deletes `noesis-doctor-probe.md` (`IObsidianMcpProbe.write_probe`). The `vault` check fails on an unset vault only when one is required. The last check, `update`, is warn-only (always `ok`, so the exit code is unchanged; `warning: true` and a `warn` line, with the fix command as next step when there is one, for every verdict except `up_to_date`); it uses the same handler as `noesis update check` with a 3 s budget. |
+| `noesis doctor` | `commands/doctor_commands.py`, `noesis/diagnostics/` | `bootstrap.run_diagnostics` builds a `RunDiagnosticsQuery` of primitives (env file, vault dir, state dir, curator binary, installed hook events from `GetAgentHooksStatusQuery`, and whether a vault is required); `RunDiagnosticsHandler` applies the rules through `IEnvironmentProbe`; `format_report` renders the text. An unreadable agent settings file becomes a failed `claude_code_hooks` check. The `graph_store` check (after `search_backend`; `IGraphStoreProbe` over the shared Neo4j client, built only when `NOESIS_NEO4J_PASSWORD` is set) reports reachability and the applied schema steps against the names the composition root passes from `registered_schema_step_names()`: unreachable, rejected credentials or a missing step fail it, an unset password is a warning, so existing exit codes hold. The `writer` check sits between `claude_code_hooks` and `search_backend`: it reports the filesystem writer and makes no write; `search_backend` reports `filesystem`. The `vault` check fails on an unset vault only when one is required. The last check, `update`, is warn-only (always `ok`, so the exit code is unchanged; `warning: true` and a `warn` line, with the fix command as next step when there is one, for every verdict except `up_to_date`); it uses the same handler as `noesis update check` with a 3 s budget. |
 | `noesis update check` | `commands/update_commands.py`, `noesis/diagnostics/` | `bootstrap.run_update_check` hands the installed package folder to `CheckForUpdateHandler`; `ICheckoutInspector` (`GitCheckoutInspectorAdapter`, `git` through asyncio subprocesses, 15 s budget, never raises) returns a `CheckoutSnapshot`, and the pure `assess_update` picks `up_to_date`, `behind`, `ahead`, `diverged` or `unknown`. Exit 0 for every verdict. When origin's commit is not in the local object store the adapter fetches objects only (`--no-write-fetch-head --refmap=`: no refs, no worktree change) to compare histories; see ADR-0001 Amendment 4. |
 | `noesis config init` | `commands/config_commands.py`, `core/env_template.py` | `write_env_file` renders the template and writes the file; the command decides whether overwriting is allowed. |
 | `noesis skills get` | `commands/skills_commands.py`, `skill_guides/*.md` (repository root) | Version-matched agent guide packaged with the CLI. |
