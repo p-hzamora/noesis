@@ -4,7 +4,6 @@ import json
 from pathlib import Path
 
 import pytest
-from tests.support.fake_obsidian_mcp import free_port
 from tests.support.notes_support import note_file
 
 from noesis.interfaces.cli import run
@@ -12,7 +11,7 @@ from noesis.shared_kernel.domain import JsonObject
 
 pytestmark = pytest.mark.integration
 
-FALLBACK_NOTICE: str = "Obsidian MCP unreachable, searched files instead"
+FALLBACK_NOTICE: str = "vectra could not search, searched files instead"
 GOTCHA = "repos/demo/gotchas/cache-stampede.md"
 RUN = "repos/demo/runs/login-cache-rollout.md"
 OTHER = "repos/other/decisions/login-cache.md"
@@ -229,12 +228,11 @@ def test_without_a_vault_it_fails_with_vault_not_configured(
     assert error["code"] == "CORE_002_VAULT_NOT_CONFIGURED"
 
 
-def test_with_obsidian_closed_recall_falls_back_to_files_and_says_so(
+def test_with_vectra_unavailable_recall_falls_back_to_files_and_says_so(
     vault: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    monkeypatch.setenv("NOESIS_SEARCH_BACKEND", "obsidian-mcp")
-    monkeypatch.setenv("NOESIS_OBSIDIAN_MCP_URL", f"http://127.0.0.1:{free_port()}/mcp/")
-    monkeypatch.setenv("NOESIS_OBSIDIAN_MCP_TIMEOUT_SECONDS", "2")
+    monkeypatch.setenv("NOESIS_SEARCH_BACKEND", "vectra")
+    monkeypatch.setenv("NOESIS_VECTRA_BIN", str(vault.parent / "no-such-vectra"))
 
     assert (
         run(["notes", "recall", "login cache", "--repo", "demo", "--json", "--no-synthesis"]) == 0

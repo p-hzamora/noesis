@@ -95,6 +95,21 @@ async def test_the_run_has_no_tools_no_mcp_no_settings_and_no_session(tmp_path: 
     assert "No length target." in (tmp_path / "stdin.txt").read_text()
 
 
+async def test_the_store_password_never_reaches_the_recall_agent(tmp_path: Path) -> None:
+    claude = write_fake_claude(tmp_path, envelope=briefing_envelope(BRIEFING))
+    environment = {
+        "PATH": "/usr/bin:/bin",
+        "NOESIS_NEO4J_PASSWORD": "s3cret-store-password",
+        "NOESIS_NEO4J_URI": "bolt://127.0.0.1:7687",
+    }
+
+    await _adapter(claude, environment=environment).brief("task", [_note()], target_tokens=0)
+
+    seen: dict[str, str] = json.loads((tmp_path / "env.json").read_text())
+    assert "NOESIS_NEO4J_PASSWORD" not in seen
+    assert seen["NOESIS_NEO4J_URI"] == "bolt://127.0.0.1:7687"  # only the secret is withheld
+
+
 async def test_model_and_effort_are_passed_through_verbatim(tmp_path: Path) -> None:
     claude = write_fake_claude(tmp_path, envelope=briefing_envelope(BRIEFING))
 
@@ -105,17 +120,6 @@ async def test_model_and_effort_are_passed_through_verbatim(tmp_path: Path) -> N
     argv: list[str] = (tmp_path / "argv.txt").read_text().split("\n")
     assert argv[argv.index("--model") + 1] == "any-model-name"
     assert argv[argv.index("--effort") + 1] == "low"
-
-
-async def test_the_vault_token_is_withheld_from_the_agent_process(tmp_path: Path) -> None:
-    claude = write_fake_claude(tmp_path, envelope=briefing_envelope(BRIEFING))
-    environment = {"PATH": "/usr/bin:/bin", "NOESIS_OBSIDIAN_MCP_TOKEN": "s3cret", "KEEP": "1"}
-
-    await _adapter(claude, environment=environment).brief("task", [_note()], target_tokens=0)
-
-    seen: dict[str, str] = json.loads((tmp_path / "env.json").read_text())
-    assert "NOESIS_OBSIDIAN_MCP_TOKEN" not in seen
-    assert (seen["KEEP"], seen["NOESIS_HOOK"]) == ("1", "1")
 
 
 @pytest.mark.parametrize(

@@ -13,7 +13,9 @@ from noesis.core.configurations import (
     LogLevelEnum,
 )
 from noesis.exceptions import (
+    ExitCodeEnum,
     InvalidConfigurationError,
+    RemovedBackendError,
 )
 
 pytestmark = pytest.mark.unit
@@ -88,23 +90,56 @@ def test_the_env_example_template_documents_every_setting() -> None:
         assert variable in template
 
 
-def test_search_backend_defaults_to_the_filesystem_and_hides_the_token(
+def test_search_backend_defaults_to_the_filesystem(
     tmp_path: Path, isolated_environment: Path
 ) -> None:
     default = load_environment(tmp_path / "missing.env").notes
     assert default.search_backend.value == "filesystem"
-    assert default.obsidian_mcp_url == "http://127.0.0.1:27123/mcp/"
-    assert default.obsidian_mcp_token is None
 
+
+@pytest.mark.parametrize(
+    ("variable", "removed"),
+    [("NOESIS_SEARCH_BACKEND", "obsidian-mcp"), ("NOESIS_WRITER_BACKEND", "mcp")],
+)
+def test_a_removed_backend_value_fails_validation_with_a_typed_error(
+    variable: str, removed: str, tmp_path: Path, isolated_environment: Path
+) -> None:
     env_file: Path = tmp_path / "noesis.env"
-    env_file.write_text(
-        "NOESIS_SEARCH_BACKEND=obsidian-mcp\nNOESIS_OBSIDIAN_MCP_TOKEN=abc123\n", encoding="utf-8"
-    )
-    configured = load_environment(env_file).notes
-    assert configured.search_backend.value == "obsidian-mcp"
-    assert configured.obsidian_mcp_token is not None
-    assert configured.obsidian_mcp_token.get_secret_value() == "abc123"
-    assert "abc123" not in repr(configured)
+    env_file.write_text(f"{variable}={removed}\n", encoding="utf-8")
+
+    with pytest.raises(RemovedBackendError) as raised:
+        load_environment(env_file)
+
+    error: RemovedBackendError = raised.value
+    assert error.error_code == "CORE_006_REMOVED_BACKEND"
+    assert error.exit_code is ExitCodeEnum.FAILURE
+    assert error.metadata == {"variable": variable, "value": removed}
+    assert any("filesystem" in step for step in error.next_steps)
+
+
+@pytest.mark.parametrize(
+    ("variable", "removed"),
+    [("NOESIS_SEARCH_BACKEND", "OBSIDIAN-MCP"), ("NOESIS_WRITER_BACKEND", " mcp ")],
+)
+def test_a_removed_backend_value_is_caught_from_the_process_environment(
+    variable: str, removed: str, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv(variable, removed)
+
+    with pytest.raises(RemovedBackendError):
+        load_environment(tmp_path / "missing.env")
+
+
+def test_obsidian_mcp_variables_are_ignored(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, isolated_environment: Path
+) -> None:
+    monkeypatch.setenv("NOESIS_OBSIDIAN_MCP_URL", "http://127.0.0.1:1/mcp/")
+    monkeypatch.setenv("NOESIS_OBSIDIAN_MCP_TOKEN", "abc123")
+
+    notes = load_environment(tmp_path / "missing.env").notes
+
+    assert not hasattr(notes, "obsidian_mcp_url")
+    assert not hasattr(notes, "obsidian_mcp_token")
 
 
 def test_an_unknown_search_backend_is_rejected(tmp_path: Path) -> None:
@@ -117,13 +152,8 @@ def test_an_unknown_search_backend_is_rejected(tmp_path: Path) -> None:
     assert "NOESIS_SEARCH_BACKEND" in str(raised.value.metadata["problems"])
 
 
-def test_writer_backend_defaults_to_the_filesystem_and_accepts_mcp(tmp_path: Path) -> None:
+def test_writer_backend_defaults_to_the_filesystem(tmp_path: Path) -> None:
     assert load_environment(tmp_path / "missing.env").notes.writer_backend.value == "filesystem"
-
-    env_file: Path = tmp_path / "noesis.env"
-    env_file.write_text("NOESIS_WRITER_BACKEND=mcp\n", encoding="utf-8")
-
-    assert load_environment(env_file).notes.writer_backend.value == "mcp"
 
 
 def test_an_unknown_writer_backend_is_rejected(tmp_path: Path) -> None:

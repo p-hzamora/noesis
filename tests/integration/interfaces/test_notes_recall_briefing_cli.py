@@ -1,11 +1,10 @@
-"""`noesis notes recall` with synthesis, end to end: a fake `claude` and, for the Obsidian case, a fake MCP server."""
+"""`noesis notes recall` with synthesis, end to end: a fake `claude` and a vault of files."""
 
 import json
 from pathlib import Path
 
 import pytest
 from tests.support.fake_claude import briefing_envelope, write_fake_claude
-from tests.support.fake_obsidian_mcp import fake_obsidian_mcp, free_port
 from tests.support.notes_support import note_file, path_note_id
 
 from noesis.interfaces.cli import run
@@ -196,56 +195,3 @@ def test_an_agent_that_answers_garbage_is_a_failure_not_an_empty_success(
     assert _recall("--json") == 1
 
     assert json.loads(capsys.readouterr().out)["error"]["code"] == "NOTES_103_RECALL_AGENT_FAILED"
-
-
-def test_the_reproduction_obsidian_matches_every_word_yet_recall_still_finds_the_notes(
-    vault: Path, claude: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
-    """`recall` once returned ok with no entries here: one combined query matched no note."""
-    with fake_obsidian_mcp(vault, all_words=True) as server:
-        monkeypatch.setenv("NOESIS_SEARCH_BACKEND", "obsidian-mcp")
-        monkeypatch.setenv("NOESIS_WRITER_BACKEND", "mcp")
-        monkeypatch.setenv("NOESIS_OBSIDIAN_MCP_URL", server.url)
-        monkeypatch.delenv("NOESIS_VAULT_DIR")
-
-        assert _recall("--json") == 0
-
-        result = _result(capsys)
-        searched: list[str] = [
-            args["query"] for tool, args in server.calls if tool == "search_simple"
-        ]
-    assert "cv-generator" in searched and len(searched) > 1
-    assert result["backend"] == "obsidian-mcp"
-    assert result["synthesis"] == "briefing"
-    assert {entry["path"] for entry in result["entries"]} >= {PRIVACY, GROUNDING}  # type: ignore[union-attr]
-    assert "Candidate data never leaves the machine." in (claude / "stdin.txt").read_text()
-
-
-def test_obsidian_closed_still_briefs_from_files_and_says_so(
-    vault: Path, claude: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
-    monkeypatch.setenv("NOESIS_SEARCH_BACKEND", "obsidian-mcp")
-    monkeypatch.setenv("NOESIS_OBSIDIAN_MCP_URL", f"http://127.0.0.1:{free_port()}/mcp/")
-    monkeypatch.setenv("NOESIS_OBSIDIAN_MCP_TIMEOUT_SECONDS", "2")
-
-    assert _recall("--json") == 0
-
-    result = _result(capsys)
-    assert result["notice"] == "Obsidian MCP unreachable, searched files instead"
-    assert (result["backend"], result["synthesis"]) == ("filesystem", "briefing")
-
-
-def test_obsidian_closed_without_a_vault_fails_instead_of_reporting_no_evidence(
-    vault: Path, claude: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
-    monkeypatch.setenv("NOESIS_SEARCH_BACKEND", "obsidian-mcp")
-    monkeypatch.setenv("NOESIS_WRITER_BACKEND", "mcp")
-    monkeypatch.setenv("NOESIS_OBSIDIAN_MCP_URL", f"http://127.0.0.1:{free_port()}/mcp/")
-    monkeypatch.setenv("NOESIS_OBSIDIAN_MCP_TIMEOUT_SECONDS", "2")
-    monkeypatch.delenv("NOESIS_VAULT_DIR")
-
-    assert _recall("--json") == 1
-
-    error: JsonObject = json.loads(capsys.readouterr().out)["error"]
-    assert "unreachable" in str(error["message"])
-    assert not (claude / "argv.txt").exists()

@@ -16,12 +16,12 @@ async def test_parked_briefs_round_trip_and_are_discarded(tmp_path: Path) -> Non
     queue = JsonFileParkedCurationQueueAdapter(tmp_path / "parked")
     assert await queue.list_parked() == []
 
-    ticket: str = await queue.park(a_brief(), error="MCP 401", now=NOW)
+    ticket: str = await queue.park(a_brief(), error="vault locked", now=NOW)
     (tmp_path / "parked/garbage.json").write_text("{}", encoding="utf-8")
 
     assert ticket.startswith("20261030T120000-")
     assert [(p.ticket, p.repository, p.error) for p in await queue.list_parked()] == [
-        (ticket, "demo", "MCP 401")
+        (ticket, "demo", "vault locked")
     ]
     assert await queue.get(ticket) == a_brief()
     assert await queue.get("missing") is None

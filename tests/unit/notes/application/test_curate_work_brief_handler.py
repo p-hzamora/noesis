@@ -203,13 +203,13 @@ async def test_retrying_an_unknown_ticket_fails_clearly() -> None:
 
 def _storage_error() -> NoteStorageError:
     return NoteStorageError(
-        "Wrote 1 of 2 note(s) through the Obsidian MCP before it failed: disk full",
+        "Wrote 1 of 2 note(s) before the storage failed: disk full",
         {
-            "backend": "mcp",
+            "backend": "filesystem",
             "written": ["repos/demo/decisions/a.md"],
             "not_written": ["repos/demo/decisions/b.md"],
         },
-        next_steps=["Check NOESIS_OBSIDIAN_MCP_URL (`noesis doctor`)."],
+        next_steps=["Check the vault folder (`noesis doctor`)."],
     )
 
 
@@ -231,14 +231,14 @@ async def test_storage_failure_parks_the_brief_and_keeps_the_error_details(
     assert error.error_code == "NOTES_201_CURATION_FAILED"
     assert error.message.startswith("Storing the notes failed: Wrote 1 of 2 note(s)")
     assert error.metadata == {
-        "backend": "mcp",
+        "backend": "filesystem",
         "written": ["repos/demo/decisions/a.md"],
         "not_written": ["repos/demo/decisions/b.md"],
         "repository": "demo",
         "ticket": "ticket-1",
     }
     assert error.next_steps == (
-        "Check NOESIS_OBSIDIAN_MCP_URL (`noesis doctor`).",
+        "Check the vault folder (`noesis doctor`).",
         "Fix the cause, then run `noesis notes retry ticket-1`.",
     )
     assert world.queue.parked["ticket-1"][0] == a_brief()
