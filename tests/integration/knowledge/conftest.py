@@ -1,6 +1,7 @@
 """Knowledge over the pinned Neo4j container: a ready environment per test."""
 
 from collections.abc import AsyncIterator
+from typing import Any
 
 import pytest
 from tests.support.knowledge_neo4j_support import Neo4jKnowledgeEnv, make_neo4j_env
@@ -27,3 +28,20 @@ async def env(bare_env: Neo4jKnowledgeEnv) -> Neo4jKnowledgeEnv:
         InitialiseStoreCommand(default_space_key=DEFAULT_SPACE_KEY)
     )
     return bare_env
+
+
+@pytest.fixture
+async def review_bare_env(neo4j_settings: Neo4jConnectionSettings) -> AsyncIterator[Any]:
+    """C4's handlers over an empty database whose schema registry holds `core` and `review`."""
+    from tests.support.review_support import make_review_neo4j_env  # C4 modules: imported lazily
+
+    review_env = make_review_neo4j_env(neo4j_settings)
+    yield review_env
+    await review_env.client.close()
+
+
+@pytest.fixture
+async def review_env(review_bare_env: Any) -> Any:
+    """`review_bare_env` after `store init` (both steps applied, default space `default`)."""
+    await review_bare_env.initialise()
+    return review_bare_env

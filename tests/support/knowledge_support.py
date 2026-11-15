@@ -4,7 +4,7 @@ import copy
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from types import TracebackType
-from typing import TYPE_CHECKING, Self
+from typing import TYPE_CHECKING, Any, Self
 from uuid import uuid4
 
 from noesis.bounded_context.knowledge.application.dtos import (
@@ -42,6 +42,8 @@ from noesis.bounded_context.knowledge.application.ports.schema import IStoreSche
 from noesis.bounded_context.knowledge.application.ports.uow import IKnowledgeUnitOfWork
 from noesis.bounded_context.knowledge.application.services.schema_steps import CORE_STEP
 from noesis.bounded_context.knowledge.domain.entities import (
+    Assertion,
+    CatalogEntry,
     Experience,
     Knowledge,
     KnowledgeSpace,
@@ -70,9 +72,15 @@ from noesis.bounded_context.knowledge.domain.value_objects import (
 from noesis.exceptions import EntryAlreadyExistsError, RevisionConflictError
 from noesis.shared_kernel.application.ports.clock import IClock
 
-if TYPE_CHECKING:
+if TYPE_CHECKING:  # C4 modules; the C2 fakes must keep importing without them
     from noesis.bounded_context.knowledge.application.dtos.pending_record_change import (
         PendingRecordChange,
+    )
+    from noesis.bounded_context.knowledge.application.ports.references.i_record_reference_lookup import (
+        IRecordReferenceLookup,
+    )
+    from noesis.bounded_context.knowledge.domain.repositories.i_assertion_repository import (
+        IAssertionRepository,
     )
     from noesis.shared_kernel.contracts.knowledge import RecordChangedContract
 
@@ -129,6 +137,11 @@ class FakeKnowledgeStore:
     commits: int = 0
     changes: list[RecordChangedContract] = field(default_factory=list)
     change_counters: dict[str, int] = field(default_factory=dict)
+    # C4 additions (review lifecycle); unused by C2 tests
+    assertions: dict[str, Assertion] = field(default_factory=dict)
+    catalog_entries: dict[str, CatalogEntry] = field(default_factory=dict)
+    decision_keys: set[str] = field(default_factory=set)
+    decisions: dict[str, list[Any]] = field(default_factory=dict)
 
     def source_key(self, source: Source) -> tuple[str, str, str, str | None]:
         """The natural key of a source, as a plain tuple."""
@@ -148,6 +161,9 @@ class _Staged:
         self.revisions: list[tuple[Knowledge, Revision]] = []
         self.ledger: dict[tuple[str, str], LedgerEntry] = {}
         self.changes: list[RecordChangedContract] = []
+        self.knowledge_saves: list[Knowledge] = []
+        self.assertions: dict[str, Assertion] = {}
+        self.assertion_saves: list[Assertion] = []
 
     def clear(self) -> None:
         """Forget everything staged (the repositories keep sharing this object)."""
@@ -159,6 +175,20 @@ class _Staged:
         self.revisions.clear()
         self.ledger.clear()
         self.changes.clear()
+        self.knowledge_saves.clear()
+        self.assertions.clear()
+        self.assertion_saves.clear()
+
+
+def _live_key(assertion: Assertion) -> tuple[str, str, str, str, str | None]:
+    project = assertion.applicability.project_id
+    return (
+        assertion.space_id.value,
+        assertion.predicate.value,
+        assertion.subject_id.value,
+        assertion.object_id.value,
+        project.value if project else None,
+    )
 
 
 def _exists(kind: str, key: str) -> EntryAlreadyExistsError:
@@ -270,6 +300,9 @@ class _KnowledgeRepo(IKnowledgeRepository):
     async def append_revision(self, knowledge: Knowledge, revision: Revision) -> None:
         self._staged.revisions.append((copy.deepcopy(knowledge), revision))
 
+    async def save(self, knowledge: Knowledge) -> None:
+        self._staged.knowledge_saves.append(copy.deepcopy(knowledge))
+
 
 class _ExperienceRepo(IExperienceRepository):
     def __init__(self, store: FakeKnowledgeStore, staged: _Staged) -> None:
@@ -355,11 +388,31 @@ class FakeKnowledgeUnitOfWork(IKnowledgeUnitOfWork):
         self._experiences = _ExperienceRepo(store, self._staged)
         self._ledger = _Ledger(store, self._staged)
         self._changes = FakeRecordChangeLog(store, self._staged)
+        self._assertions: IAssertionRepository | None = None
+        self._record_references: IRecordReferenceLookup | None = None
 
     @property
     def changes(self) -> FakeRecordChangeLog:
         """Fake change log (staged until commit)."""
         return self._changes
+
+    @property
+    def assertions(self) -> IAssertionRepository:
+        """Fake assertion repository (built lazily from `tests.support.review_fakes`)."""
+        if self._assertions is None:
+            from tests.support.review_fakes import FakeAssertionRepository
+
+            self._assertions = FakeAssertionRepository(self._store, self._staged)
+        return self._assertions
+
+    @property
+    def record_references(self) -> IRecordReferenceLookup:
+        """Fake record-reference lookup (built lazily from `tests.support.review_fakes`)."""
+        if self._record_references is None:
+            from tests.support.review_fakes import FakeRecordReferenceLookup
+
+            self._record_references = FakeRecordReferenceLookup(self._store)
+        return self._record_references
 
     @property
     def spaces(self) -> IKnowledgeSpaceRepository:
@@ -437,6 +490,8 @@ class FakeKnowledgeUnitOfWork(IKnowledgeUnitOfWork):
                     },
                 )
 
+        self._check_review_constraints()
+
         store.spaces.update(staged.spaces)
         store.projects.update(staged.projects)
         store.sources.update(staged.sources)
@@ -451,8 +506,49 @@ class FakeKnowledgeUnitOfWork(IKnowledgeUnitOfWork):
         for change in staged.changes:
             store.changes.append(change)
             store.change_counters[change.space_id] = change.sequence
+        for knowledge in staged.knowledge_saves:
+            store.knowledge[knowledge.id.value] = knowledge
+            self._keep_decision(knowledge.id.value, knowledge.latest_decision)
+        store.assertions.update(staged.assertions)
+        for assertion in staged.assertion_saves:
+            store.assertions[assertion.id.value] = assertion
+            self._keep_decision(assertion.id.value, assertion.latest_decision)
         store.commits += 1
         await self.rollback()
+
+    def _keep_decision(self, record_id: str, decision: Any) -> None:
+        if decision is not None:
+            self._store.decision_keys.add(f"{record_id}:{decision.seq}")
+            self._store.decisions.setdefault(record_id, []).append(decision)
+
+    def _check_review_constraints(self) -> None:
+        """The constraints C4 adds: unique decision key per record, one live statement."""
+        store, staged = self._store, self._staged
+        for record in (*staged.knowledge_saves, *staged.assertion_saves):
+            decision = record.latest_decision
+            if decision is not None and f"{record.id.value}:{decision.seq}" in store.decision_keys:
+                from noesis.exceptions import StatusConflictError
+
+                raise StatusConflictError(
+                    f"Another decision for {record.id.value} won the race.",
+                    {"record_id": record.id.value, "seq": decision.seq},
+                )
+        for assertion in (*staged.assertions.values(), *staged.assertion_saves):
+            if assertion.status.value not in ("proposed", "accepted"):
+                continue
+            key = _live_key(assertion)
+            for other in store.assertions.values():
+                if (
+                    other.id != assertion.id
+                    and other.status.value in ("proposed", "accepted")
+                    and _live_key(other) == key
+                ):
+                    from noesis.exceptions import DuplicateAssertionError
+
+                    raise DuplicateAssertionError(
+                        f"A live assertion {other.id.value} states the same.",
+                        {"existing_id": other.id.value},
+                    )
 
     async def rollback(self) -> None:
         """Drop everything staged."""

@@ -39,7 +39,7 @@ FAKE_STEP: Neo4jSchemaStep = Neo4jSchemaStep(
     name="c9_fake",
     statements=("CREATE INDEX c9_fake_index IF NOT EXISTS FOR (n:FakeC9) ON (n.value)",),
 )
-ALL_STEPS: tuple[str, ...] = ("core", "change_feed", "knowledge_fulltext", "retrieval_index")
+ALL_STEPS: tuple[str, ...] = ("core", "review", "change_feed", "knowledge_fulltext", "retrieval_index")
 CORE_CONSTRAINTS: set[tuple[str, str]] = {
     ("Record", "id"),
     ("Space", "id"),

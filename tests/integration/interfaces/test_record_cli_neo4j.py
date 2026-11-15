@@ -20,7 +20,7 @@ from noesis.shared_kernel.infrastructure.outbound.neo4j import Neo4jConnectionSe
 pytestmark = [pytest.mark.integration, pytest.mark.neo4j]
 
 MISSING_ID = "01ARZ3NDEKTSV4RRFFQ69G5FAV"
-ALL_STEPS = ["core", "change_feed", "knowledge_fulltext", "retrieval_index"]
+ALL_STEPS = ["core", "review", "change_feed", "knowledge_fulltext", "retrieval_index"]
 
 
 @pytest.fixture

@@ -18,6 +18,9 @@ from noesis.shared_kernel.infrastructure.outbound.neo4j import Neo4jConnectionSe
 
 COMMAND_TIMEOUT_SECONDS: Final[float] = 120.0
 
+_PTY_MASTERS: dict[int, int] = {}
+"""Parent end of each pseudo-terminal handed to a child as standard input, by child pid."""
+
 
 @dataclass(frozen=True, slots=True)
 class ProcessResult:
@@ -87,33 +90,70 @@ def _command(args: list[str], env_file: Path, *, json_output: bool) -> list[str]
 
 
 def start_noesis(
-    args: list[str], env: dict[str, str], *, json_output: bool = True
+    args: list[str], env: dict[str, str], *, json_output: bool = True, tty: bool = False
 ) -> subprocess.Popen[str]:
-    """Start a child without waiting, so several can race; collect it with `finish`."""
+    """Start a child without waiting, so several can race; collect it with `finish`.
+
+    Args:
+        args: The `noesis` arguments (without `--json`).
+        env: The child's whole environment.
+        json_output: Append `--json`.
+        tty: Attach standard input to a pseudo-terminal (`pty.openpty()`, Linux and macOS only)
+            so the child sees an interactive terminal; otherwise standard input is `/dev/null`.
+    """
     home: Path = Path(env["HOME"])
     env_file: Path = home / "empty.env"
     env_file.touch()
-    return subprocess.Popen(
-        _command(args, env_file, json_output=json_output),
-        env=env,
-        cwd=home,
-        stdin=subprocess.DEVNULL,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True,
-    )
+    command: list[str] = _command(args, env_file, json_output=json_output)
+    if not tty:
+        return subprocess.Popen(
+            command,
+            env=env,
+            cwd=home,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+    import pty  # not available on Windows; imported only when a terminal is asked for
+
+    master, slave = pty.openpty()
+    try:
+        process: subprocess.Popen[str] = subprocess.Popen(
+            command,
+            env=env,
+            cwd=home,
+            stdin=slave,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+    except BaseException:
+        os.close(master)
+        raise
+    finally:
+        os.close(slave)
+    _PTY_MASTERS[process.pid] = master
+    return process
 
 
 def finish(process: subprocess.Popen[str], started: float) -> ProcessResult:
     """Wait for a child started by `start_noesis`."""
-    stdout, stderr = process.communicate(timeout=COMMAND_TIMEOUT_SECONDS)
+    try:
+        stdout, stderr = process.communicate(timeout=COMMAND_TIMEOUT_SECONDS)
+    finally:
+        master: int | None = _PTY_MASTERS.pop(process.pid, None)
+        if master is not None:
+            os.close(master)
     return ProcessResult(process.returncode, stdout, stderr, time.monotonic() - started)
 
 
-def run_noesis(args: list[str], env: dict[str, str], *, json_output: bool = True) -> ProcessResult:
-    """Run one `noesis` command to completion in its own process."""
+def run_noesis(
+    args: list[str], env: dict[str, str], *, json_output: bool = True, tty: bool = False
+) -> ProcessResult:
+    """Run one `noesis` command to completion in its own process (`tty`: see `start_noesis`)."""
     started: float = time.monotonic()
-    return finish(start_noesis(args, env, json_output=json_output), started)
+    return finish(start_noesis(args, env, json_output=json_output, tty=tty), started)
 
 
 def capture_command(
