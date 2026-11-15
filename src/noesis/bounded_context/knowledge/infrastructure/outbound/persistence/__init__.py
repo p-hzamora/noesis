@@ -9,6 +9,9 @@ from .neo4j_catalog_entry_read_repository_adapter import (
 from .neo4j_catalog_entry_repository_adapter import Neo4jCatalogEntryRepositoryAdapter
 from .neo4j_experience_repository_adapter import Neo4jExperienceRepositoryAdapter
 from .neo4j_idempotency_ledger_adapter import Neo4jIdempotencyLedgerAdapter
+from .neo4j_import_candidate_read_repository_adapter import (
+    Neo4jImportCandidateReadRepositoryAdapter,
+)
 from .neo4j_knowledge_repository_adapter import Neo4jKnowledgeRepositoryAdapter
 from .neo4j_knowledge_space_repository_adapter import Neo4jKnowledgeSpaceRepositoryAdapter
 from .neo4j_knowledge_unit_of_work_adapter import Neo4jKnowledgeUnitOfWorkAdapter
@@ -45,6 +48,7 @@ __all__ = [
     "Neo4jCatalogEntryRepositoryAdapter",
     "Neo4jExperienceRepositoryAdapter",
     "Neo4jIdempotencyLedgerAdapter",
+    "Neo4jImportCandidateReadRepositoryAdapter",
     "Neo4jKnowledgeRepositoryAdapter",
     "Neo4jKnowledgeSpaceRepositoryAdapter",
     "Neo4jKnowledgeUnitOfWorkAdapter",

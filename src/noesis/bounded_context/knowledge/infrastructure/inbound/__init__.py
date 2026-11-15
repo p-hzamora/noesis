@@ -1,1 +1,1 @@
-"""Inbound adapters: other contexts read Knowledge through contracts."""
+"""Inbound adapters: other contexts call into Knowledge through contracts."""

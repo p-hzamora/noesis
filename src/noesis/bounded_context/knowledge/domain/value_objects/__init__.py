@@ -21,6 +21,8 @@ from .enums import (
     ReviewTransitionEnum,
     SourceKindEnum,
 )
+from .import_candidate import IdHolderEnum, ImportCandidate, ImportOnChangeEnum
+from .import_decision import ImportDecision, ImportDecisionKindEnum
 from .key import Key
 from .record_id import RecordId
 from .record_reference import RecordReference
@@ -63,4 +65,9 @@ __all__ = [
     "SpaceId",
     "StatementKey",
     "Tag",
+    "IdHolderEnum",
+    "ImportCandidate",
+    "ImportDecision",
+    "ImportDecisionKindEnum",
+    "ImportOnChangeEnum",
 ]

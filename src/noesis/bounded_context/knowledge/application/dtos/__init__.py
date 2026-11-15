@@ -9,6 +9,8 @@ from .capture_result_dto import CaptureResultDto
 from .catalog_entry_detail_dto import CatalogEntryDetailDto
 from .catalog_entry_dto import CatalogEntryDto
 from .catalog_write_result_dto import CatalogWriteResultDto
+from .import_candidates_dto import ImportCandidateDto, ImportCandidatesDto
+from .import_knowledge_result_dto import ImportKnowledgeResultDto
 from .installed_artifact_dto import InstalledArtifactDto
 from .not_installed_dto import NotInstalledDto
 from .pending_record_change import PendingRecordChange
@@ -77,6 +79,9 @@ __all__ = [
     "CatalogEntryDetailDto",
     "CatalogEntryDto",
     "CatalogWriteResultDto",
+    "ImportCandidateDto",
+    "ImportCandidatesDto",
+    "ImportKnowledgeResultDto",
     "InstalledArtifactDto",
     "NotInstalledDto",
     "PendingRecordChange",
