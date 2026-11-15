@@ -428,3 +428,49 @@ Common error codes: `CORE_002_VAULT_NOT_CONFIGURED` (run `config init`),
 `NOTES_204_NO_RECALL_TERMS` (`notes recall` task has no usable keyword),
 `NOTES_103_RECALL_AGENT_FAILED` (`notes recall` could not write the briefing; `--no-synthesis` still works),
 `INTEGRATION_101_AGENT_SETTINGS_INVALID` (the settings file is not valid JSON).
+
+## Import a vault or a file into the record store
+
+```bash
+noesis [--env-file <path>] import run --json --verbose          # preview: reads NOESIS_VAULT_DIR, assesses, writes nothing
+noesis [--env-file <path>] import run --yes --json              # apply
+noesis [--env-file <path>] import run --yes --update --json     # also revise / supersede records whose note changed
+noesis [--env-file <path>] import run --strict --json           # refuse (IMPORT_201) when any note is blocked
+noesis [--env-file <path>] import file <path> [--title <text>] [--subtype <slug>] [--project <key>] [--tag <tag>]... [--dry-run] --json
+```
+
+`import run` previews unless `--yes` is given; `--verbose` adds one row per note (path order) to
+`result.notes`. It needs `NOESIS_VAULT_DIR` (`CORE_002_VAULT_NOT_CONFIGURED` when unset) and the
+store (`noesis store init` first, `KNOWLEDGE_204_STORE_NOT_INITIALISED` otherwise). Locators use
+`vault://<vault_key>/<relative path>`; the key is `NOESIS_IMPORT_VAULT_KEY` or the vault folder
+name (letters, digits, `.`, `_`, `-`; otherwise `CORE_001_INVALID_CONFIGURATION`). Files are only
+read, never written. Every imported record is graph-owned, `proposed`, and tagged `origin:migrated`
+(`import run`) or `origin:imported` (`import file`); the run is resumable and a rerun is safe.
+
+Per-note `outcome`: `created`, `unchanged`, `changed_in_vault` (the note changed; add `--update` to
+act on it), `revised` (a `proposed` record got a new revision), `successor_proposed` (an accepted
+record's note changed; a new `proposed` record was linked to it), `skipped_empty` (nothing left
+after normalisation, e.g. a links-only index), `blocked`. A note is blocked with `reason`
+`not_text`, `invalid_header`, `invalid_id`, `duplicate_id`, `invalid_scope` (interop), or
+`id_conflict`, `target_closed`, `revision_conflict`, `idempotency_key_reused`, `invalid_metadata`
+(Knowledge, `detail` holds its code). Until C4 is built, a changed note of an accepted record yields outcome `created` with
+`target_record_id` and reason `assertions unavailable: target not linked` (no `successor_proposed`). The run still exits 0 with `complete: false`; read the
+`blocked_reasons` counts and the rows. Wiki links become their text, sections holding only links
+are removed, code is left alone.
+
+`import file` registers one file (anywhere on disk) by its resolved path; `--dry-run` shows the
+outcome without writing. A header `id` is ignored, so a copy of a migrated note is a new record.
+It fails with `IMPORT_102_FILE_READ_FAILED` (path missing, not a file, unreadable) or
+`IMPORT_203_FILE_NOT_IMPORTABLE` (`metadata.reason`: `not_text`, `invalid_header`, `empty_body`, or a
+Knowledge block reason such as `invalid_metadata` for a bad `--subtype`, `--project` or `--tag`).
+Usage errors (exit 2): `import file` without a path, `--update` or `--strict` on `import file`,
+`--dry-run` on `import run`.
+
+Codes: `IMPORT_101_VAULT_READ_FAILED` (vault folder missing or a note unreadable; `metadata.path`),
+`IMPORT_102_FILE_READ_FAILED`, `IMPORT_201_BLOCKING_FINDINGS` (`--strict` and a blocked note;
+`metadata.blocked_reasons`, `metadata.paths`; nothing written), `IMPORT_203_FILE_NOT_IMPORTABLE`.
+
+Next steps: a preview ends with the exact apply command; an apply with `changed_in_vault` notes lists
+`noesis import run --yes --update`; with blocked notes, `noesis import run --verbose`. Accepting the
+migrated records in bulk (`noesis review accept --tag origin:migrated --all --yes`) exists only once
+the review commands (C4) are built; until then the records stay `proposed`.
