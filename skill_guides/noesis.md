@@ -286,6 +286,59 @@ projection, so each one reports `projections: []`, the feed's `head_sequence` an
 nothing and exits 0. `rebuild` without `--yes`, or naming an unregistered `--projection`, is a usage
 error (exit 2). Normal use needs none of them: text search reads the record store directly.
 
+## Assertions and review (Neo4j)
+
+An assertion says how two records relate; every proposal waits in a queue for a decision. Both
+need the `review` schema step (`noesis store init`; without it every command below exits 1 with
+`KNOWLEDGE_204`, `metadata.missing_steps: ["review"]`).
+
+```bash
+noesis assertion propose --predicate supports|contradicts|supersedes|recommends \
+  --subject <ID> --object <ID> [--evidence <ID>]... --rationale "<why>" \
+  --source <kind>:<locator> [--project <key>] [--tag <tag>]... --idempotency-key <key> --json
+noesis assertion list --about <ID> [--role subject|object|evidence|any] [--predicate <p>]... [--status <s>]... --json
+noesis review queue [--project <key> | --global] [--type knowledge|assertion] [--predicate <p>] [--limit <n>, default 50] [--cursor <c>] --json
+noesis review accept <ID> [--expected-revision <N>] [--reason "<why>"] [--yes --idempotency-key <key>] --json
+noesis review retract <ID> --reason "<why>" [--yes --idempotency-key <key>] --json
+noesis review log <ID> --json
+noesis review repair [--yes] --json
+```
+
+- `assertion propose` is space-wide unless you pass `--project` (there is no git fallback here).
+  It needs `--idempotency-key`, `--rationale` and at least one `--source`. Evidence ids are
+  Experience, Knowledge or Source records. A `supersedes` is Knowledge over Knowledge or Assertion
+  over Assertion, in one project; it may be proposed while its subject is still `proposed`.
+- Without `--yes`, `review accept`, `review retract` and `review repair` only preview: they run
+  every check, print the result with `applied: false` and write nothing. Accepting Knowledge needs
+  `--expected-revision` (the head from `record get`); accepting an Assertion does not.
+- What you may decide: an agent accepts, rejects or retracts only a record whose project is named
+  (for `supersedes`, the same project on both ends), and accepts an assertion only with at least one
+  evidence record. Everything space-wide is the user's. `review queue` shows `requires`
+  (`user` or `agent_or_user`) and `decidable_by_caller` for each item; leave the others alone.
+- Accepting a `supersedes` marks the object `superseded` (its `effective_status` reads that at once).
+  If the process died in between, repeat the same accept (same key) or run `review repair --yes`.
+  Nothing is deleted: `record get` still returns retracted and superseded records, and
+  `review log` lists every decision with actor, basis and reason.
+- Bulk accept: `noesis review accept --tag <tag> --all` previews the counts (`matched`, `proposed`,
+  `skipped_not_proposed`) and a sample of up to 10 records, for any actor. Report them to the user.
+  Only the user applies it (`--yes`, in their own terminal): an agent that adds `--yes` gets
+  `KNOWLEDGE_022` before the store is touched, and so does an agent that tries to apply it by
+  another route. It accepts Knowledge only, one record per transaction, with basis `migration`;
+  a rerun finishes what an interruption left. It takes no `<ID>`, `--expected-revision` or
+  `--idempotency-key`.
+- The user's `--yes` on `review accept` or `review retract` (single or bulk) needs an interactive
+  terminal on standard input; otherwise `INTERFACE_006_USER_PRESENCE_REQUIRED`. If you meet it, tell
+  the user to run the command themselves; do not look for a way around it.
+- Codes (all exit 1): `KNOWLEDGE_020` invalid assertion (`metadata.field` names what to fix; also an
+  id that is not in the space), `KNOWLEDGE_021` transition not allowed from the current status
+  (`record get`), `KNOWLEDGE_022` not yours to decide (ask the user), `KNOWLEDGE_023` an agent
+  accept needs evidence (propose with `--evidence`), `KNOWLEDGE_220` another decision won (`review
+  log`, re-evaluate), `KNOWLEDGE_221` the same statement is already live (`metadata.existing_id`),
+  `KNOWLEDGE_222` an end is retracted, superseded or, for `supersedes`, not both accepted (accept
+  the subject first), `KNOWLEDGE_223` Knowledge accept without `--expected-revision`,
+  `KNOWLEDGE_224` the record has no status (an Experience, Source, Project), `INTERFACE_006` above.
+  A usage error is exit 2. The same key with another request is `KNOWLEDGE_203`.
+
 ## Failed curations
 
 ```bash
