@@ -12,6 +12,9 @@ CHANGE_FEED_STEP: str = "change_feed"
 KNOWLEDGE_FULLTEXT_STEP: str = "knowledge_fulltext"
 """C5a: Knowledge's full-text index over revision and experience text."""
 
+REVIEW_STEP: str = "review"
+"""The step C4 registers: uniqueness of decision keys and live assertion statements."""
+
 
 async def require_steps(schema: IStoreSchema, *names: str) -> None:
     """Fail unless every named step is applied.

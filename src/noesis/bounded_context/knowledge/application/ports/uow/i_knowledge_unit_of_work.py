@@ -4,7 +4,9 @@ import abc
 
 from noesis.bounded_context.knowledge.application.ports.changes import IRecordChangeLog
 from noesis.bounded_context.knowledge.application.ports.ledger import IIdempotencyLedger
+from noesis.bounded_context.knowledge.application.ports.references import IRecordReferenceLookup
 from noesis.bounded_context.knowledge.domain.repositories import (
+    IAssertionRepository,
     IExperienceRepository,
     IKnowledgeRepository,
     IKnowledgeSpaceRepository,
@@ -62,4 +64,16 @@ class IKnowledgeUnitOfWork(IUnitOfWork["IKnowledgeUnitOfWork"]):
     @abc.abstractmethod
     def changes(self) -> IRecordChangeLog:
         """The change log; its entries commit with the aggregate change."""
+        ...
+
+    @property
+    @abc.abstractmethod
+    def assertions(self) -> IAssertionRepository:
+        """Assertions."""
+        ...
+
+    @property
+    @abc.abstractmethod
+    def record_references(self) -> IRecordReferenceLookup:
+        """Write-side guard read over every record type."""
         ...

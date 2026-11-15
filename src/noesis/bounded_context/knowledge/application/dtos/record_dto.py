@@ -71,6 +71,30 @@ class RevisionDto(BaseDto):
     sources: tuple[SourceDto, ...] = ()
 
 
+class SupersededByDto(BaseDto):
+    """The accepted `supersedes` assertion that targets a record.
+
+    Attributes:
+        assertion_id: The `supersedes` assertion.
+        record_id: Its subject, the successor.
+    """
+
+    assertion_id: str
+    record_id: str
+
+
+class AssertionEndpointDto(BaseDto):
+    """One end of an assertion and the revision judged.
+
+    Attributes:
+        id: Record id.
+        at_revision: Revision judged; None for types without revisions.
+    """
+
+    id: str
+    at_revision: int | None = None
+
+
 class RecordDto(BaseDto):
     """Any record by id. Fields that do not apply to the type stay None.
 
@@ -96,6 +120,14 @@ class RecordDto(BaseDto):
         source_kind: Kind of a Source record.
         locator: Locator of a Source record.
         digest: Digest of a Source record.
+        effective_status: Derived status (knowledge, assertion): `superseded` when an accepted
+            `supersedes` assertion targets it.
+        superseded_by: That assertion and its subject, or None.
+        predicate: Assertion predicate.
+        subject: Assertion subject and the revision judged.
+        object: Assertion object and the revision judged.
+        evidence_ids: Assertion evidence ids.
+        rationale: Why the assertion holds.
         created_at: When the record was created.
         updated_at: When it last changed.
     """
@@ -121,5 +153,12 @@ class RecordDto(BaseDto):
     source_kind: str | None = None
     locator: str | None = None
     digest: str | None = None
+    effective_status: str | None = None
+    superseded_by: SupersededByDto | None = None
+    predicate: str | None = None
+    subject: AssertionEndpointDto | None = None
+    object: AssertionEndpointDto | None = None
+    evidence_ids: tuple[str, ...] = ()
+    rationale: str | None = None
     created_at: datetime
     updated_at: datetime
