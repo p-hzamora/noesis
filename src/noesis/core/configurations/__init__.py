@@ -6,6 +6,7 @@ Only `noesis.core.env` builds them; everything else reads them from there.
 from .base_settings import AppBaseSettings
 from .capture_settings import CaptureSettings
 from .claude_code_settings import ClaudeCodeSettings
+from .codex_settings import CodexSettings
 from .curator_settings import CuratorSettings
 from .knowledge_settings import KnowledgeSettings
 from .notes_settings import NotesSettings
@@ -19,6 +20,7 @@ __all__ = [
     "AppBaseSettings",
     "CaptureSettings",
     "ClaudeCodeSettings",
+    "CodexSettings",
     "CuratorSettings",
     "KnowledgeSettings",
     "NotesSettings",

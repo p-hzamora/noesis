@@ -20,6 +20,22 @@ from .assertion_response import (
 )
 from .capture_run_response import CaptureRunListResponse, CaptureRunResponse
 from .capture_status_response import CaptureStatusResponse
+from .catalog_response import (
+    AvailabilitySummaryResponse,
+    CatalogCheckResponse,
+    CatalogEntryResponse,
+    CatalogListResponse,
+    CatalogScanResponse,
+    CatalogShowResponse,
+    CatalogWriteResponse,
+    CheckRuntimeResponse,
+    NotInstalledResponse,
+    ObservationResponse,
+    ScanRuntimeResponse,
+    UncatalogedResponse,
+    UnreadableKindResponse,
+    VersionDriftResponse,
+)
 from .config_init_response import ConfigInitResponse
 from .config_show_response import ConfigShowResponse
 from .curation_response import CurationPreviewResponse, CurationResponse, SkippedCandidateResponse
@@ -111,6 +127,20 @@ __all__ = [
     "SearchResponse",
     "SearchScopeResponse",
     "SearchSemanticResponse",
+    "AvailabilitySummaryResponse",
+    "CatalogCheckResponse",
+    "CatalogEntryResponse",
+    "CatalogListResponse",
+    "CatalogScanResponse",
+    "CatalogShowResponse",
+    "CatalogWriteResponse",
+    "CheckRuntimeResponse",
+    "NotInstalledResponse",
+    "ObservationResponse",
+    "ScanRuntimeResponse",
+    "UncatalogedResponse",
+    "UnreadableKindResponse",
+    "VersionDriftResponse",
     "CaptureRunListResponse",
     "CaptureRunResponse",
     "CaptureStatusResponse",

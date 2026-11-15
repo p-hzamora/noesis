@@ -3,6 +3,10 @@
 from .knowledge_persistence_factory import KnowledgePersistence, build_knowledge_persistence
 from .neo4j_assertion_read_adapter import Neo4jAssertionReadAdapter
 from .neo4j_assertion_repository_adapter import Neo4jAssertionRepositoryAdapter
+from .neo4j_catalog_entry_read_repository_adapter import (
+    Neo4jCatalogEntryReadRepositoryAdapter,
+)
+from .neo4j_catalog_entry_repository_adapter import Neo4jCatalogEntryRepositoryAdapter
 from .neo4j_experience_repository_adapter import Neo4jExperienceRepositoryAdapter
 from .neo4j_idempotency_ledger_adapter import Neo4jIdempotencyLedgerAdapter
 from .neo4j_knowledge_repository_adapter import Neo4jKnowledgeRepositoryAdapter
@@ -17,6 +21,7 @@ from .neo4j_review_queue_read_adapter import Neo4jReviewQueueReadAdapter
 from .neo4j_review_state_read_adapter import Neo4jReviewStateReadAdapter
 from .neo4j_source_repository_adapter import Neo4jSourceRepositoryAdapter
 from .neo4j_store_schema_adapter import (
+    CATALOG_SCHEMA_STEP,
     CORE_SCHEMA_STEP,
     REVIEW_SCHEMA_STEP,
     Neo4jSchemaStep,
@@ -28,6 +33,7 @@ from .retrieval_schema_steps import (
 )
 
 __all__ = [
+    "CATALOG_SCHEMA_STEP",
     "CHANGE_FEED_SCHEMA_STEP",
     "KNOWLEDGE_FULLTEXT_SCHEMA_STEP",
     "CORE_SCHEMA_STEP",
@@ -35,6 +41,8 @@ __all__ = [
     "KnowledgePersistence",
     "Neo4jAssertionReadAdapter",
     "Neo4jAssertionRepositoryAdapter",
+    "Neo4jCatalogEntryReadRepositoryAdapter",
+    "Neo4jCatalogEntryRepositoryAdapter",
     "Neo4jExperienceRepositoryAdapter",
     "Neo4jIdempotencyLedgerAdapter",
     "Neo4jKnowledgeRepositoryAdapter",

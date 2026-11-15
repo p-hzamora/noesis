@@ -2,6 +2,7 @@
 
 from .assertion_commands import assertion_app
 from .capture_commands import capture_app
+from .catalog_commands import catalog_app
 from .config_commands import config_app
 from .doctor_commands import doctor
 from .hook_commands import hook_app
@@ -19,6 +20,7 @@ from .vault_commands import vault_app
 __all__ = [
     "assertion_app",
     "capture_app",
+    "catalog_app",
     "config_app",
     "doctor",
     "hook_app",

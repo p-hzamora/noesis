@@ -117,7 +117,7 @@ def _read_body(context: typer.Context, body: str | None, *, required: bool) -> s
     return sys.stdin.read() if body == STDIN_MARKER else body
 
 
-def _parse_sources(
+def parse_sources(
     context: typer.Context, sources: list[str] | None, source_ids: list[str] | None
 ) -> tuple[SourceInput, ...]:
     """Source inputs from `--source <kind>:<locator>` and `--source-id <ULID>` values."""
@@ -201,7 +201,7 @@ def capture(
 ) -> None:
     """Record knowledge (a proposal) or an experience; at least one source is required."""
     text: str = _read_body(context, body, required=True) or ""
-    sources: tuple[SourceInput, ...] = _parse_sources(context, source, source_id)
+    sources: tuple[SourceInput, ...] = parse_sources(context, source, source_id)
     if not sources:
         raise _usage(context, "Cite at least one source.", "--source")
     result: CaptureResultDto
@@ -280,7 +280,7 @@ def revise(
 ) -> None:
     """Append a revision to proposed knowledge; what you leave out stays as it was."""
     text: str | None = _read_body(context, body, required=False)
-    sources: tuple[SourceInput, ...] = _parse_sources(context, source, source_id)
+    sources: tuple[SourceInput, ...] = parse_sources(context, source, source_id)
     env: Environment = cli_state(context).environment()
     command = ReviseKnowledgeCommand(
         idempotency_key=idempotency_key,

@@ -69,6 +69,18 @@ class EvidenceRequiredError(DomainException):
     __error_code__ = "KNOWLEDGE_023_EVIDENCE_REQUIRED"
 
 
+class InvalidCatalogNameError(DomainException):
+    """A catalog entry name breaks the name grammar (ASCII letters, digits, `.`, `_`, `-`, `:`)."""
+
+    __error_code__ = "KNOWLEDGE_061_INVALID_CATALOG_NAME"
+
+
+class InvalidCatalogPrerequisiteError(DomainException):
+    """A catalog prerequisite is malformed, or an entry lists itself."""
+
+    __error_code__ = "KNOWLEDGE_062_INVALID_CATALOG_PREREQUISITE"
+
+
 class RecordNotFoundError(ApplicationException):
     """No record has the requested id (or revision) in the active space."""
 
@@ -145,3 +157,15 @@ class RecordNotReviewableError(ApplicationException):
     """The record's type has no review status."""
 
     __error_code__ = "KNOWLEDGE_224_RECORD_NOT_REVIEWABLE"
+
+
+class CatalogEntryNotFoundError(ApplicationException):
+    """No catalog entry matches the reference (or revision) in the active space."""
+
+    __error_code__ = "KNOWLEDGE_261_CATALOG_ENTRY_NOT_FOUND"
+
+
+class CatalogEntryAlreadyExistsError(ApplicationException):
+    """A catalog entry with the same kind and name already exists in the space."""
+
+    __error_code__ = "KNOWLEDGE_262_CATALOG_ENTRY_ALREADY_EXISTS"

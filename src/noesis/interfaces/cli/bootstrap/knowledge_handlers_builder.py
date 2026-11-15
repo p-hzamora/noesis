@@ -5,10 +5,13 @@ it opens no connection: the driver is created on the first query, so `--help`, u
 a missing password never reach this module or the store.
 """
 
-from collections.abc import AsyncIterator, Awaitable, Callable
+import socket
+from collections.abc import AsyncIterator, Awaitable, Callable, Mapping
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
+from pathlib import Path
 
+from noesis.bounded_context.knowledge.application.dtos import RuntimeEnum
 from noesis.bounded_context.knowledge.application.handlers.commands.accept_assertion_handler import (
     AcceptAssertionHandler,
 )
@@ -26,6 +29,12 @@ from noesis.bounded_context.knowledge.application.handlers.commands.capture_expe
 )
 from noesis.bounded_context.knowledge.application.handlers.commands.capture_knowledge_handler import (
     CaptureKnowledgeHandler,
+)
+from noesis.bounded_context.knowledge.application.handlers.commands.catalog.register_catalog_entry_handler import (
+    RegisterCatalogEntryHandler,
+)
+from noesis.bounded_context.knowledge.application.handlers.commands.catalog.revise_catalog_entry_handler import (
+    ReviseCatalogEntryHandler,
 )
 from noesis.bounded_context.knowledge.application.handlers.commands.initialise_store_handler import (
     InitialiseStoreHandler,
@@ -45,6 +54,12 @@ from noesis.bounded_context.knowledge.application.handlers.commands.retract_know
 from noesis.bounded_context.knowledge.application.handlers.commands.revise_knowledge_handler import (
     ReviseKnowledgeHandler,
 )
+from noesis.bounded_context.knowledge.application.handlers.queries.catalog import (
+    CheckCatalogAvailabilityHandler,
+    GetCatalogEntryHandler,
+    ListCatalogEntriesHandler,
+    ScanRuntimeCatalogHandler,
+)
 from noesis.bounded_context.knowledge.application.handlers.queries.get_record_handler import (
     GetRecordHandler,
 )
@@ -63,20 +78,38 @@ from noesis.bounded_context.knowledge.application.handlers.queries.list_review_d
 from noesis.bounded_context.knowledge.application.handlers.queries.list_review_queue_handler import (
     ListReviewQueueHandler,
 )
+from noesis.bounded_context.knowledge.application.ports.runtime import (
+    IHostToolProbe,
+    IRuntimeInventoryProbe,
+)
+from noesis.bounded_context.knowledge.infrastructure.inbound.retrieval import (
+    CatalogAvailabilityInboundAdapter,
+)
 from noesis.bounded_context.knowledge.infrastructure.outbound.persistence import (
+    CATALOG_SCHEMA_STEP,
     CORE_SCHEMA_STEP,
     REVIEW_SCHEMA_STEP,
     KnowledgePersistence,
     Neo4jSchemaStep,
     build_knowledge_persistence,
 )
-from noesis.core import Environment
+from noesis.bounded_context.knowledge.infrastructure.outbound.runtime import (
+    ClaudeCodeRuntimeInventoryAdapter,
+    CodexRuntimeInventoryAdapter,
+    PathHostToolProbeAdapter,
+)
+from noesis.core import Environment, load_claude_code_settings
+from noesis.shared_kernel.application.ports.clock import IClock
 from noesis.shared_kernel.infrastructure.outbound.clock import SystemClockAdapter
 from noesis.shared_kernel.infrastructure.outbound.neo4j import Neo4jClient
 
 from .retrieval_handlers_builder import RETRIEVAL_SCHEMA_STEPS
 
-EXTRA_SCHEMA_STEPS: tuple[Neo4jSchemaStep, ...] = (REVIEW_SCHEMA_STEP, *RETRIEVAL_SCHEMA_STEPS)
+EXTRA_SCHEMA_STEPS: tuple[Neo4jSchemaStep, ...] = (
+    REVIEW_SCHEMA_STEP,
+    *RETRIEVAL_SCHEMA_STEPS,
+    CATALOG_SCHEMA_STEP,
+)
 """Schema steps other modules register after `core` (A-3); later chunks append here."""
 
 
@@ -108,6 +141,12 @@ class KnowledgeHandlers:
         list_assertions_by_subjects: Assertion summaries by subject (Retrieval's read).
         list_review_decisions: The decision history of a record.
         get_review_states: Review states of records (Retrieval's read).
+        register_catalog_entry: Register a capability in the catalog.
+        revise_catalog_entry: Revise a catalog entry.
+        list_catalog_entries: List catalog entries.
+        get_catalog_entry: Show one catalog entry.
+        check_catalog_availability: Check what is installed against the catalog.
+        scan_runtime_catalog: Compare what is installed with the catalog.
     """
 
     capture_knowledge: CaptureKnowledgeHandler
@@ -128,6 +167,61 @@ class KnowledgeHandlers:
     list_assertions_by_subjects: ListAssertionsBySubjectsHandler
     list_review_decisions: ListReviewDecisionsHandler
     get_review_states: GetReviewStatesHandler
+    register_catalog_entry: RegisterCatalogEntryHandler
+    revise_catalog_entry: ReviseCatalogEntryHandler
+    list_catalog_entries: ListCatalogEntriesHandler
+    get_catalog_entry: GetCatalogEntryHandler
+    check_catalog_availability: CheckCatalogAvailabilityHandler
+    scan_runtime_catalog: ScanRuntimeCatalogHandler
+
+
+def _catalog_probes(
+    clock: IClock, environment: Environment
+) -> tuple[Mapping[RuntimeEnum, IRuntimeInventoryProbe], IHostToolProbe]:
+    """The runtime probes and the `PATH` probe of this host, project and user."""
+    host: str = socket.gethostname()
+    return (
+        {
+            RuntimeEnum.CLAUDE_CODE: ClaudeCodeRuntimeInventoryAdapter(
+                config_dir=load_claude_code_settings().config_dir,
+                project_root=Path.cwd(),
+                clock=clock,
+                host=host,
+            ),
+            RuntimeEnum.CODEX: CodexRuntimeInventoryAdapter(
+                codex_home=environment.codex.codex_home, clock=clock, host=host
+            ),
+        },
+        PathHostToolProbeAdapter(),
+    )
+
+
+def _check_handler(
+    persistence: KnowledgePersistence,
+    runtime_probes: Mapping[RuntimeEnum, IRuntimeInventoryProbe],
+    host_tools: IHostToolProbe,
+) -> CheckCatalogAvailabilityHandler:
+    return CheckCatalogAvailabilityHandler(
+        read_repository=persistence.catalog_read_repository,
+        records=persistence.read_repository,
+        schema=persistence.schema,
+        runtime_probes=runtime_probes,
+        host_tools=host_tools,
+    )
+
+
+def build_catalog_availability_adapter(
+    client: Neo4jClient, environment: Environment
+) -> CatalogAvailabilityInboundAdapter:
+    """Wire Retrieval's availability door over `client` (the caller closes it); opens no connection."""
+    clock = SystemClockAdapter()
+    persistence: KnowledgePersistence = build_knowledge_persistence(
+        client, clock=clock, extra_steps=EXTRA_SCHEMA_STEPS
+    )
+    runtime_probes, host_tools = _catalog_probes(clock, environment)
+    return CatalogAvailabilityInboundAdapter(
+        check=_check_handler(persistence, runtime_probes, host_tools)
+    )
 
 
 def build_knowledge(client: Neo4jClient, environment: Environment) -> KnowledgeHandlers:
@@ -136,6 +230,7 @@ def build_knowledge(client: Neo4jClient, environment: Environment) -> KnowledgeH
     persistence: KnowledgePersistence = build_knowledge_persistence(
         client, clock=clock, extra_steps=EXTRA_SCHEMA_STEPS
     )
+    runtime_probes, host_tools = _catalog_probes(clock, environment)
     return KnowledgeHandlers(
         capture_knowledge=CaptureKnowledgeHandler(
             uow_factory=persistence.uow_factory,
@@ -238,6 +333,36 @@ def build_knowledge(client: Neo4jClient, environment: Environment) -> KnowledgeH
             read_repository=persistence.review_state_read_repository,
             records=persistence.read_repository,
             schema=persistence.schema,
+        ),
+        register_catalog_entry=RegisterCatalogEntryHandler(
+            uow_factory=persistence.uow_factory,
+            clock=clock,
+            ids=persistence.ids,
+            schema=persistence.schema,
+        ),
+        revise_catalog_entry=ReviseCatalogEntryHandler(
+            uow_factory=persistence.uow_factory,
+            clock=clock,
+            ids=persistence.ids,
+            schema=persistence.schema,
+        ),
+        list_catalog_entries=ListCatalogEntriesHandler(
+            read_repository=persistence.catalog_read_repository,
+            records=persistence.read_repository,
+            schema=persistence.schema,
+        ),
+        get_catalog_entry=GetCatalogEntryHandler(
+            read_repository=persistence.catalog_read_repository,
+            records=persistence.read_repository,
+            schema=persistence.schema,
+        ),
+        check_catalog_availability=_check_handler(persistence, runtime_probes, host_tools),
+        scan_runtime_catalog=ScanRuntimeCatalogHandler(
+            read_repository=persistence.catalog_read_repository,
+            records=persistence.read_repository,
+            schema=persistence.schema,
+            runtime_probes=runtime_probes,
+            host_tools=host_tools,
         ),
     )
 

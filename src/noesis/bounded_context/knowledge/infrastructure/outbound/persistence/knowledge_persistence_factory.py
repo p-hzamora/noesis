@@ -9,6 +9,7 @@ from noesis.bounded_context.knowledge.application.handlers.types import (
 from noesis.bounded_context.knowledge.application.ports.ids import IRecordIdGenerator
 from noesis.bounded_context.knowledge.application.ports.read_repositories import (
     IAssertionReadRepository,
+    ICatalogEntryReadRepository,
     IRecordReadRepository,
     IReviewDecisionReadRepository,
     IReviewQueueReadRepository,
@@ -23,6 +24,9 @@ from noesis.shared_kernel.application.ports.clock import IClock
 from noesis.shared_kernel.infrastructure.outbound.neo4j import Neo4jClient
 
 from .neo4j_assertion_read_adapter import Neo4jAssertionReadAdapter
+from .neo4j_catalog_entry_read_repository_adapter import (
+    Neo4jCatalogEntryReadRepositoryAdapter,
+)
 from .neo4j_knowledge_unit_of_work_adapter import Neo4jKnowledgeUnitOfWorkAdapter
 from .neo4j_record_read_repository_adapter import Neo4jRecordReadRepositoryAdapter
 from .neo4j_review_decision_read_adapter import Neo4jReviewDecisionReadAdapter
@@ -38,6 +42,7 @@ class KnowledgePersistence:
     Attributes:
         uow_factory: Opens a new unit of work (one transaction) per call.
         read_repository: The record read side.
+        catalog_read_repository: The catalog entry read side.
         schema: Registered schema steps (`core` first, then `extra_steps`).
         ids: ULID generator.
         review_queue_read_repository: The review queue and the tag selection.
@@ -48,6 +53,7 @@ class KnowledgePersistence:
 
     uow_factory: KnowledgeUnitOfWorkFactory
     read_repository: IRecordReadRepository
+    catalog_read_repository: ICatalogEntryReadRepository
     schema: IStoreSchema
     ids: IRecordIdGenerator
     review_queue_read_repository: IReviewQueueReadRepository
@@ -76,6 +82,7 @@ def build_knowledge_persistence(
     return KnowledgePersistence(
         uow_factory=new_unit_of_work,
         read_repository=Neo4jRecordReadRepositoryAdapter(client),
+        catalog_read_repository=Neo4jCatalogEntryReadRepositoryAdapter(client),
         schema=Neo4jStoreSchemaAdapter(client, (CORE_SCHEMA_STEP, *extra_steps)),
         ids=UlidRecordIdGeneratorAdapter(clock),
         review_queue_read_repository=Neo4jReviewQueueReadAdapter(client),

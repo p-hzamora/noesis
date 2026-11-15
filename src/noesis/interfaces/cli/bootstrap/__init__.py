@@ -24,6 +24,7 @@ from .diagnostics_handlers_builder import (
 )
 from .knowledge_handlers_builder import (
     KnowledgeHandlers,
+    build_catalog_availability_adapter,
     build_knowledge,
     open_knowledge,
     registered_schema_step_names,
@@ -57,6 +58,7 @@ __all__ = [
     "UPDATE_CHECK_TIMEOUT_SECONDS",
     "build_agent_hooks",
     "build_apply",
+    "build_catalog_availability_adapter",
     "build_capture",
     "build_curator",
     "build_diagnostics",

@@ -7,6 +7,7 @@ from noesis.bounded_context.knowledge.application.ports.ledger import IIdempoten
 from noesis.bounded_context.knowledge.application.ports.references import IRecordReferenceLookup
 from noesis.bounded_context.knowledge.domain.repositories import (
     IAssertionRepository,
+    ICatalogEntryRepository,
     IExperienceRepository,
     IKnowledgeRepository,
     IKnowledgeSpaceRepository,
@@ -76,4 +77,10 @@ class IKnowledgeUnitOfWork(IUnitOfWork["IKnowledgeUnitOfWork"]):
     @abc.abstractmethod
     def record_references(self) -> IRecordReferenceLookup:
         """Write-side guard read over every record type."""
+        ...
+
+    @property
+    @abc.abstractmethod
+    def catalog_entries(self) -> ICatalogEntryRepository:
+        """Catalog entries."""
         ...

@@ -11,6 +11,7 @@ from typing import Any, Final, LiteralString
 
 from noesis.bounded_context.knowledge.application.ports.schema import IStoreSchema
 from noesis.bounded_context.knowledge.application.services.schema_steps import (
+    CATALOG_STEP,
     CORE_STEP,
     REVIEW_STEP,
 )
@@ -45,7 +46,16 @@ CORE_SCHEMA_STEP: Final[Neo4jSchemaStep] = Neo4jSchemaStep(
         "CREATE CONSTRAINT idempotency_key IF NOT EXISTS FOR (n:IdempotencyKey) REQUIRE n.key IS UNIQUE",
     ),
 )
-"""Knowledge's own step. `CatalogEntry.catalog_key` is reserved and registered by C6."""
+"""Knowledge's own step."""
+
+CATALOG_SCHEMA_STEP: Final[Neo4jSchemaStep] = Neo4jSchemaStep(
+    name=CATALOG_STEP,
+    statements=(
+        "CREATE CONSTRAINT catalog_key IF NOT EXISTS FOR (n:CatalogEntry) "
+        "REQUIRE n.catalog_key IS UNIQUE",
+    ),
+)
+"""The catalog's step: one uniqueness constraint on `CatalogEntry.catalog_key`."""
 
 REVIEW_SCHEMA_STEP: Final[Neo4jSchemaStep] = Neo4jSchemaStep(
     name=REVIEW_STEP,

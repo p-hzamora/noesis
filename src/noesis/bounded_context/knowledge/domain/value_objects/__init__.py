@@ -2,6 +2,8 @@
 
 from .actor import Actor
 from .applicability import Applicability
+from .catalog_name import CatalogEntryName
+from .catalog_ref import CatalogRef
 from .catalog_revision import CatalogRevision
 from .content_hash import ContentHash
 from .enums import (
@@ -37,6 +39,8 @@ __all__ = [
     "AssertionRoleEnum",
     "AuthorityLabelEnum",
     "CatalogEntryKindEnum",
+    "CatalogEntryName",
+    "CatalogRef",
     "CatalogRevision",
     "ContentHash",
     "DecisionBasisEnum",

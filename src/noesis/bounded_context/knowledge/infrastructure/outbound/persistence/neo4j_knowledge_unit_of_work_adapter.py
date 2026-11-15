@@ -9,6 +9,7 @@ from noesis.bounded_context.knowledge.application.ports.references import IRecor
 from noesis.bounded_context.knowledge.application.ports.uow import IKnowledgeUnitOfWork
 from noesis.bounded_context.knowledge.domain.repositories import (
     IAssertionRepository,
+    ICatalogEntryRepository,
     IExperienceRepository,
     IKnowledgeRepository,
     IKnowledgeSpaceRepository,
@@ -19,6 +20,7 @@ from noesis.exceptions import GraphStoreConstraintViolatedError
 from noesis.shared_kernel.infrastructure.outbound.neo4j import Neo4jClient, Neo4jTransaction
 
 from .neo4j_assertion_repository_adapter import Neo4jAssertionRepositoryAdapter
+from .neo4j_catalog_entry_repository_adapter import Neo4jCatalogEntryRepositoryAdapter
 from .neo4j_experience_repository_adapter import Neo4jExperienceRepositoryAdapter
 from .neo4j_idempotency_ledger_adapter import Neo4jIdempotencyLedgerAdapter
 from .neo4j_knowledge_repository_adapter import Neo4jKnowledgeRepositoryAdapter
@@ -58,6 +60,9 @@ class Neo4jKnowledgeUnitOfWorkAdapter(IKnowledgeUnitOfWork):
         )
         self._record_references: Neo4jRecordReferenceLookupAdapter = (
             Neo4jRecordReferenceLookupAdapter(self._current)
+        )
+        self._catalog_entries: Neo4jCatalogEntryRepositoryAdapter = (
+            Neo4jCatalogEntryRepositoryAdapter(self._current, client)
         )
 
     def _current(self) -> Neo4jTransaction:
@@ -114,6 +119,11 @@ class Neo4jKnowledgeUnitOfWorkAdapter(IKnowledgeUnitOfWork):
     def record_references(self) -> IRecordReferenceLookup:
         """Record reference lookup over the generic record label."""
         return self._record_references
+
+    @property
+    def catalog_entries(self) -> ICatalogEntryRepository:
+        """Catalog entries."""
+        return self._catalog_entries
 
     async def __aenter__(self) -> Self:
         """Begin the transaction; an unreachable store fails here (INTEGRATION_103)."""

@@ -22,6 +22,7 @@ from .configurations import (
     AppBaseSettings,
     CaptureSettings,
     ClaudeCodeSettings,
+    CodexSettings,
     CuratorSettings,
     KnowledgeSettings,
     NotesSettings,
@@ -48,6 +49,7 @@ class Environment:
         recall: Recall agent settings (`notes recall` briefings).
         knowledge: Neo4j connection and active knowledge space (`record`, `store`).
         retrieval: Search and index settings (`search`, `index`).
+        codex: Codex's home folder, from the process environment only (`catalog check`).
         identity: Session ids found in the process environment (never in the `.env` file).
     """
 
@@ -59,6 +61,7 @@ class Environment:
     recall: RecallSettings
     knowledge: KnowledgeSettings
     retrieval: RetrievalSettings
+    codex: CodexSettings
     identity: SessionIdentitySettings
 
 
@@ -108,6 +111,7 @@ def load_environment(env_file: Path | None = None) -> Environment:
         recall=recall,
         knowledge=knowledge,
         retrieval=retrieval,
+        codex=CodexSettings(),
         identity=SessionIdentitySettings(),
     )
 
@@ -138,6 +142,7 @@ def _load[S: AppBaseSettings](
 
 __all__ = [
     "ClaudeCodeSettings",
+    "CodexSettings",
     "Environment",
     "KnowledgeSettings",
     "RecallRuntimeEnum",

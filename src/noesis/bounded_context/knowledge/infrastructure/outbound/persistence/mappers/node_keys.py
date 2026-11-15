@@ -4,6 +4,7 @@ import hashlib
 import json
 
 from noesis.bounded_context.knowledge.domain.value_objects import (
+    CatalogEntryKindEnum,
     ContentHash,
     Key,
     RecordId,
@@ -21,6 +22,11 @@ def revision_key(record_id: RecordId, number: int) -> str:
 def project_key(space_id: SpaceId, key: Key) -> str:
     """`Project.project_key`: `<space_id>:<key>`."""
     return f"{space_id.value}:{key.value}"
+
+
+def catalog_key(space_id: SpaceId, kind: CatalogEntryKindEnum, name: str) -> str:
+    """`CatalogEntry.catalog_key`: `<space_id>:<kind>:<name>`, the name exactly as typed."""
+    return f"{space_id.value}:{kind.value}:{name}"
 
 
 def ledger_key(space_id: SpaceId, key: str) -> str:
