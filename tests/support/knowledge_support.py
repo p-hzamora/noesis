@@ -51,6 +51,7 @@ from noesis.bounded_context.knowledge.domain.entities import (
     Source,
 )
 from noesis.bounded_context.knowledge.domain.repositories import (
+    ICatalogEntryRepository,
     IExperienceRepository,
     IKnowledgeRepository,
     IKnowledgeSpaceRepository,
@@ -443,6 +444,11 @@ class FakeKnowledgeUnitOfWork(IKnowledgeUnitOfWork):
     def ledger(self) -> IIdempotencyLedger:
         """Fake ledger."""
         return self._ledger
+
+    @property
+    def catalog_entries(self) -> ICatalogEntryRepository:
+        """Not stored here: `FakeCatalogUnitOfWork` (catalog_support) overrides it."""
+        raise NotImplementedError("use FakeCatalogUnitOfWork for catalog entries")
 
     async def __aenter__(self) -> Self:
         self._staged.clear()

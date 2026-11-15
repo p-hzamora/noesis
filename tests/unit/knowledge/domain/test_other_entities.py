@@ -33,7 +33,12 @@ from noesis.bounded_context.knowledge.domain.value_objects import (
     SourceKindEnum,
     SpaceId,
 )
-from noesis.exceptions import ExperienceWithoutSourceError, InvalidRecordError
+from noesis.bounded_context.knowledge.domain.value_objects.catalog_ref import CatalogRef
+from noesis.exceptions import (
+    ExperienceWithoutSourceError,
+    InvalidCatalogNameError,
+    InvalidRecordError,
+)
 
 pytestmark = pytest.mark.unit
 
@@ -208,34 +213,51 @@ def test_catalog_kinds_are_exactly_the_four_capabilities() -> None:
 
 
 def test_catalog_entry_has_first_revision_and_no_status() -> None:
+    node: CatalogRef = CatalogRef.parse("cli_tool:node")
+
     entry: CatalogEntry = CatalogEntry.create(
         id=rid(1),
         space_id=SPACE,
         kind=CatalogEntryKindEnum.CLI_TOOL,
-        name=" vectra ",
+        name="vectra",
         purpose=" search ",
         version="1.0",
-        prerequisites=("node",),
-        location="/usr/bin/vectra",
+        prerequisites=(node,),
+        location="https://example.invalid/vectra",
+        actor=AGENT,
+        source_ids=(rid(2),),
         now=NOW,
     )
 
-    assert entry.name == "vectra"
+    assert entry.name.value == "vectra"
     assert [r.number for r in entry.revisions] == [1]
     assert entry.revisions[0].purpose == "search"
-    assert entry.revisions[0].prerequisites == ("node",)
+    assert entry.revisions[0].prerequisites == (node,)
     assert "status" not in CatalogEntry.__dataclass_fields__
     assert [type(e) for e in entry.collect_events()] == [CatalogEntryRegistered]
 
 
-@pytest.mark.parametrize(("name", "purpose"), [("", "p"), ("n", " "), (" ", " ")])
-def test_catalog_entry_requires_name_and_purpose(name: str, purpose: str) -> None:
+def make_catalog_entry(**overrides: object) -> CatalogEntry:
+    values: dict[str, object] = {
+        "id": rid(1),
+        "space_id": SPACE,
+        "kind": CatalogEntryKindEnum.SKILL,
+        "name": "n",
+        "purpose": "p",
+        "location": "plugin@market",
+        "actor": AGENT,
+        "source_ids": (rid(2),),
+        "now": NOW,
+    }
+    return CatalogEntry.create(**{**values, **overrides})  # type: ignore[arg-type]
+
+
+def test_catalog_entry_requires_a_purpose() -> None:
     with pytest.raises(InvalidRecordError):
-        CatalogEntry.create(
-            id=rid(1),
-            space_id=SPACE,
-            kind=CatalogEntryKindEnum.SKILL,
-            name=name,
-            purpose=purpose,
-            now=NOW,
-        )
+        make_catalog_entry(purpose=" ")
+
+
+@pytest.mark.parametrize("name", ["", " "])
+def test_catalog_entry_requires_a_valid_name(name: str) -> None:
+    with pytest.raises(InvalidCatalogNameError):
+        make_catalog_entry(name=name)

@@ -4,10 +4,14 @@ import pytest
 
 from noesis.exceptions import (
     ApplicationException,
+    CatalogEntryAlreadyExistsError,
+    CatalogEntryNotFoundError,
     DomainException,
     EntryAlreadyExistsError,
     ExperienceWithoutSourceError,
     IdempotencyKeyReusedError,
+    InvalidCatalogNameError,
+    InvalidCatalogPrerequisiteError,
     InvalidContentHashError,
     InvalidKeyError,
     InvalidRecordError,
@@ -41,6 +45,18 @@ CASES: list[tuple[type[Exception], str, type[Exception]]] = [
     (EntryAlreadyExistsError, "KNOWLEDGE_206_ENTRY_ALREADY_EXISTS", ApplicationException),
     (RecordNotRevisableError, "KNOWLEDGE_207_RECORD_NOT_REVISABLE", ApplicationException),
     (SpaceNotFoundError, "KNOWLEDGE_208_SPACE_NOT_FOUND", ApplicationException),
+    (InvalidCatalogNameError, "KNOWLEDGE_061_INVALID_CATALOG_NAME", DomainException),
+    (
+        InvalidCatalogPrerequisiteError,
+        "KNOWLEDGE_062_INVALID_CATALOG_PREREQUISITE",
+        DomainException,
+    ),
+    (CatalogEntryNotFoundError, "KNOWLEDGE_261_CATALOG_ENTRY_NOT_FOUND", ApplicationException),
+    (
+        CatalogEntryAlreadyExistsError,
+        "KNOWLEDGE_262_CATALOG_ENTRY_ALREADY_EXISTS",
+        ApplicationException,
+    ),
 ]
 
 

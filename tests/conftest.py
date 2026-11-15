@@ -28,6 +28,7 @@ def isolated_environment(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Pat
     for name in (
         "CODEX_THREAD_ID",
         "CODEX_SESSION_ID",
+        "CODEX_HOME",
         "CLAUDECODE",
         "CLAUDE_CODE_SESSION_ID",
         "AI_AGENT",
