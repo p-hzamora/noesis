@@ -74,7 +74,7 @@ noesis store init [--json]
 Applies every registered schema step once and ensures the default space
 (`NOESIS_KNOWLEDGE_SPACE`, default `personal`). It is idempotent. Result: `applied_steps` (this
 call), `already_applied_steps` and `default_space` (`id`, `key`, `name`, `created`). There is no
-numeric schema version; the steps are named (`core`, then the steps later chunks add). Before it
+numeric schema version; the steps are named (`core`, `catalog`, then the steps later chunks add). Before it
 runs, the other commands fail with `KNOWLEDGE_204_STORE_NOT_INITIALISED`, naming the missing steps.
 
 ## Errors
@@ -93,6 +93,7 @@ runs, the other commands fail with `KNOWLEDGE_204_STORE_NOT_INITIALISED`, naming
 | `KNOWLEDGE_205_REFERENCE_NOT_IN_SPACE` | 1 | A `--source-id` is not in the active space. |
 | `KNOWLEDGE_207_RECORD_NOT_REVISABLE` | 1 | `revise` on an experience, or on knowledge that is no longer proposed. |
 | `KNOWLEDGE_208_SPACE_NOT_FOUND` | 1 | The configured space does not exist: run `noesis store init`. |
+| `KNOWLEDGE_061_INVALID_CATALOG_NAME`, `KNOWLEDGE_062_INVALID_CATALOG_PREREQUISITE`, `KNOWLEDGE_261_CATALOG_ENTRY_NOT_FOUND`, `KNOWLEDGE_262_CATALOG_ENTRY_ALREADY_EXISTS` | 1 | Catalog commands: see [catalog.md](catalog.md). |
 
 Exit 2 (usage, nothing read or written): a missing `--idempotency-key`, `--type`, `--title`,
 `--subtype`, `--body` or source, a malformed `--source`, an unknown source kind or subtype.

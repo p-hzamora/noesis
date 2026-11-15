@@ -71,7 +71,7 @@ InitialiseStoreHandler -> IStoreSchema.apply_step(...)        (`store init`)
 
 | Piece | Where | Notes |
 |---|---|---|
-| Aggregates | `domain/entities/` | Seven roots, each with its own repository and transaction, referencing each other by id: `KnowledgeSpace`, `Project`, `Source` (write-once), `Knowledge` (immutable numbered revisions, status `proposed` at creation, revise only while `proposed`), `Experience` (write-once, at least one source), `Assertion` and `CatalogEntry` (types only: storage arrives with later chunks). |
+| Aggregates | `domain/entities/` | Seven roots, each with its own repository and transaction, referencing each other by id: `KnowledgeSpace`, `Project`, `Source` (write-once), `Knowledge` (immutable numbered revisions, status `proposed` at creation, revise only while `proposed`), `Experience` (write-once, at least one source), `Assertion` (a type only: storage arrives with a later chunk) and `CatalogEntry` (immutable numbered revisions, unique by `catalog_key`). |
 | Ownership | `Knowledge.ownership` | `file`-owned revisions carry only the content hash, the file-version `Source` id and the title as read, never editable text; `graph`-owned revisions carry title and body (after redaction). Fixed at creation. |
 | Value objects | `domain/value_objects/` | `RecordId` (ULID, unique across record types; existing frontmatter ULIDs accepted), `SpaceId`, `Key`, `Revision`, `ContentHash`, `Applicability`, `Tag`, `Actor`, `Slug`. |
 | Domain events | `domain/events/` | Past tense, internal to the context; no outbox yet. |
@@ -99,13 +99,13 @@ below are reserved (a later chunk never changes the meaning of an existing membe
 
 | Kind | Reserved | For |
 |---|---|---|
-| Unit-of-work members | `changes`; `assertions`, `record_references`; `catalog_entries`; `link_sets`; `consolidations`, `consolidation_guard` | change feed; review; catalog; import links; consolidation |
+| Unit-of-work members | `changes`; `assertions`, `record_references`; `catalog_entries` (used by the catalog); `link_sets`; `consolidations`, `consolidation_guard` | change feed; review; catalog; import links; consolidation |
 | Labels | `:Change`, `:ChangeCounter`, `Index*` prefix | change feed and indexing |
 | Labels | `:LinkSet` | file import |
 | Labels | `:Decision` | review |
 | Labels | `:Consolidation`, `:ConsolidationMembership` | consolidation |
 | Edges | `LINKS_TO`, `EMBEDS` (import); `DECIDES` (review); `CONSOLIDATES`, `PRODUCED`, `OF` (consolidation); `SUBJECT`, `OBJECT`, `EVIDENCED_BY` (assertions) | - |
-| Error blocks, `KNOWLEDGE` | 020-029 and 220-229 (review); x61-x69 (catalog); 14x and 24x (work briefs); x9x (consolidation) | C2's own codes stay outside these |
+| Error blocks, `KNOWLEDGE` | 020-029 and 220-229 (review); x61-x69 (catalog: 061, 062, 261, 262 used); 14x and 24x (work briefs); x9x (consolidation) | C2's own codes stay outside these |
 
 Other points: the ledger command name is an open set; a Source's observed time is set by
 Knowledge's clock, never by the caller; `revise` locks the record node before checking status and

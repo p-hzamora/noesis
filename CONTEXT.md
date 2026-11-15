@@ -142,9 +142,19 @@ An immutable claim between two records (`supports`, `contradicts`, `supersedes`,
 evidence and a rationale; only its status changes. Modelled in the domain, stored by a later chunk.
 
 **Catalog entry**:
-A record of a tool agents may use (`skill`, `agent`, `cli_tool`, `mcp_server`) with append-only
-revisions of purpose, version, prerequisites and location. Availability is never a property.
-Modelled in the domain, stored by a later chunk.
+A record of a tool agents may use (`skill`, `agent`, `cli_tool`, `mcp_server`), unique by kind and
+name in a space, with append-only revisions of purpose, declared version, prerequisites and
+location. It holds only values a caller supplied, never an install path, and availability is never
+a property of it. Registered and revised with `noesis catalog`.
+
+**Runtime**:
+An agent harness whose installed capabilities noesis can list: `claude-code` or `codex`. A
+catalog check names the runtime and the host it observed.
+
+**Observation**:
+What `catalog check` finds when it compares an entry with what a runtime has installed now:
+`available`, `unavailable` or `unknown`, with a reason. It is computed per invocation and never
+stored; only `available` means usable.
 
 **Idempotency key**:
 The caller's required token on every mutating `record` command. The same key and request returns the

@@ -339,6 +339,45 @@ noesis review repair [--yes] --json
   `KNOWLEDGE_224` the record has no status (an Experience, Source, Project), `INTERFACE_006` above.
   A usage error is exit 2. The same key with another request is `KNOWLEDGE_203`.
 
+## The catalog (what you may use, and what is available now)
+
+`catalog` keeps a record of capabilities (`skill`, `agent`, `cli_tool`, `mcp_server`) in the same
+Neo4j store, and checks what is installed right now. A catalog entry never says a thing is available:
+only `catalog check` does, for the runtime and machine it ran on.
+
+```bash
+noesis catalog register --kind skill --name <plugin>:<name> --purpose "<text>" --location <plugin@marketplace|url> \
+  [--declared-version <v>] [--requires <kind>:<name>]... --source <kind>:<locator> --idempotency-key <key> --json
+noesis catalog revise <ID|kind:name> --expected-revision <N> [--purpose ..] [--declared-version ..] [--requires ..] [--location ..] \
+  --source <kind>:<locator> --idempotency-key <key> --json
+noesis catalog list [--kind <kind>] [--name-prefix <text>] --json
+noesis catalog show <ID|kind:name> [--revision <N>] --json
+noesis catalog check [<ID|kind:name>...] [--kind <kind>] [--runtime claude-code|codex]... --json
+noesis catalog scan [--runtime claude-code|codex]... --json
+```
+
+- Before relying on a cataloged capability, run `catalog check` and use only what is `available`.
+  `unknown` (`probe_failed`, `kind_not_probed`) means not verified; MCP servers are never probed.
+  `unavailable` carries a `reason` (`not_installed`, `prerequisite_missing` with
+  `missing_prerequisites`); `result.next_steps` names where to install it. `check` and `scan` exit 0
+  even when things are unavailable: read the statuses. `version_drift: true` means the installed
+  version differs from the declared one; the entry is still `available`.
+- With no `--runtime`, the runtime of your session is used (Claude Code, Codex), else both are checked.
+- `scan` lists what is installed but not cataloged, version drift and cataloged but not installed. It
+  registers nothing: register entries yourself, with values you choose (never an install path in
+  `--location`).
+- Names are case-sensitive: letters, digits, `.`, `_`, `-`, `:` (`<plugin>:<name>` for plugin
+  artifacts), at most 128 characters. `--requires` and refs split at the first colon.
+- `register` and `revise` need `--source` (at least one) and `--idempotency-key`, like `record`.
+  `revise` changes only the options you give (`--declared-version ""` clears the version, a lone `--requires ""`
+  clears the prerequisites); revising with nothing different writes nothing and returns the head.
+  An empty `--purpose` or `--location` is exit 2.
+- Codes you may meet (all exit 1): `KNOWLEDGE_061` invalid name, `KNOWLEDGE_062` invalid
+  prerequisite or ref, `KNOWLEDGE_261` unknown entry (or another space's), `KNOWLEDGE_262` entry
+  exists (use `catalog revise`), plus `KNOWLEDGE_202`, `KNOWLEDGE_203`, `KNOWLEDGE_204` (run
+  `noesis store init` to add the `catalog` step) and `INTEGRATION_103` as for `record`. When the store is
+  unreachable nothing is probed and nothing is guessed: report that you could not check.
+
 ## Failed curations
 
 ```bash
