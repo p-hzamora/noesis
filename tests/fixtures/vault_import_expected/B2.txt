@@ -1,0 +1,4 @@
+## Steps
+
+1. Read the ports note.
+2. Run `noesis record capture`.

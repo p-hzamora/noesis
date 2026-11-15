@@ -1,0 +1,9 @@
+# Ports and adapters
+
+Ports isolate the core. See the capture howto and diseño-hexagonal.
+
+```python
+link = "[[in-fence]]"
+```
+
+Use `[[inline-code]]` literally. Example: api_key = [REDACTED]

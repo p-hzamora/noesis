@@ -1,0 +1,9 @@
+# Use Neo4j
+
+## Context
+
+The store needs a graph.
+
+## Related
+
+- ports: the boundary this decision protects
