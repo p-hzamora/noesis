@@ -75,6 +75,7 @@ markers = [
     "integration: exercises a real adapter (files, git, subprocess)",
     "architecture: enforces dependency rules",
     "neo4j: needs Docker; runs against a pinned Neo4j container (testcontainers)",
+    "measurement: NFR-005 harness; runs only with --vault-source (tests/measurement)",
 ]
 filterwarnings = ["error"]
 
@@ -125,6 +126,7 @@ source_modules = [
     "noesis.bounded_context.capture.domain",
     "noesis.bounded_context.knowledge.domain",
     "noesis.bounded_context.retrieval.domain",
+    "noesis.bounded_context.interop.domain",
 ]
 forbidden_modules = ["typer", "subprocess", "pydantic_settings", "noesis.core"]
 allow_indirect_imports = true
@@ -177,6 +179,12 @@ layers = [
 ]
 
 [[tool.importlinter.contracts]]
+name = "Interop layers point inward"
+type = "layers"
+containers = ["noesis.bounded_context.interop"]
+layers = ["infrastructure", "application", "domain"]
+
+[[tool.importlinter.contracts]]
 name = "Bounded contexts are independent (they share only the kernel's contracts)"
 type = "independence"
 modules = [
@@ -184,6 +192,7 @@ modules = [
     "noesis.bounded_context.knowledge",
     "noesis.bounded_context.notes",
     "noesis.bounded_context.retrieval",
+    "noesis.bounded_context.interop",
 ]
 
 [[tool.importlinter.contracts]]
@@ -199,6 +208,8 @@ source_modules = [
     "noesis.bounded_context.retrieval.domain",
     "noesis.bounded_context.retrieval.application",
     "noesis.diagnostics.application",
+    "noesis.bounded_context.interop.domain",
+    "noesis.bounded_context.interop.application",
 ]
 forbidden_modules = ["yaml", "subprocess", "shutil", "tempfile", "noesis.shared_kernel.infrastructure"]
 
@@ -215,6 +226,7 @@ source_modules = [
     "noesis.bounded_context.retrieval.domain",
     "noesis.bounded_context.retrieval.application",
     "noesis.diagnostics.application",
+    "noesis.bounded_context.interop",
 ]
 forbidden_modules = ["neo4j"]
 
