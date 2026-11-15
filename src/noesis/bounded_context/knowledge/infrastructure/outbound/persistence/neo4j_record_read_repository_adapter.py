@@ -15,7 +15,8 @@ from noesis.bounded_context.knowledge.domain.value_objects import (
 )
 from noesis.shared_kernel.infrastructure.outbound.neo4j import Neo4jClient, Neo4jTransaction
 
-from .mappers import RecordDtoMapper, record_type_of, revision_key
+from .mappers import RecordDtoMapper, ReviewView, record_type_of, revision_key
+from .neo4j_review_record_support import RecordRow, fetch_record_rows
 
 _SPACE_ID: LiteralString = "MATCH (space:Space {key: $key}) RETURN space.id AS id"
 _RECORD: LiteralString = """
@@ -26,6 +27,11 @@ _REVISION: LiteralString = """
 MATCH (revision:Revision {revision_key: $revision_key})
       -[:REVISION_OF]->(:Knowledge {id: $id, space_id: $space_id})
 RETURN properties(revision) AS revision
+"""
+_ENDPOINT_REVISIONS: LiteralString = """
+MATCH (:Assertion {id: $id, space_id: $space_id})-[subject:SUBJECT]->(:Record)
+MATCH (:Assertion {id: $id, space_id: $space_id})-[object:OBJECT]->(:Record)
+RETURN subject.at_revision AS subject_at_revision, object.at_revision AS object_at_revision
 """
 _SOURCES: LiteralString = """
 MATCH (source:Source {space_id: $space_id})
@@ -65,9 +71,42 @@ class Neo4jRecordReadRepositoryAdapter(IRecordReadRepository):
                     transaction, record_id, node["head_revision"], space_id
                 )
                 sources = revision.sources if revision else ()
-            elif record_type is RecordTypeEnum.EXPERIENCE:
+            elif record_type in (RecordTypeEnum.EXPERIENCE, RecordTypeEnum.ASSERTION):
                 sources = await self._sources(transaction, node["source_ids"], space_id)
-        return RecordDtoMapper.to_record_dto(node, record_type, revision=revision, sources=sources)
+            review: ReviewView | None = await self._review(
+                transaction, record_id, record_type, space_id
+            )
+        return RecordDtoMapper.to_record_dto(
+            node, record_type, revision=revision, sources=sources, review=review
+        )
+
+    @staticmethod
+    async def _review(
+        transaction: Neo4jTransaction,
+        record_id: RecordId,
+        record_type: RecordTypeEnum,
+        space_id: SpaceId,
+    ) -> ReviewView | None:
+        """Effective status and supersession (and the revisions judged, for an assertion)."""
+        if record_type not in (RecordTypeEnum.KNOWLEDGE, RecordTypeEnum.ASSERTION):
+            return None
+        row: RecordRow = (await fetch_record_rows(transaction, space_id, [record_id]))[
+            record_id.value
+        ]
+        effective = row.effective_status
+        subject_at: int | None = None
+        object_at: int | None = None
+        if record_type is RecordTypeEnum.ASSERTION:
+            ends: list[dict[str, Any]] = await transaction.run(
+                _ENDPOINT_REVISIONS, {"id": record_id.value, "space_id": space_id.value}
+            )
+            subject_at, object_at = ends[0]["subject_at_revision"], ends[0]["object_at_revision"]
+        return ReviewView(
+            effective_status=effective.value if effective else None,
+            superseded_by=row.superseders[0] if row.superseders else None,
+            subject_at_revision=subject_at,
+            object_at_revision=object_at,
+        )
 
     async def get_revision(
         self, record_id: RecordId, number: int, *, space_id: SpaceId

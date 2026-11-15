@@ -40,6 +40,12 @@ class KnowledgeNodeMapper:
                 "subtype": knowledge.subtype.value,
                 "status": knowledge.status.value,
                 "head_revision": knowledge.head_number,
+                "decision_seq": knowledge.decision_seq,
+                "superseded_by_assertion_id": (
+                    knowledge.superseded_by_assertion_id.value
+                    if knowledge.superseded_by_assertion_id
+                    else None
+                ),
                 "project_id": project_id.value if project_id else None,
                 "tags": [tag.value for tag in knowledge.applicability.sorted_tags],
                 "created_at": knowledge.created_at,
@@ -96,6 +102,7 @@ class KnowledgeNodeMapper:
     def to_entity(node: NodeProperties, head: NodeProperties) -> Knowledge:
         """The knowledge a node and its head revision store (no pending events)."""
         project_id: str | None = node.get("project_id")
+        superseded_by: str | None = node.get("superseded_by_assertion_id")
         return Knowledge(
             id=RecordId(value=node["id"]),
             space_id=SpaceId(value=node["space_id"]),
@@ -106,6 +113,8 @@ class KnowledgeNodeMapper:
                 tags=frozenset(Tag(value=tag) for tag in node.get("tags", [])),
             ),
             status=RecordStatusEnum(node["status"]),
+            decision_seq=node.get("decision_seq", 0),
+            superseded_by_assertion_id=RecordId(value=superseded_by) if superseded_by else None,
             head=KnowledgeNodeMapper.to_revision(head),
             created_at=node["created_at"],
             updated_at=node["updated_at"],

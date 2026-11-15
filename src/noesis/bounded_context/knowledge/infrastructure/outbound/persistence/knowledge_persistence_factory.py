@@ -8,7 +8,11 @@ from noesis.bounded_context.knowledge.application.handlers.types import (
 )
 from noesis.bounded_context.knowledge.application.ports.ids import IRecordIdGenerator
 from noesis.bounded_context.knowledge.application.ports.read_repositories import (
+    IAssertionReadRepository,
     IRecordReadRepository,
+    IReviewDecisionReadRepository,
+    IReviewQueueReadRepository,
+    IReviewStateReadRepository,
 )
 from noesis.bounded_context.knowledge.application.ports.schema import IStoreSchema
 from noesis.bounded_context.knowledge.application.ports.uow import IKnowledgeUnitOfWork
@@ -18,8 +22,12 @@ from noesis.bounded_context.knowledge.infrastructure.outbound.ids import (
 from noesis.shared_kernel.application.ports.clock import IClock
 from noesis.shared_kernel.infrastructure.outbound.neo4j import Neo4jClient
 
+from .neo4j_assertion_read_adapter import Neo4jAssertionReadAdapter
 from .neo4j_knowledge_unit_of_work_adapter import Neo4jKnowledgeUnitOfWorkAdapter
 from .neo4j_record_read_repository_adapter import Neo4jRecordReadRepositoryAdapter
+from .neo4j_review_decision_read_adapter import Neo4jReviewDecisionReadAdapter
+from .neo4j_review_queue_read_adapter import Neo4jReviewQueueReadAdapter
+from .neo4j_review_state_read_adapter import Neo4jReviewStateReadAdapter
 from .neo4j_store_schema_adapter import CORE_SCHEMA_STEP, Neo4jSchemaStep, Neo4jStoreSchemaAdapter
 
 
@@ -32,12 +40,20 @@ class KnowledgePersistence:
         read_repository: The record read side.
         schema: Registered schema steps (`core` first, then `extra_steps`).
         ids: ULID generator.
+        review_queue_read_repository: The review queue and the tag selection.
+        assertion_read_repository: Assertions as DTOs.
+        review_state_read_repository: Derived review states and pending effects.
+        review_decision_read_repository: The decision history of a record.
     """
 
     uow_factory: KnowledgeUnitOfWorkFactory
     read_repository: IRecordReadRepository
     schema: IStoreSchema
     ids: IRecordIdGenerator
+    review_queue_read_repository: IReviewQueueReadRepository
+    assertion_read_repository: IAssertionReadRepository
+    review_state_read_repository: IReviewStateReadRepository
+    review_decision_read_repository: IReviewDecisionReadRepository
 
 
 def build_knowledge_persistence(
@@ -62,4 +78,8 @@ def build_knowledge_persistence(
         read_repository=Neo4jRecordReadRepositoryAdapter(client),
         schema=Neo4jStoreSchemaAdapter(client, (CORE_SCHEMA_STEP, *extra_steps)),
         ids=UlidRecordIdGeneratorAdapter(clock),
+        review_queue_read_repository=Neo4jReviewQueueReadAdapter(client),
+        assertion_read_repository=Neo4jAssertionReadAdapter(client),
+        review_state_read_repository=Neo4jReviewStateReadAdapter(client),
+        review_decision_read_repository=Neo4jReviewDecisionReadAdapter(client),
     )

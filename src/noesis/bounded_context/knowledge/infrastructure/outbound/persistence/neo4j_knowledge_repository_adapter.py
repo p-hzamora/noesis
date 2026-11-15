@@ -19,6 +19,7 @@ from noesis.exceptions import GraphStoreConstraintViolatedError, RevisionConflic
 from noesis.shared_kernel.infrastructure.outbound.neo4j import Neo4jClient, Neo4jTransaction
 
 from .mappers import KnowledgeNodeMapper, revision_key
+from .neo4j_review_write_support import stage_decision
 from .neo4j_write_support import TransactionProvider, create_unique, require_references
 
 _CREATE: LiteralString = """
@@ -55,6 +56,12 @@ MATCH (knowledge:Knowledge {id: $id, space_id: $space_id})
 WHERE knowledge.head_revision = $previous
 CREATE (revision:Revision $revision)-[:REVISION_OF]->(knowledge)
 SET knowledge.head_revision = $number, knowledge.updated_at = $updated_at
+RETURN knowledge.id AS id
+"""
+_SAVE_REVIEW: LiteralString = """
+MATCH (knowledge:Knowledge {id: $id, space_id: $space_id})
+SET knowledge.status = $status, knowledge.decision_seq = $decision_seq,
+    knowledge.superseded_by_assertion_id = $superseded_by, knowledge.updated_at = $updated_at
 RETURN knowledge.id AS id
 """
 _HEAD: LiteralString = (
@@ -127,6 +134,36 @@ class Neo4jKnowledgeRepositoryAdapter(IKnowledgeRepository):
         if not locked:
             return None
         return await self.get(record_id, space_id=space_id)
+
+    async def save(self, knowledge: Knowledge) -> None:
+        """Stage the status, `decision_seq`, superseding assertion and the latest decision.
+
+        Raises:
+            StatusConflictError: A decision with the same key exists.
+        """
+        transaction: Neo4jTransaction = self._transaction()
+        await transaction.run(
+            _SAVE_REVIEW,
+            {
+                "id": knowledge.id.value,
+                "space_id": knowledge.space_id.value,
+                "status": knowledge.status.value,
+                "decision_seq": knowledge.decision_seq,
+                "superseded_by": (
+                    knowledge.superseded_by_assertion_id.value
+                    if knowledge.superseded_by_assertion_id
+                    else None
+                ),
+                "updated_at": knowledge.updated_at,
+            },
+        )
+        if knowledge.latest_decision is not None:
+            await stage_decision(
+                transaction,
+                space_id=knowledge.space_id,
+                record_id=knowledge.id,
+                decision=knowledge.latest_decision,
+            )
 
     async def append_revision(self, knowledge: Knowledge, revision: Revision) -> None:
         """Stage `revision` as the new head, moving `head_revision` from n-1 to n.

@@ -5,22 +5,28 @@ from typing import Self
 
 from noesis.bounded_context.knowledge.application.ports.changes import IRecordChangeLog
 from noesis.bounded_context.knowledge.application.ports.ledger import IIdempotencyLedger
+from noesis.bounded_context.knowledge.application.ports.references import IRecordReferenceLookup
 from noesis.bounded_context.knowledge.application.ports.uow import IKnowledgeUnitOfWork
 from noesis.bounded_context.knowledge.domain.repositories import (
+    IAssertionRepository,
     IExperienceRepository,
     IKnowledgeRepository,
     IKnowledgeSpaceRepository,
     IProjectRepository,
     ISourceRepository,
 )
+from noesis.exceptions import GraphStoreConstraintViolatedError
 from noesis.shared_kernel.infrastructure.outbound.neo4j import Neo4jClient, Neo4jTransaction
 
+from .neo4j_assertion_repository_adapter import Neo4jAssertionRepositoryAdapter
 from .neo4j_experience_repository_adapter import Neo4jExperienceRepositoryAdapter
 from .neo4j_idempotency_ledger_adapter import Neo4jIdempotencyLedgerAdapter
 from .neo4j_knowledge_repository_adapter import Neo4jKnowledgeRepositoryAdapter
 from .neo4j_knowledge_space_repository_adapter import Neo4jKnowledgeSpaceRepositoryAdapter
 from .neo4j_project_repository_adapter import Neo4jProjectRepositoryAdapter
 from .neo4j_record_change_log_adapter import Neo4jRecordChangeLogAdapter
+from .neo4j_record_reference_lookup_adapter import Neo4jRecordReferenceLookupAdapter
+from .neo4j_review_write_support import LIVE_KEY_PROPERTY, status_conflict
 from .neo4j_source_repository_adapter import Neo4jSourceRepositoryAdapter
 
 
@@ -47,6 +53,12 @@ class Neo4jKnowledgeUnitOfWorkAdapter(IKnowledgeUnitOfWork):
         )
         self._ledger: Neo4jIdempotencyLedgerAdapter = Neo4jIdempotencyLedgerAdapter(self._current)
         self._changes: Neo4jRecordChangeLogAdapter = Neo4jRecordChangeLogAdapter(self._current)
+        self._assertions: Neo4jAssertionRepositoryAdapter = Neo4jAssertionRepositoryAdapter(
+            self._current, client
+        )
+        self._record_references: Neo4jRecordReferenceLookupAdapter = (
+            Neo4jRecordReferenceLookupAdapter(self._current)
+        )
 
     def _current(self) -> Neo4jTransaction:
         """The open transaction.
@@ -93,6 +105,16 @@ class Neo4jKnowledgeUnitOfWorkAdapter(IKnowledgeUnitOfWork):
         """The change log."""
         return self._changes
 
+    @property
+    def assertions(self) -> IAssertionRepository:
+        """Assertions."""
+        return self._assertions
+
+    @property
+    def record_references(self) -> IRecordReferenceLookup:
+        """Record reference lookup over the generic record label."""
+        return self._record_references
+
     async def __aenter__(self) -> Self:
         """Begin the transaction; an unreachable store fails here (INTEGRATION_103)."""
         self._transaction = await self._client.begin()
@@ -108,8 +130,21 @@ class Neo4jKnowledgeUnitOfWorkAdapter(IKnowledgeUnitOfWork):
         await self.rollback()
 
     async def commit(self) -> None:
-        """Make every staged change durable."""
-        await self._current().commit()
+        """Make every staged change durable.
+
+        Raises:
+            StatusConflictError: A decision key clashed (reported at commit).
+            DuplicateAssertionError: A live statement clashed (reported at commit).
+        """
+        try:
+            await self._current().commit()
+        except GraphStoreConstraintViolatedError as error:
+            conflict = status_conflict(error)
+            if conflict is not None:
+                raise conflict from error
+            if error.metadata.get("property") == LIVE_KEY_PROPERTY:
+                raise await self._assertions.duplicate_error() from error
+            raise
 
     async def rollback(self) -> None:
         """Discard every staged change; a no-op after commit."""

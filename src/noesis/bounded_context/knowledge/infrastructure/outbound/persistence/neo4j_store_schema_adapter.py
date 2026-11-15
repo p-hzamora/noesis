@@ -10,7 +10,10 @@ from dataclasses import dataclass
 from typing import Any, Final, LiteralString
 
 from noesis.bounded_context.knowledge.application.ports.schema import IStoreSchema
-from noesis.bounded_context.knowledge.application.services.schema_steps import CORE_STEP
+from noesis.bounded_context.knowledge.application.services.schema_steps import (
+    CORE_STEP,
+    REVIEW_STEP,
+)
 from noesis.exceptions import InvalidConfigurationError
 from noesis.shared_kernel.infrastructure.outbound.neo4j import Neo4jClient
 
@@ -43,6 +46,15 @@ CORE_SCHEMA_STEP: Final[Neo4jSchemaStep] = Neo4jSchemaStep(
     ),
 )
 """Knowledge's own step. `CatalogEntry.catalog_key` is reserved and registered by C6."""
+
+REVIEW_SCHEMA_STEP: Final[Neo4jSchemaStep] = Neo4jSchemaStep(
+    name=REVIEW_STEP,
+    statements=(
+        "CREATE CONSTRAINT decision_key IF NOT EXISTS FOR (n:Decision) REQUIRE n.decision_key IS UNIQUE",
+        "CREATE CONSTRAINT assertion_live_key IF NOT EXISTS FOR (n:Assertion) REQUIRE n.live_key IS UNIQUE",
+    ),
+)
+"""Review's step: one decision per sequence number, one live assertion per statement."""
 
 _APPLIED: LiteralString = """
 OPTIONAL MATCH (meta:StoreMeta {name: $name})
