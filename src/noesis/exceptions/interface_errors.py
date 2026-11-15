@@ -1,6 +1,9 @@
 """Errors raised by delivery adapters for invalid input."""
 
+from typing import ClassVar
+
 from .base import InterfaceException
+from .exit_code_enum import ExitCodeEnum
 
 
 class InvalidWorkBriefError(InterfaceException):
@@ -31,3 +34,10 @@ class EmptyRecallTaskError(InterfaceException):
     """`notes recall` got an empty or blank task."""
 
     __error_code__ = "INTERFACE_005_EMPTY_RECALL_TASK"
+
+
+class UserPresenceRequiredError(InterfaceException):
+    """A user-applied review transition ran without an interactive terminal on standard input."""
+
+    __error_code__ = "INTERFACE_006_USER_PRESENCE_REQUIRED"
+    __exit_code__: ClassVar[ExitCodeEnum] = ExitCodeEnum.FAILURE

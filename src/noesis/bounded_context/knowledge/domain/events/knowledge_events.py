@@ -73,3 +73,35 @@ class CatalogEntryRevised(DomainEvent[object]):
 
     space_id: str
     revision: int
+
+
+class KnowledgeAccepted(DomainEvent[object]):
+    """Proposed knowledge was accepted at a pinned revision."""
+
+    space_id: str
+    pinned_revision: int
+
+
+class KnowledgeRetracted(DomainEvent[object]):
+    """Knowledge was rejected (from `proposed`) or retracted (from `accepted`)."""
+
+    space_id: str
+
+
+class AssertionAccepted(DomainEvent[object]):
+    """A proposed assertion was accepted."""
+
+    space_id: str
+
+
+class AssertionRetracted(DomainEvent[object]):
+    """An assertion was rejected (from `proposed`) or retracted (from `accepted`)."""
+
+    space_id: str
+
+
+class RecordSuperseded(DomainEvent[object]):
+    """An accepted record became superseded by an accepted `supersedes` assertion."""
+
+    space_id: str
+    cause_assertion_id: str

@@ -41,3 +41,12 @@ class IKnowledgeRepository(abc.ABC):
                 the expected and actual head.
         """
         ...
+
+    @abc.abstractmethod
+    async def save(self, knowledge: Knowledge) -> None:
+        """Stage the record's status, `decision_seq`, `superseded_by_assertion_id` and latest decision.
+
+        Raises:
+            StatusConflictError: Another decision with the same decision key won.
+        """
+        ...

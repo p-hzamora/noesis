@@ -6,6 +6,7 @@ from .experience import Experience
 from .knowledge import Knowledge
 from .knowledge_space import KnowledgeSpace
 from .project import Project
+from .review_decision import ReviewDecision
 from .source import Source
 
 __all__ = [
@@ -15,5 +16,6 @@ __all__ = [
     "Knowledge",
     "KnowledgeSpace",
     "Project",
+    "ReviewDecision",
     "Source",
 ]

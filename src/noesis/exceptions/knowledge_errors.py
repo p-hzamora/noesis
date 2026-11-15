@@ -45,6 +45,30 @@ class InvalidRecordError(DomainException):
     __error_code__ = "KNOWLEDGE_007_INVALID_RECORD"
 
 
+class InvalidAssertionError(DomainException):
+    """An assertion breaks a creation invariant or the kind matrix; the metadata names the field."""
+
+    __error_code__ = "KNOWLEDGE_020_INVALID_ASSERTION"
+
+
+class InvalidStatusTransitionError(DomainException):
+    """The requested review transition is not allowed from the record's current status."""
+
+    __error_code__ = "KNOWLEDGE_021_INVALID_STATUS_TRANSITION"
+
+
+class ReviewNotAuthorisedError(DomainException):
+    """The actor may not take this review decision on this scope."""
+
+    __error_code__ = "KNOWLEDGE_022_REVIEW_NOT_AUTHORISED"
+
+
+class EvidenceRequiredError(DomainException):
+    """An agent cannot accept an assertion that has no evidence."""
+
+    __error_code__ = "KNOWLEDGE_023_EVIDENCE_REQUIRED"
+
+
 class RecordNotFoundError(ApplicationException):
     """No record has the requested id (or revision) in the active space."""
 
@@ -91,3 +115,33 @@ class SpaceNotFoundError(ApplicationException):
     """No knowledge space has the requested key."""
 
     __error_code__ = "KNOWLEDGE_208_SPACE_NOT_FOUND"
+
+
+class StatusConflictError(ApplicationException):
+    """A concurrent review decision on the same record won."""
+
+    __error_code__ = "KNOWLEDGE_220_STATUS_CONFLICT"
+
+
+class DuplicateAssertionError(ApplicationException):
+    """A live (proposed or accepted) assertion already states the same thing."""
+
+    __error_code__ = "KNOWLEDGE_221_DUPLICATE_ASSERTION"
+
+
+class ReferenceNotAcceptableError(ApplicationException):
+    """An endpoint of an assertion is retracted, superseded or not yet accepted."""
+
+    __error_code__ = "KNOWLEDGE_222_REFERENCE_NOT_ACCEPTABLE"
+
+
+class ExpectedRevisionRequiredError(ApplicationException):
+    """Accepting knowledge needs the head revision the reviewer judged."""
+
+    __error_code__ = "KNOWLEDGE_223_EXPECTED_REVISION_REQUIRED"
+
+
+class RecordNotReviewableError(ApplicationException):
+    """The record's type has no review status."""
+
+    __error_code__ = "KNOWLEDGE_224_RECORD_NOT_REVIEWABLE"

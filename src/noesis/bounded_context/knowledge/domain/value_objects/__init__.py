@@ -7,18 +7,26 @@ from .content_hash import ContentHash
 from .enums import (
     ActorKindEnum,
     AssertionPredicateEnum,
+    AssertionRoleEnum,
+    AuthorityLabelEnum,
     CatalogEntryKindEnum,
+    DecisionBasisEnum,
     ExperienceSubtypeEnum,
     OwnershipEnum,
     RecordStatusEnum,
     RecordTypeEnum,
+    ReviewRequirementEnum,
+    ReviewTransitionEnum,
     SourceKindEnum,
 )
 from .key import Key
 from .record_id import RecordId
+from .record_reference import RecordReference
+from .review_lifecycle import ReviewLifecycle
 from .revision import FileContent, GraphContent, Revision, RevisionContent
 from .slug import Slug
 from .space_id import SpaceId
+from .statement_key import StatementKey
 from .tag import Tag
 
 __all__ = [
@@ -26,21 +34,29 @@ __all__ = [
     "ActorKindEnum",
     "Applicability",
     "AssertionPredicateEnum",
+    "AssertionRoleEnum",
+    "AuthorityLabelEnum",
     "CatalogEntryKindEnum",
     "CatalogRevision",
     "ContentHash",
+    "DecisionBasisEnum",
     "ExperienceSubtypeEnum",
     "FileContent",
     "GraphContent",
     "Key",
     "OwnershipEnum",
     "RecordId",
+    "RecordReference",
     "RecordStatusEnum",
     "RecordTypeEnum",
+    "ReviewLifecycle",
+    "ReviewRequirementEnum",
+    "ReviewTransitionEnum",
     "Revision",
     "RevisionContent",
     "Slug",
     "SourceKindEnum",
     "SpaceId",
+    "StatementKey",
     "Tag",
 ]

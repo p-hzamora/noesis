@@ -75,3 +75,47 @@ class RecordTypeEnum(StrEnum):
     SOURCE = "source"
     PROJECT = "project"
     CATALOG_ENTRY = "catalog_entry"
+
+
+class AuthorityLabelEnum(StrEnum):
+    """How much a consumer may trust a record as guidance (decided in the domain)."""
+
+    AUTHORITATIVE = "authoritative"
+    PROPOSED = "proposed"
+    SUPERSEDED = "superseded"
+    RETRACTED = "retracted"
+    NOT_REVIEWABLE = "not_reviewable"
+
+
+class DecisionBasisEnum(StrEnum):
+    """Why a review decision was taken."""
+
+    USER = "user"
+    AGENT_PROJECT = "agent_project"
+    SUPERSESSION_EFFECT = "supersession_effect"
+    MIGRATION = "migration"
+
+
+class ReviewTransitionEnum(StrEnum):
+    """A step of the review lifecycle."""
+
+    ACCEPT = "accept"
+    REJECT = "reject"
+    RETRACT = "retract"
+    SUPERSEDE = "supersede"
+
+
+class ReviewRequirementEnum(StrEnum):
+    """Who must decide a queued item."""
+
+    USER = "user"
+    AGENT_OR_USER = "agent_or_user"
+
+
+class AssertionRoleEnum(StrEnum):
+    """The part a record plays in an assertion."""
+
+    SUBJECT = "subject"
+    OBJECT = "object"
+    EVIDENCE = "evidence"
+    ANY = "any"

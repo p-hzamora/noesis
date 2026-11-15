@@ -4,7 +4,17 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Self
 
-from noesis.bounded_context.knowledge.domain.events import KnowledgeProposed, KnowledgeRevised
+from noesis.bounded_context.knowledge.domain.entities.review_decision import (
+    ReviewDecision,
+    decide,
+)
+from noesis.bounded_context.knowledge.domain.events import (
+    KnowledgeAccepted,
+    KnowledgeProposed,
+    KnowledgeRetracted,
+    KnowledgeRevised,
+    RecordSuperseded,
+)
 from noesis.bounded_context.knowledge.domain.value_objects import (
     Actor,
     Applicability,
@@ -18,6 +28,11 @@ from noesis.bounded_context.knowledge.domain.value_objects import (
     Slug,
     SpaceId,
 )
+from noesis.bounded_context.knowledge.domain.value_objects.enums import (
+    DecisionBasisEnum,
+    ReviewTransitionEnum,
+)
+from noesis.bounded_context.knowledge.domain.value_objects.review_lifecycle import ReviewLifecycle
 from noesis.exceptions import InvalidRecordError, KnowledgeNotRevisableError, RevisionConflictError
 from noesis.shared_kernel.domain.entities import AggregateRoot
 
@@ -29,7 +44,7 @@ class Knowledge(AggregateRoot["Knowledge"]):
     Invariants: ownership and space never change; a graph-owned revision carries text, a
     file-owned one only hash, file_version source id and title; revisions are numbered 1..n and
     each names an actor and at least one source; the root holds only the head; status is
-    `proposed` at creation and `revise` is allowed only while it is. C2 has no status transition.
+    `proposed` at creation and `revise` is allowed only while it is. Review transitions follow `ReviewLifecycle`.
 
     Attributes:
         id: Record id.
@@ -39,6 +54,9 @@ class Knowledge(AggregateRoot["Knowledge"]):
         applicability: Project and tags it applies to.
         status: Review state.
         head: The latest revision.
+        decision_seq: Number of review decisions taken; the concurrency token.
+        superseded_by_assertion_id: The `supersedes` assertion that superseded it.
+        latest_decision: The latest review decision.
     """
 
     id: RecordId
@@ -48,6 +66,9 @@ class Knowledge(AggregateRoot["Knowledge"]):
     applicability: Applicability
     status: RecordStatusEnum
     head: Revision
+    decision_seq: int = 0
+    superseded_by_assertion_id: RecordId | None = None
+    latest_decision: ReviewDecision | None = None
 
     @property
     def head_number(self) -> int:
@@ -165,6 +186,150 @@ class Knowledge(AggregateRoot["Knowledge"]):
             )
         )
         return revision
+
+    def accept(
+        self,
+        *,
+        expected_revision: int,
+        actor: Actor,
+        reason: str | None,
+        basis: DecisionBasisEnum,
+        now: datetime,
+    ) -> ReviewDecision:
+        """Accept proposed knowledge, pinning the head revision the caller judged.
+
+        The lifecycle is checked before the revision, as `revise` does.
+
+        Raises:
+            InvalidStatusTransitionError: The status is not `proposed`.
+            RevisionConflictError: `expected_revision` is not the head.
+
+        Returns:
+            The decision, with `KnowledgeAccepted` pending.
+        """
+        ReviewLifecycle.next_status(ReviewTransitionEnum.ACCEPT, self.status)
+        if expected_revision != self.head.number:
+            raise RevisionConflictError(
+                f"Expected revision {expected_revision} but the head is {self.head.number}.",
+                {
+                    "record_id": self.id.value,
+                    "expected_revision": expected_revision,
+                    "actual_revision": self.head.number,
+                },
+                next_steps=[
+                    "Run `noesis record get`, then pass the head as the expected revision."
+                ],
+            )
+        decision: ReviewDecision = self._decide(
+            ReviewTransitionEnum.ACCEPT,
+            actor=actor,
+            reason=reason,
+            basis=basis,
+            now=now,
+            pinned_revision=self.head.number,
+        )
+        self._record(
+            KnowledgeAccepted(
+                aggregate_id=self.id.value,
+                space_id=self.space_id.value,
+                pinned_revision=self.head.number,
+            )
+        )
+        return decision
+
+    def reject(
+        self, *, actor: Actor, reason: str | None, basis: DecisionBasisEnum, now: datetime
+    ) -> ReviewDecision:
+        """Reject a proposal: `proposed` to `retracted`.
+
+        Raises:
+            InvalidStatusTransitionError: The status is not `proposed`.
+        """
+        return self._retire(ReviewTransitionEnum.REJECT, actor, reason, basis, now)
+
+    def retract(
+        self, *, actor: Actor, reason: str | None, basis: DecisionBasisEnum, now: datetime
+    ) -> ReviewDecision:
+        """Retract accepted knowledge: `accepted` to `retracted`.
+
+        Raises:
+            InvalidStatusTransitionError: The status is not `accepted`.
+        """
+        return self._retire(ReviewTransitionEnum.RETRACT, actor, reason, basis, now)
+
+    def supersede(
+        self, *, cause: RecordId, successor: RecordId, actor: Actor, now: datetime
+    ) -> ReviewDecision:
+        """Mark accepted knowledge superseded by the accepted `supersedes` assertion `cause`.
+
+        Args:
+            cause: The `supersedes` assertion.
+            successor: Its subject, for the event reader's benefit.
+            actor: Who runs the effect.
+            now: Decision time.
+
+        Raises:
+            InvalidStatusTransitionError: The status is not `accepted`.
+        """
+        decision: ReviewDecision = self._decide(
+            ReviewTransitionEnum.SUPERSEDE,
+            actor=actor,
+            reason=f"superseded by {successor.value}",
+            basis=DecisionBasisEnum.SUPERSESSION_EFFECT,
+            now=now,
+            cause_assertion_id=cause,
+        )
+        self.superseded_by_assertion_id = cause
+        self._record(
+            RecordSuperseded(
+                aggregate_id=self.id.value,
+                space_id=self.space_id.value,
+                cause_assertion_id=cause.value,
+            )
+        )
+        return decision
+
+    def _retire(
+        self,
+        transition: ReviewTransitionEnum,
+        actor: Actor,
+        reason: str | None,
+        basis: DecisionBasisEnum,
+        now: datetime,
+    ) -> ReviewDecision:
+        decision: ReviewDecision = self._decide(
+            transition, actor=actor, reason=reason, basis=basis, now=now
+        )
+        self._record(KnowledgeRetracted(aggregate_id=self.id.value, space_id=self.space_id.value))
+        return decision
+
+    def _decide(
+        self,
+        transition: ReviewTransitionEnum,
+        *,
+        actor: Actor,
+        reason: str | None,
+        basis: DecisionBasisEnum,
+        now: datetime,
+        pinned_revision: int | None = None,
+        cause_assertion_id: RecordId | None = None,
+    ) -> ReviewDecision:
+        decision: ReviewDecision = decide(
+            transition=transition,
+            status=self.status,
+            decision_seq=self.decision_seq,
+            actor=actor,
+            reason=reason,
+            basis=basis,
+            now=now,
+            pinned_revision=pinned_revision,
+            cause_assertion_id=cause_assertion_id,
+        )
+        self.status = decision.to_status
+        self.decision_seq = decision.seq
+        self.latest_decision = decision
+        self.updated_at = now
+        return decision
 
 
 def _check_shape(ownership: OwnershipEnum, content: RevisionContent) -> None:
