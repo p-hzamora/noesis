@@ -8,6 +8,12 @@ from .catalog_availability_result_contract import (
     CatalogAvailabilityRuntimeContract,
 )
 from .graph_neighbour_contract import GraphNeighbourContract
+from .import_knowledge_outcome_contract import ImportKnowledgeOutcomeContract
+from .import_knowledge_request_contract import (
+    ImportActorContract,
+    ImportHeaderSourceContract,
+    ImportKnowledgeRequestContract,
+)
 from .indexable_record_contract import IndexableRecordContract, RecordBodyMissingError
 from .record_changed_contract import RecordChangedContract
 from .record_hit_contract import RecordHitContract
@@ -21,6 +27,10 @@ __all__ = [
     "CatalogAvailabilityResultContract",
     "CatalogAvailabilityRuntimeContract",
     "GraphNeighbourContract",
+    "ImportActorContract",
+    "ImportHeaderSourceContract",
+    "ImportKnowledgeOutcomeContract",
+    "ImportKnowledgeRequestContract",
     "IndexableRecordContract",
     "RecordBodyMissingError",
     "RecordChangedContract",

@@ -24,6 +24,12 @@ from .core_errors import (
     VaultNotConfiguredError,
 )
 from .exit_code_enum import ExitCodeEnum
+from .import_errors import (
+    BlockingFindingsError,
+    FileNotImportableError,
+    FileReadFailedError,
+    VaultReadFailedError,
+)
 from .integration_errors import (
     AgentSettingsInvalidError,
     GraphStoreAuthenticationFailedError,
@@ -182,4 +188,8 @@ __all__ = [
     "SkillGuideNotFoundError",
     "UnknownNoteKindError",
     "VaultNotConfiguredError",
+    "BlockingFindingsError",
+    "FileNotImportableError",
+    "FileReadFailedError",
+    "VaultReadFailedError",
 ]

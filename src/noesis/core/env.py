@@ -24,6 +24,7 @@ from .configurations import (
     ClaudeCodeSettings,
     CodexSettings,
     CuratorSettings,
+    ImportSettings,
     KnowledgeSettings,
     NotesSettings,
     RecallRuntimeEnum,
@@ -51,6 +52,7 @@ class Environment:
         retrieval: Search and index settings (`search`, `index`).
         codex: Codex's home folder, from the process environment only (`catalog check`).
         identity: Session ids found in the process environment (never in the `.env` file).
+        vault_import: Vault folder and locator key of `noesis import`.
     """
 
     env_file: Path
@@ -63,6 +65,7 @@ class Environment:
     retrieval: RetrievalSettings
     codex: CodexSettings
     identity: SessionIdentitySettings
+    vault_import: ImportSettings
 
 
 def load_environment(env_file: Path | None = None) -> Environment:
@@ -88,6 +91,7 @@ def load_environment(env_file: Path | None = None) -> Environment:
     recall: RecallSettings | None = _load(RecallSettings, path, problems)
     knowledge: KnowledgeSettings | None = _load(KnowledgeSettings, path, problems)
     retrieval: RetrievalSettings | None = _load(RetrievalSettings, path, problems)
+    vault_import: ImportSettings | None = _load(ImportSettings, path, problems)
     if (
         runtime is None
         or notes is None
@@ -96,6 +100,7 @@ def load_environment(env_file: Path | None = None) -> Environment:
         or recall is None
         or knowledge is None
         or retrieval is None
+        or vault_import is None
     ):
         raise InvalidConfigurationError(
             f"Invalid configuration in {path} or the environment.",
@@ -113,6 +118,7 @@ def load_environment(env_file: Path | None = None) -> Environment:
         retrieval=retrieval,
         codex=CodexSettings(),
         identity=SessionIdentitySettings(),
+        vault_import=vault_import,
     )
 
 

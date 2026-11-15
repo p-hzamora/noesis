@@ -8,6 +8,7 @@ from .capture_settings import CaptureSettings
 from .claude_code_settings import ClaudeCodeSettings
 from .codex_settings import CodexSettings
 from .curator_settings import CuratorSettings
+from .import_settings import ImportSettings
 from .knowledge_settings import KnowledgeSettings
 from .notes_settings import NotesSettings
 from .paths import default_config_dir, default_env_file, default_state_dir
@@ -22,6 +23,7 @@ __all__ = [
     "ClaudeCodeSettings",
     "CodexSettings",
     "CuratorSettings",
+    "ImportSettings",
     "KnowledgeSettings",
     "NotesSettings",
     "RecallRuntimeEnum",
