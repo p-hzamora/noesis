@@ -43,6 +43,7 @@ app.add_typer(commands.review_app, name="review")
 app.add_typer(commands.index_app, name="index")
 app.command("search")(commands.search)
 app.add_typer(commands.catalog_app, name="catalog")
+app.add_typer(commands.import_app, name="import")
 app.command("doctor")(commands.doctor)
 
 

@@ -22,6 +22,11 @@ from .diagnostics_handlers_builder import (
     run_diagnostics,
     run_update_check,
 )
+from .import_handlers_builder import (
+    VaultImportHandlers,
+    open_file_import,
+    open_vault_import,
+)
 from .knowledge_handlers_builder import (
     KnowledgeHandlers,
     build_catalog_availability_adapter,
@@ -50,6 +55,7 @@ __all__ = [
     "KnowledgeHandlers",
     "NotesHandlers",
     "VaultHandlers",
+    "VaultImportHandlers",
     "APPLY_FAILED_FOLDER",
     "CAPTURE_FOLDER",
     "DOCTOR_UPDATE_TIMEOUT_SECONDS",
@@ -71,7 +77,9 @@ __all__ = [
     "curator_system_prompt",
     "installed_package_dir",
     "needs_vault",
+    "open_file_import",
     "open_knowledge",
+    "open_vault_import",
     "registered_schema_step_names",
     "require_vault",
     "run_diagnostics",

@@ -42,6 +42,13 @@ from .curation_response import CurationPreviewResponse, CurationResponse, Skippe
 from .doctor_response import DoctorCheckResponse, DoctorResponse
 from .error_response import ErrorDetail, ErrorResponse
 from .i_renderable_response import IRenderableResponse
+from .import_file_response import ImportFileResponse
+from .import_run_response import (
+    ImportNoteRowResponse,
+    ImportRunResponse,
+    ImportTotalsResponse,
+    ImportWarningCountsResponse,
+)
 from .index_response import (
     IndexDivergenceResponse,
     IndexProjectionStatusResponse,
@@ -153,6 +160,11 @@ __all__ = [
     "DoctorResponse",
     "ErrorDetail",
     "ErrorResponse",
+    "ImportFileResponse",
+    "ImportNoteRowResponse",
+    "ImportRunResponse",
+    "ImportTotalsResponse",
+    "ImportWarningCountsResponse",
     "IntegrationBaseResponse",
     "IntegrationResponse",
     "IntegrationStatusResponse",
