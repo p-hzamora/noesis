@@ -2,6 +2,8 @@
 
 from datetime import datetime
 
+from pydantic import AliasChoices, Field, computed_field
+
 from noesis.utils import FrozenObject
 
 from .i_renderable_response import IRenderableResponse
@@ -124,6 +126,30 @@ class RecordRevisionResponse(FrozenObject):
     sources: tuple[RecordSourceResponse, ...] = ()
 
 
+class RecordSupersededByResponse(FrozenObject):
+    """The accepted `supersedes` assertion that targets a record.
+
+    Attributes:
+        assertion_id: The `supersedes` assertion.
+        record_id: Its subject, the successor.
+    """
+
+    assertion_id: str
+    record_id: str
+
+
+class RecordEndpointResponse(FrozenObject):
+    """One end of an assertion.
+
+    Attributes:
+        id: Record id.
+        at_revision: Revision judged; None for types without revisions.
+    """
+
+    id: str
+    at_revision: int | None = None
+
+
 class RecordResponse(IRenderableResponse):
     """`noesis record get`: a record with the content of one revision.
 
@@ -151,6 +177,14 @@ class RecordResponse(IRenderableResponse):
         source_kind: Kind of a Source record.
         locator: Locator of a Source record.
         digest: Digest of a Source record.
+        effective_status: Derived status (knowledge, assertion): `superseded` once an accepted
+            `supersedes` assertion targets it, whatever `status` says.
+        superseded_by: That assertion and its subject, or None.
+        predicate: Assertion predicate.
+        subject: Assertion subject and the revision judged.
+        object: Assertion object and the revision judged.
+        evidence: Assertion evidence record ids.
+        rationale: Why the assertion holds.
         created_at: When the record was created.
         updated_at: When it last changed.
     """
@@ -176,14 +210,30 @@ class RecordResponse(IRenderableResponse):
     source_kind: str | None = None
     locator: str | None = None
     digest: str | None = None
+    effective_status: str | None = None
+    superseded_by: RecordSupersededByResponse | None = None
+    predicate: str | None = None
+    subject: RecordEndpointResponse | None = None
+    object: RecordEndpointResponse | None = None
+    evidence: tuple[str, ...] | None = Field(
+        default=None, validation_alias=AliasChoices("evidence", "evidence_ids")
+    )
+    rationale: str | None = None
     created_at: datetime
     updated_at: datetime
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def space(self) -> str | None:
+        """The space of an assertion (the documented assertion shape); null for other types."""
+        return self.space_id if self.type == "assertion" else None
 
     def render(self) -> str:
         lines: list[str] = [f"{self.type} {self.id}"]
         for label, value in (
             ("subtype", self.subtype),
             ("status", self.status),
+            ("effective status", self.effective_status),
             ("ownership", self.ownership),
             ("head revision", self.head_revision),
             ("space", self.space_id),
@@ -194,11 +244,20 @@ class RecordResponse(IRenderableResponse):
             ("session", self.session),
             ("environment", self.environment),
             ("source", f"{self.source_kind}:{self.locator}" if self.source_kind else None),
+            ("predicate", self.predicate),
+            ("subject", self.subject.id if self.subject else None),
+            ("object", self.object.id if self.object else None),
+            ("rationale", self.rationale),
         ):
             if value is not None:
                 lines.append(f"{label}: {value}")
         if self.applicability is not None and self.applicability.tags:
             lines.append(f"tags: {', '.join(self.applicability.tags)}")
+        if self.superseded_by is not None:
+            lines.append(
+                f"superseded by: {self.superseded_by.record_id} "
+                f"(assertion {self.superseded_by.assertion_id})"
+            )
         if self.actor is not None:
             lines.append(f"actor: {self.actor.kind} {self.actor.name}")
         if self.revision is not None:

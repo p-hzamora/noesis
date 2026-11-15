@@ -11,6 +11,13 @@ Envelope, on stdout with `--json`:
     failure: `ErrorResponse`   -> `{"ok": false, "error": {...}}`
 """
 
+from .assertion_response import (
+    AssertionApplicabilityResponse,
+    AssertionEndpointResponse,
+    AssertionItemResponse,
+    AssertionListResponse,
+    AssertionProposeResponse,
+)
 from .capture_run_response import CaptureRunListResponse, CaptureRunResponse
 from .capture_status_response import CaptureStatusResponse
 from .config_init_response import ConfigInitResponse
@@ -51,12 +58,22 @@ from .record_response import (
     RecordActorResponse,
     RecordApplicabilityResponse,
     RecordCaptureResponse,
+    RecordEndpointResponse,
     RecordResponse,
     RecordReviseResponse,
     RecordRevisionResponse,
     RecordSourceResponse,
+    RecordSupersededByResponse,
     StoreInitResponse,
     StoreSpaceResponse,
+)
+from .review_response import (
+    ReviewAcceptResponse,
+    ReviewBulkAcceptResponse,
+    ReviewLogResponse,
+    ReviewQueueResponse,
+    ReviewRepairResponse,
+    ReviewRetractResponse,
 )
 from .search_response import (
     SearchHitResponse,
@@ -71,6 +88,11 @@ from .update_check_response import UpdateCheckResponse
 from .vault_response import DuplicateProjectResponse, VaultDoctorResponse, VaultMigrationResponse
 
 __all__ = [
+    "AssertionApplicabilityResponse",
+    "AssertionEndpointResponse",
+    "AssertionItemResponse",
+    "AssertionListResponse",
+    "AssertionProposeResponse",
     "IndexDivergenceResponse",
     "IndexProjectionStatusResponse",
     "IndexRebuildResponse",
@@ -78,6 +100,12 @@ __all__ = [
     "IndexStatusResponse",
     "IndexSyncResponse",
     "IndexSyncedProjectionResponse",
+    "ReviewAcceptResponse",
+    "ReviewBulkAcceptResponse",
+    "ReviewLogResponse",
+    "ReviewQueueResponse",
+    "ReviewRepairResponse",
+    "ReviewRetractResponse",
     "SearchHitResponse",
     "SearchIndexResponse",
     "SearchResponse",
@@ -110,10 +138,12 @@ __all__ = [
     "RecordActorResponse",
     "RecordApplicabilityResponse",
     "RecordCaptureResponse",
+    "RecordEndpointResponse",
     "RecordResponse",
     "RecordReviseResponse",
     "RecordRevisionResponse",
     "RecordSourceResponse",
+    "RecordSupersededByResponse",
     "StoreInitResponse",
     "StoreSpaceResponse",
     "RecallEntryResponse",
