@@ -6,8 +6,7 @@ from noesis.bounded_context.knowledge.application.ports.read_repositories import
 )
 from noesis.bounded_context.knowledge.application.ports.schema import IStoreSchema
 from noesis.bounded_context.knowledge.application.services.schema_steps import (
-    CORE_STEP,
-    require_steps,
+    require_initialised,
 )
 from noesis.bounded_context.knowledge.domain.value_objects import Key, RecordId, SpaceId
 from noesis.exceptions import RecordNotFoundError, SpaceNotFoundError
@@ -44,7 +43,7 @@ class GetRecordHandler(IHandler[GetRecordQuery, RecordDto]):
             SpaceNotFoundError: The space key is unknown.
             RecordNotFoundError: Unknown id or revision, or the record is in another space.
         """
-        await require_steps(self._schema, CORE_STEP)
+        await require_initialised(self._schema)
         space_id: SpaceId | None = await self._read_repository.get_space_id(action.space_key)
         if space_id is None:
             raise SpaceNotFoundError(

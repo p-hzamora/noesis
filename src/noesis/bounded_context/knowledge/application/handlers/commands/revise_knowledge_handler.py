@@ -3,6 +3,9 @@
 from pydantic import Field
 
 from noesis.bounded_context.knowledge.application.dtos import ReviseResultDto
+from noesis.bounded_context.knowledge.application.dtos.pending_record_change import (
+    PendingRecordChange,
+)
 from noesis.bounded_context.knowledge.application.handlers.types import (
     KnowledgeUnitOfWorkFactory,
 )
@@ -15,12 +18,14 @@ from noesis.bounded_context.knowledge.application.services.idempotency import (
     replay_of,
 )
 from noesis.bounded_context.knowledge.application.services.inputs import SourceInput
+from noesis.bounded_context.knowledge.application.services.record_changes import (
+    pending_changes_from,
+)
 from noesis.bounded_context.knowledge.application.services.record_reference_resolver import (
     RecordReferenceResolver,
 )
 from noesis.bounded_context.knowledge.application.services.schema_steps import (
-    CORE_STEP,
-    require_steps,
+    require_initialised,
 )
 from noesis.bounded_context.knowledge.application.services.secret_redactor import SecretRedactor
 from noesis.bounded_context.knowledge.domain.entities import Knowledge
@@ -107,7 +112,7 @@ class ReviseKnowledgeHandler(IHandler[ReviseKnowledgeCommand, ReviseResultDto]):
                 "A revision needs a new title or a new body.",
                 next_steps=["Pass --title and/or --body."],
             )
-        await require_steps(self._schema, CORE_STEP)
+        await require_initialised(self._schema)
         space_id: SpaceId = await self._references.resolve_space(action.space_key)
         fingerprint: str = fingerprint_request(
             REVISE_KNOWLEDGE_COMMAND, action, exclude={"idempotency_key"}
@@ -169,6 +174,12 @@ class ReviseKnowledgeHandler(IHandler[ReviseKnowledgeCommand, ReviseResultDto]):
                     ),
                     now=now,
                 )
+                changes: list[PendingRecordChange] = pending_changes_from(
+                    knowledge.collect_events(),
+                    record_type="knowledge",
+                    status=knowledge.status.value,
+                    occurred_at=now,
+                )
                 entry: LedgerEntry = LedgerEntry(
                     space_id=space_id,
                     key=action.idempotency_key,
@@ -180,6 +191,8 @@ class ReviseKnowledgeHandler(IHandler[ReviseKnowledgeCommand, ReviseResultDto]):
                 )
                 await uow.knowledge.append_revision(knowledge, revision)
                 await uow.ledger.record(entry)
+                for change in changes:
+                    await uow.changes.append(change)
                 await uow.commit()
         except EntryAlreadyExistsError:
             winner: LedgerEntry | None = replay_of(

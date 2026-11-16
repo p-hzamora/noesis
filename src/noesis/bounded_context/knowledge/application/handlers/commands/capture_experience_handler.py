@@ -5,6 +5,9 @@ from datetime import datetime
 from pydantic import Field
 
 from noesis.bounded_context.knowledge.application.dtos import CaptureResultDto
+from noesis.bounded_context.knowledge.application.dtos.pending_record_change import (
+    PendingRecordChange,
+)
 from noesis.bounded_context.knowledge.application.handlers.types import (
     KnowledgeUnitOfWorkFactory,
 )
@@ -17,12 +20,14 @@ from noesis.bounded_context.knowledge.application.services.idempotency import (
     replay_of,
 )
 from noesis.bounded_context.knowledge.application.services.inputs import ProjectRef, SourceInput
+from noesis.bounded_context.knowledge.application.services.record_changes import (
+    pending_changes_from,
+)
 from noesis.bounded_context.knowledge.application.services.record_reference_resolver import (
     RecordReferenceResolver,
 )
 from noesis.bounded_context.knowledge.application.services.schema_steps import (
-    CORE_STEP,
-    require_steps,
+    require_initialised,
 )
 from noesis.bounded_context.knowledge.application.services.secret_redactor import SecretRedactor
 from noesis.bounded_context.knowledge.domain.entities import Experience
@@ -105,7 +110,7 @@ class CaptureExperienceHandler(IHandler[CaptureExperienceCommand, CaptureResultD
                 "An experience needs at least one source.",
                 next_steps=["Cite at least one source."],
             )
-        await require_steps(self._schema, CORE_STEP)
+        await require_initialised(self._schema)
         space_id: SpaceId = await self._references.resolve_space(action.space_key)
         fingerprint: str = fingerprint_request(
             CAPTURE_EXPERIENCE_COMMAND, action, exclude={"idempotency_key"}
@@ -146,6 +151,12 @@ class CaptureExperienceHandler(IHandler[CaptureExperienceCommand, CaptureResultD
             source_ids=source_ids,
             now=now,
         )
+        changes: list[PendingRecordChange] = pending_changes_from(
+            experience.collect_events(),
+            record_type="experience",
+            status=None,
+            occurred_at=now,
+        )
         project_value: JsonValue = project_id.value if project_id is not None else None
         entry: LedgerEntry = LedgerEntry(
             space_id=space_id,
@@ -160,6 +171,8 @@ class CaptureExperienceHandler(IHandler[CaptureExperienceCommand, CaptureResultD
             async with self._uow_factory() as uow:
                 await uow.experiences.add(experience)
                 await uow.ledger.record(entry)
+                for change in changes:
+                    await uow.changes.append(change)
                 await uow.commit()
         except EntryAlreadyExistsError:
             winner: LedgerEntry | None = replay_of(

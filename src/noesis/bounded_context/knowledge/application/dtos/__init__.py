@@ -1,6 +1,7 @@
 """Knowledge DTOs."""
 
 from .capture_result_dto import CaptureResultDto
+from .pending_record_change import PendingRecordChange
 from .record_dto import (
     ActorDto,
     ApplicabilityDto,
@@ -15,6 +16,7 @@ __all__ = [
     "ActorDto",
     "ApplicabilityDto",
     "CaptureResultDto",
+    "PendingRecordChange",
     "RecordDto",
     "ReviseResultDto",
     "RevisionDto",

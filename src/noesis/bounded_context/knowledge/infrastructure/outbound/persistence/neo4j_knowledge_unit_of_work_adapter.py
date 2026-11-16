@@ -3,6 +3,7 @@
 from types import TracebackType
 from typing import Self
 
+from noesis.bounded_context.knowledge.application.ports.changes import IRecordChangeLog
 from noesis.bounded_context.knowledge.application.ports.ledger import IIdempotencyLedger
 from noesis.bounded_context.knowledge.application.ports.uow import IKnowledgeUnitOfWork
 from noesis.bounded_context.knowledge.domain.repositories import (
@@ -19,6 +20,7 @@ from .neo4j_idempotency_ledger_adapter import Neo4jIdempotencyLedgerAdapter
 from .neo4j_knowledge_repository_adapter import Neo4jKnowledgeRepositoryAdapter
 from .neo4j_knowledge_space_repository_adapter import Neo4jKnowledgeSpaceRepositoryAdapter
 from .neo4j_project_repository_adapter import Neo4jProjectRepositoryAdapter
+from .neo4j_record_change_log_adapter import Neo4jRecordChangeLogAdapter
 from .neo4j_source_repository_adapter import Neo4jSourceRepositoryAdapter
 
 
@@ -44,6 +46,7 @@ class Neo4jKnowledgeUnitOfWorkAdapter(IKnowledgeUnitOfWork):
             self._current
         )
         self._ledger: Neo4jIdempotencyLedgerAdapter = Neo4jIdempotencyLedgerAdapter(self._current)
+        self._changes: Neo4jRecordChangeLogAdapter = Neo4jRecordChangeLogAdapter(self._current)
 
     def _current(self) -> Neo4jTransaction:
         """The open transaction.
@@ -84,6 +87,11 @@ class Neo4jKnowledgeUnitOfWorkAdapter(IKnowledgeUnitOfWork):
     def ledger(self) -> IIdempotencyLedger:
         """The idempotency ledger."""
         return self._ledger
+
+    @property
+    def changes(self) -> IRecordChangeLog:
+        """The change log."""
+        return self._changes
 
     async def __aenter__(self) -> Self:
         """Begin the transaction; an unreachable store fails here (INTEGRATION_103)."""

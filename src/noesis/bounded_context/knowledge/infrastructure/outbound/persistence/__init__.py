@@ -7,6 +7,7 @@ from .neo4j_knowledge_repository_adapter import Neo4jKnowledgeRepositoryAdapter
 from .neo4j_knowledge_space_repository_adapter import Neo4jKnowledgeSpaceRepositoryAdapter
 from .neo4j_knowledge_unit_of_work_adapter import Neo4jKnowledgeUnitOfWorkAdapter
 from .neo4j_project_repository_adapter import Neo4jProjectRepositoryAdapter
+from .neo4j_record_change_log_adapter import Neo4jRecordChangeLogAdapter
 from .neo4j_record_read_repository_adapter import Neo4jRecordReadRepositoryAdapter
 from .neo4j_source_repository_adapter import Neo4jSourceRepositoryAdapter
 from .neo4j_store_schema_adapter import (
@@ -14,8 +15,14 @@ from .neo4j_store_schema_adapter import (
     Neo4jSchemaStep,
     Neo4jStoreSchemaAdapter,
 )
+from .retrieval_schema_steps import (
+    CHANGE_FEED_SCHEMA_STEP,
+    KNOWLEDGE_FULLTEXT_SCHEMA_STEP,
+)
 
 __all__ = [
+    "CHANGE_FEED_SCHEMA_STEP",
+    "KNOWLEDGE_FULLTEXT_SCHEMA_STEP",
     "CORE_SCHEMA_STEP",
     "KnowledgePersistence",
     "Neo4jExperienceRepositoryAdapter",
@@ -24,6 +31,7 @@ __all__ = [
     "Neo4jKnowledgeSpaceRepositoryAdapter",
     "Neo4jKnowledgeUnitOfWorkAdapter",
     "Neo4jProjectRepositoryAdapter",
+    "Neo4jRecordChangeLogAdapter",
     "Neo4jRecordReadRepositoryAdapter",
     "Neo4jSchemaStep",
     "Neo4jSourceRepositoryAdapter",
