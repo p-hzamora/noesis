@@ -9,7 +9,7 @@ from noesis.shared_kernel.infrastructure.outbound.neo4j import Neo4jConnectionSe
 pytestmark = [pytest.mark.integration, pytest.mark.neo4j]
 
 NEW_STEPS = ["change_feed", "knowledge_fulltext", "retrieval_index"]
-INIT_STEPS = ["review", *NEW_STEPS, "catalog", "links"]
+INIT_STEPS = ["review", *NEW_STEPS, "catalog", "links", "consolidation"]
 
 
 def test_ac028_processes(

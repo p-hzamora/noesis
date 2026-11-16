@@ -28,6 +28,7 @@ ALL_STEPS = [
     "retrieval_index",
     "catalog",
     "links",
+    "consolidation",
 ]
 
 

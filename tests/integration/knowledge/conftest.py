@@ -45,3 +45,20 @@ async def review_env(review_bare_env: Any) -> Any:
     """`review_bare_env` after `store init` (both steps applied, default space `default`)."""
     await review_bare_env.initialise()
     return review_bare_env
+
+
+@pytest.fixture
+async def consolidation_bare_env(neo4j_settings: Neo4jConnectionSettings) -> AsyncIterator[Any]:
+    """C9's handlers over an empty database whose registry holds `core`, `review`, `consolidation`."""
+    from tests.support.consolidation_support import make_consolidation_env
+
+    env = make_consolidation_env(neo4j_settings)
+    yield env
+    await env.client.close()
+
+
+@pytest.fixture
+async def consolidation_env(consolidation_bare_env: Any) -> Any:
+    """`consolidation_bare_env` after `store init` (every registered step, default space)."""
+    await consolidation_bare_env.review.initialise()
+    return consolidation_bare_env

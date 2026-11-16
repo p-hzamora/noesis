@@ -30,6 +30,9 @@ from noesis.bounded_context.knowledge.application.handlers.commands.revise_knowl
 from noesis.bounded_context.knowledge.application.handlers.queries.get_record_handler import (
     GetRecordHandler,
 )
+from noesis.bounded_context.knowledge.application.ports.consolidation import (
+    IConsolidationGuardLookup,
+)
 from noesis.bounded_context.knowledge.application.ports.ids import IRecordIdGenerator
 from noesis.bounded_context.knowledge.application.ports.ledger import (
     IIdempotencyLedger,
@@ -52,6 +55,7 @@ from noesis.bounded_context.knowledge.domain.entities import (
 )
 from noesis.bounded_context.knowledge.domain.repositories import (
     ICatalogEntryRepository,
+    IConsolidationRepository,
     IExperienceRepository,
     IKnowledgeRepository,
     IKnowledgeSpaceRepository,
@@ -72,6 +76,7 @@ from noesis.bounded_context.knowledge.domain.value_objects import (
 )
 from noesis.exceptions import EntryAlreadyExistsError, RevisionConflictError
 from noesis.shared_kernel.application.ports.clock import IClock
+from noesis.shared_kernel.domain import JsonValue
 
 if TYPE_CHECKING:  # C4 modules; the C2 fakes must keep importing without them
     from noesis.bounded_context.knowledge.application.dtos.pending_record_change import (
@@ -161,6 +166,7 @@ class _Staged:
         self.experiences: dict[str, Experience] = {}
         self.revisions: list[tuple[Knowledge, Revision]] = []
         self.ledger: dict[tuple[str, str], LedgerEntry] = {}
+        self.ledger_updates: dict[tuple[str, str], LedgerEntry] = {}
         self.changes: list[RecordChangedContract] = []
         self.knowledge_saves: list[Knowledge] = []
         self.assertions: dict[str, Assertion] = {}
@@ -175,6 +181,7 @@ class _Staged:
         self.experiences.clear()
         self.revisions.clear()
         self.ledger.clear()
+        self.ledger_updates.clear()
         self.changes.clear()
         self.knowledge_saves.clear()
         self.assertions.clear()
@@ -336,6 +343,26 @@ class _Ledger(IIdempotencyLedger):
             raise _exists("idempotency key", entry.key)
         self._staged.ledger[slot] = entry
 
+    async def update_extra(
+        self,
+        space_id: SpaceId,
+        key: str,
+        *,
+        expected_progress_version: int,
+        extra: dict[str, JsonValue],
+    ) -> None:
+        slot = (space_id.value, key)
+        current = self._staged.ledger_updates.get(slot) or self._store.ledger.get(slot)
+        actual = current.extra.get("progress_version") if current else None
+        if current is None or actual != expected_progress_version:
+            raise RevisionConflictError(
+                f"Expected progress version {expected_progress_version} but it is {actual}.",
+                {"key": key},
+            )
+        self._staged.ledger_updates[slot] = current.model_copy(
+            update={"extra": {**extra, "progress_version": expected_progress_version + 1}}
+        )
+
 
 class FakeRecordChangeLog:
     """The change log of one fake unit of work (structural `IRecordChangeLog`).
@@ -451,6 +478,16 @@ class FakeKnowledgeUnitOfWork(IKnowledgeUnitOfWork):
         raise NotImplementedError("use FakeCatalogUnitOfWork for catalog entries")
 
     @property
+    def consolidations(self) -> IConsolidationRepository:
+        """Consolidations are covered against Neo4j; the in-memory fake has none."""
+        raise NotImplementedError("use the Neo4j environment for consolidations")
+
+    @property
+    def consolidation_guard(self) -> IConsolidationGuardLookup:
+        """Consolidation guards are covered against Neo4j; the in-memory fake has none."""
+        raise NotImplementedError("use the Neo4j environment for consolidations")
+
+    @property
     def link_sets(self):
         """Link tests override this member with a staged repository."""
         raise NotImplementedError("use a link-set unit of work")
@@ -508,6 +545,7 @@ class FakeKnowledgeUnitOfWork(IKnowledgeUnitOfWork):
         store.sources.update(staged.sources)
         store.experiences.update(staged.experiences)
         store.ledger.update(staged.ledger)
+        store.ledger.update(staged.ledger_updates)
         for knowledge in staged.knowledge.values():
             store.knowledge[knowledge.id.value] = knowledge
             store.revisions[knowledge.id.value] = [knowledge.head]
