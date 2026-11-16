@@ -93,6 +93,9 @@ from noesis.bounded_context.knowledge.infrastructure.outbound.persistence import
     Neo4jSchemaStep,
     build_knowledge_persistence,
 )
+from noesis.bounded_context.knowledge.infrastructure.outbound.persistence.links_schema_step import (
+    LINKS_SCHEMA_STEP,
+)
 from noesis.bounded_context.knowledge.infrastructure.outbound.runtime import (
     ClaudeCodeRuntimeInventoryAdapter,
     CodexRuntimeInventoryAdapter,
@@ -109,6 +112,7 @@ EXTRA_SCHEMA_STEPS: tuple[Neo4jSchemaStep, ...] = (
     REVIEW_SCHEMA_STEP,
     *RETRIEVAL_SCHEMA_STEPS,
     CATALOG_SCHEMA_STEP,
+    LINKS_SCHEMA_STEP,
 )
 """Schema steps other modules register after `core` (A-3); later chunks append here."""
 

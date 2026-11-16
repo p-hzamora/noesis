@@ -28,11 +28,22 @@ from noesis.bounded_context.knowledge.application.handlers.commands.import_knowl
 from noesis.bounded_context.knowledge.application.handlers.commands.propose_assertion_handler import (
     ProposeAssertionHandler,
 )
+from noesis.bounded_context.knowledge.application.handlers.commands.replace_link_set_handler import (
+    ReplaceLinkSetHandler,
+)
 from noesis.bounded_context.knowledge.application.handlers.queries.assess_import_knowledge_handler import (
     AssessImportKnowledgeHandler,
 )
+from noesis.bounded_context.knowledge.application.handlers.queries.assess_link_set_handler import (
+    AssessLinkSetHandler,
+)
 from noesis.bounded_context.knowledge.application.services.assertion_supersession_proposer import (
     AssertionSupersessionProposer,
+)
+from noesis.bounded_context.knowledge.application.services.schema_steps import (
+    CORE_STEP,
+    LINKS_STEP,
+    require_steps,
 )
 from noesis.bounded_context.knowledge.infrastructure.inbound.import_contracts import (
     KnowledgeImporterAdapter,
@@ -80,6 +91,8 @@ def _importer(client: Neo4jClient) -> KnowledgeImporterAdapter:
         ),
     )
     return KnowledgeImporterAdapter(
+        link_replacer=ReplaceLinkSetHandler(uow_factory=persistence.uow_factory, clock=clock),
+        link_assessor=AssessLinkSetHandler(uow_factory=persistence.uow_factory, clock=clock),
         importer=ImportKnowledgeHandler(
             uow_factory=persistence.uow_factory,
             clock=clock,
@@ -121,7 +134,9 @@ def require_vault_dir(environment: Environment) -> Path:
 
 
 @asynccontextmanager
-async def open_vault_import(environment: Environment) -> AsyncIterator[VaultImportHandlers]:
+async def open_vault_import(
+    environment: Environment, *, apply: bool = False
+) -> AsyncIterator[VaultImportHandlers]:
     """The `import run` handlers over a client that is closed when the block ends.
 
     Settings are checked before the client is built, so a missing folder or a bad key never
@@ -135,6 +150,11 @@ async def open_vault_import(environment: Environment) -> AsyncIterator[VaultImpo
     vault_key: str = environment.vault_import.resolve_vault_key()
     connection = environment.knowledge.neo4j_connection()
     async with Neo4jClient(connection) as client:
+        if apply:
+            persistence = build_knowledge_persistence(
+                client, clock=SystemClockAdapter(), extra_steps=EXTRA_SCHEMA_STEPS
+            )
+            await require_steps(persistence.schema, CORE_STEP, LINKS_STEP)
         importer: KnowledgeImporterAdapter = _importer(client)
         space_key: str = environment.knowledge.knowledge_space
         actor: ImportActor = _actor(environment)

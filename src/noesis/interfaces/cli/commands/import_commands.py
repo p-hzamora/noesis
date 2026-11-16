@@ -30,7 +30,7 @@ import_app: typer.Typer = typer.Typer(
 async def _run_vault(
     environment: Environment, *, apply: bool, update: bool, strict: bool
 ) -> VaultImportResultDto:
-    async with open_vault_import(environment) as handlers:
+    async with open_vault_import(environment, apply=apply) as handlers:
         if apply:
             return await handlers.run.handle(RunVaultImportCommand(update=update, strict=strict))
         return await handlers.plan.handle(PlanVaultImportQuery(update=update, strict=strict))

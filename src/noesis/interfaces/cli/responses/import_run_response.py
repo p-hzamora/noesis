@@ -2,7 +2,7 @@
 
 from typing import Any
 
-from pydantic import SerializerFunctionWrapHandler, model_serializer
+from pydantic import Field, SerializerFunctionWrapHandler, model_serializer
 
 from noesis.bounded_context.interop.application.dtos import VaultImportResultDto
 from noesis.utils import FrozenObject
@@ -18,6 +18,13 @@ TOTAL_LABELS: tuple[str, ...] = (
     "skipped_empty",
     "blocked",
 )
+
+
+class AmbiguousLinkResponse(FrozenObject):
+    """Target text and candidate vault paths."""
+
+    target: str
+    candidates: tuple[str, ...]
 
 
 class ImportNoteRowResponse(FrozenObject):
@@ -54,6 +61,8 @@ class ImportNoteRowResponse(FrozenObject):
     reason: str | None = None
     detail: str | None = None
     warnings: tuple[str, ...] = ()
+    links: dict[str, int | str | None] = Field(default_factory=dict)
+    ambiguous: tuple[AmbiguousLinkResponse, ...] = ()
 
 
 class ImportTotalsResponse(FrozenObject):
@@ -92,6 +101,8 @@ class ImportRunResponse(IRenderableResponse):
         next_steps: Commands to run next.
     """
 
+    links: dict[str, int] = Field(default_factory=dict)
+    link_sets: dict[str, int] = Field(default_factory=dict)
     applied: bool
     update: bool
     vault_key: str
@@ -126,6 +137,7 @@ class ImportRunResponse(IRenderableResponse):
         lines += [
             f"  blocked by {reason}: {count}" for reason, count in self.blocked_reasons.items()
         ]
+        lines.append("links: " + ", ".join(f"{count} {name}" for name, count in self.links.items()))
         lines.append(f"complete: {'yes' if self.complete else 'no'}")
         for row in self.notes or ():
             suffix: str = f" ({row.reason})" if row.reason else ""
