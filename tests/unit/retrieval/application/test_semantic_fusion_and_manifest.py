@@ -89,7 +89,8 @@ async def test_an_identifier_query_seeds_the_graph_from_lexical_only() -> None:
     assert "N" in [hit.record_id for hit in ordinary.hits]
 
 
-async def test_an_identifier_query_keeps_authority_tiers_over_the_baseline() -> None:
+async def test_an_identifier_query_tiers_the_baseline_then_the_semantic_only_records() -> None:
+    """F-5 tuning: an accepted semantic-only record never displaces a proposed exact match."""
     world = RetrievalWorld()
     world.add_knowledge("P", status="proposed")
     world.add_knowledge("Q", status="accepted")
@@ -101,4 +102,18 @@ async def test_an_identifier_query_keeps_authority_tiers_over_the_baseline() -> 
 
     result = await world.searcher(with_semantic=True).search(make_request("NOE-12"))
 
-    assert [hit.record_id for hit in result.hits] == ["Q", "X", "P"]
+    assert [hit.record_id for hit in result.hits] == ["Q", "P", "X"]
+
+
+async def test_an_ordinary_query_tiers_the_whole_fused_list() -> None:
+    world = RetrievalWorld()
+    world.add_knowledge("P", status="proposed")
+    world.add_knowledge("X", status="accepted")
+    world.feed.add(SPACE, "P")
+    world.cursors.set("semantic", SPACE, 1)
+    world.match("P")
+    world.semantic.set_hits(SPACE, [ProjectionKey(record_id="X", revision=1)])
+
+    result = await world.searcher(with_semantic=True).search(make_request("plain words"))
+
+    assert [hit.record_id for hit in result.hits] == ["X", "P"]
