@@ -30,7 +30,7 @@ class SyncIndexCommand(FrozenObject):
 
 
 class SyncIndexHandler(IHandler[SyncIndexCommand, SyncIndexResultDto]):
-    """Per projection: lock, read the cursor, apply the changes in batches, release."""
+    """Per projection: take the lease, apply the changes in fenced batches, release."""
 
     def __init__(
         self,
@@ -56,7 +56,8 @@ class SyncIndexHandler(IHandler[SyncIndexCommand, SyncIndexResultDto]):
         Raises:
             IndexSyncInProgressError: A lock was not obtained within the wait.
             IndexNotInitialisedError: A projection has no cursor.
-            IndexRebuildRequiredError: A cursor is ahead of the head or meets a gap.
+            IndexRebuildRequiredError: A cursor is ahead of the head or meets a gap, or a rebuild
+                did not finish.
         """
         head: int = await self._feed.head_sequence(action.space_id)
         if not self._writers:
@@ -75,5 +76,9 @@ class SyncIndexHandler(IHandler[SyncIndexCommand, SyncIndexResultDto]):
                 wait_seconds=action.wait_seconds,
                 ttl_seconds=self._lock_ttl_seconds,
             ):
-                synced.append(await self._synchroniser.sync(writer, space_id=action.space_id))
+                synced.append(
+                    await self._synchroniser.sync(
+                        writer, space_id=action.space_id, owner=action.owner
+                    )
+                )
         return SyncIndexResultDto(head_sequence=head, projections=tuple(synced))

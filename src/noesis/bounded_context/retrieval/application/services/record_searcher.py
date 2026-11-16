@@ -13,11 +13,12 @@ from noesis.shared_kernel.domain import JsonValue
 
 from ...domain.enums import (
     AuthorityTierEnum,
+    BuildStateEnum,
     CandidateKindEnum,
     ProjectScopeEnum,
     SemanticStateEnum,
 )
-from ...domain.policies import AuthorityRankingPolicy, RankFusionPolicy
+from ...domain.policies import AuthorityRankingPolicy, IdentifierQueryPolicy, RankFusionPolicy
 from ...domain.value_objects import RetrievalScope
 from ..dtos.record_search_dtos import (
     RecordSearchHitDto,
@@ -29,7 +30,7 @@ from ..ports.candidates.i_candidate_source import (
     ICandidateSource,
     RankedCandidatesDto,
 )
-from ..ports.indexing.i_index_cursor_store import IIndexCursorStore
+from ..ports.indexing.i_index_cursor_store import IIndexCursorStore, ProjectionManifestDto
 from ..ports.record_source.i_indexable_record_reader import IIndexableRecordReader
 from ..ports.record_source.i_record_change_feed import IRecordChangeFeed
 from ..ports.record_source.i_record_neighbour_reader import IRecordNeighbourReader
@@ -80,7 +81,10 @@ class RecordSearcher:
     """Finds records of one space by text, shared Sources and (optionally) meaning.
 
     `search` collects candidates, resolves heads, fuses, expands graph neighbours, filters by
-    scope, ranks by authority and retries once when the filters leave too few hits. `similar`
+    scope, ranks by authority and retries once when the filters leave too few hits. Ordinary
+    queries fuse lexical, graph and semantic lists with equal weight; an identifier-like query
+    (Q-205) seeds the graph from lexical alone, keeps the lexical+graph order and appends
+    semantic-only records after it. `similar`
     runs the same collection and expansion for an anchor record. Neither writes.
     """
 
@@ -111,6 +115,7 @@ class RecordSearcher:
         self._projection_kinds: tuple[str, ...] = tuple(projection_kinds)
         self._fusion: RankFusionPolicy = RankFusionPolicy()
         self._authority: AuthorityRankingPolicy = AuthorityRankingPolicy()
+        self._identifiers: IdentifierQueryPolicy = IdentifierQueryPolicy()
 
     async def search(self, request: RecordSearchRequestDto) -> RecordSearchResultDto:
         """Run the pipeline for one request.
@@ -235,8 +240,20 @@ class RecordSearcher:
                 {"projection": kind},
                 next_steps=["Run `noesis index rebuild --yes`."],
             )
+        manifest: ProjectionManifestDto | None = await self._cursors.manifest(kind, space_id)
+        if (
+            manifest is not None
+            and manifest.profile is not None
+            and manifest.profile != (source.profile())
+        ):
+            raise IndexRebuildRequiredError(
+                f"The {kind} index of this space was built with a different profile than the"
+                " configured one.",
+                {"projection": kind, "space_id": space_id},
+                next_steps=["Run `noesis index rebuild --yes`."],
+            )
         cursor: int | None = await self._cursors.get(kind, space_id)
-        if cursor is None:
+        if cursor is None or manifest is None or manifest.state is not BuildStateEnum.COMPLETE:
             return _Semantic(
                 source=source,
                 state=SemanticStateEnum.UNAVAILABLE,
@@ -313,7 +330,10 @@ class RecordSearcher:
                     if not include_stale:
                         continue
                 target.append(record_id)
-        first: list[str] = self._fusion.fuse(_non_empty(lists.lexical, lists.semantic))
+        identifier: bool = self._identifiers.is_identifier(text)
+        first: list[str] = self._fusion.fuse(
+            _non_empty(lists.lexical) if identifier else _non_empty(lists.lexical, lists.semantic)
+        )
         seeds: list[str] = list(dict.fromkeys([*([anchor] if anchor else []), *first[:SEED_COUNT]]))
         discovery: dict[str, tuple[GraphNeighbourContract, ...]] = {}
         warnings: list[str] = []
@@ -327,7 +347,13 @@ class RecordSearcher:
                 discovery=discovery,
                 warnings=warnings,
             )
-        order: list[str] = self._fusion.fuse(_non_empty(lists.lexical, lists.graph, lists.semantic))
+        order: list[str] = (
+            self._fusion.protect(
+                self._fusion.fuse(_non_empty(lists.lexical, lists.graph)), lists.semantic
+            )
+            if identifier
+            else self._fusion.fuse(_non_empty(lists.lexical, lists.graph, lists.semantic))
+        )
         sources: dict[str, set[CandidateKindEnum]] = {}
         for kind, ranked in (
             (CandidateKindEnum.LEXICAL, lists.lexical),

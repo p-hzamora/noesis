@@ -88,8 +88,13 @@ class ProjectionStatusDto(FrozenObject):
         kind: The projection.
         cursor: Its cursor.
         lag: `head_sequence - cursor`.
-        profile: What it was built with.
+        profile: What it was built with (the persisted build profile when one exists, else the
+            configured one).
         divergences: Entries that differ from the records (only with `verify`).
+        build_state: `rebuilding` or `complete`; null when the projection records no manifest.
+        configured_profile: What the projection is configured with now.
+        profile_matches: Whether the built profile equals the configured one; null with no
+            built profile.
     """
 
     kind: str
@@ -97,6 +102,9 @@ class ProjectionStatusDto(FrozenObject):
     lag: int
     profile: dict[str, JsonValue]
     divergences: tuple[DivergenceDto, ...] = ()
+    build_state: str | None = None
+    configured_profile: dict[str, JsonValue] | None = None
+    profile_matches: bool | None = None
 
 
 class IndexStatusResultDto(FrozenObject):
@@ -107,9 +115,12 @@ class IndexStatusResultDto(FrozenObject):
         projections: One entry per registered projection.
         warnings: Plain-English notices.
         divergences: Every projection's divergences together (only with `verify`).
+        semantic: Semantic mode, dependency, model and runtime diagnostics; null when no probe
+            is wired.
     """
 
     head_sequence: int
     projections: tuple[ProjectionStatusDto, ...]
     warnings: tuple[str, ...] = ()
     divergences: tuple[DivergenceDto, ...] = ()
+    semantic: dict[str, JsonValue] | None = None
