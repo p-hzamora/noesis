@@ -10,6 +10,10 @@ from noesis.shared_kernel.contracts.knowledge import (
     ImportKnowledgeOutcomeContract,
     ImportKnowledgeRequestContract,
 )
+from noesis.shared_kernel.contracts.knowledge.import_link_set_contract import (
+    ImportLinkSetOutcomeContract,
+    ImportLinkSetRequestContract,
+)
 
 
 class IKnowledgeImporter(Protocol):
@@ -25,4 +29,16 @@ class IKnowledgeImporter(Protocol):
         self, request: ImportKnowledgeRequestContract
     ) -> ImportKnowledgeOutcomeContract:
         """Do it."""
+        ...
+
+    async def assess_links(
+        self, request: ImportLinkSetRequestContract
+    ) -> ImportLinkSetOutcomeContract:
+        """Predict a link-set replacement without writing."""
+        ...
+
+    async def replace_links(
+        self, request: ImportLinkSetRequestContract
+    ) -> ImportLinkSetOutcomeContract:
+        """Atomically replace one source's outgoing link set."""
         ...

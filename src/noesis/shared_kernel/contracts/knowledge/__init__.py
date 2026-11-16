@@ -14,6 +14,11 @@ from .import_knowledge_request_contract import (
     ImportHeaderSourceContract,
     ImportKnowledgeRequestContract,
 )
+from .import_link_set_contract import (
+    ImportLinkContract,
+    ImportLinkSetOutcomeContract,
+    ImportLinkSetRequestContract,
+)
 from .indexable_record_contract import IndexableRecordContract, RecordBodyMissingError
 from .record_changed_contract import RecordChangedContract
 from .record_hit_contract import RecordHitContract
@@ -31,6 +36,9 @@ __all__ = [
     "ImportHeaderSourceContract",
     "ImportKnowledgeOutcomeContract",
     "ImportKnowledgeRequestContract",
+    "ImportLinkContract",
+    "ImportLinkSetRequestContract",
+    "ImportLinkSetOutcomeContract",
     "IndexableRecordContract",
     "RecordBodyMissingError",
     "RecordChangedContract",

@@ -9,11 +9,16 @@ from noesis.bounded_context.interop.domain.value_objects import (
     NoteMapping,
     NoteOutcomeEnum,
 )
+from noesis.bounded_context.interop.domain.value_objects.vault_link import ImportedLink
 from noesis.shared_kernel.contracts.knowledge import (
     ImportActorContract,
     ImportHeaderSourceContract,
     ImportKnowledgeOutcomeContract,
     ImportKnowledgeRequestContract,
+)
+from noesis.shared_kernel.contracts.knowledge.import_link_set_contract import (
+    ImportLinkContract,
+    ImportLinkSetRequestContract,
 )
 
 OUTCOMES: dict[str, NoteOutcomeEnum] = {
@@ -125,3 +130,31 @@ class KnowledgeImportTranslator:
             reason=outcome.reason,
             detail=outcome.detail,
         )
+
+    async def links(
+        self, source: str, links: tuple[ImportedLink, ...], *, apply: bool
+    ) -> tuple[str, str | None]:
+        """Send only real record ids across the boundary and return interop values."""
+        request = ImportLinkSetRequestContract(
+            space_key=self._space_key,
+            source_record_id=source,
+            origin_tag="origin:migrated",
+            actor=ImportActorContract(
+                kind=self._actor.kind, name=self._actor.name, session=self._actor.session
+            ),
+            links=tuple(
+                ImportLinkContract(
+                    target_record_id=link.target_record_id,
+                    link_type=link.link_type,
+                    count=link.count,
+                    anchors=link.anchors,
+                )
+                for link in links
+            ),
+        )
+        answer = (
+            await self._importer.replace_links(request)
+            if apply
+            else await self._importer.assess_links(request)
+        )
+        return answer.outcome, answer.block_reason

@@ -20,6 +20,10 @@ from noesis.bounded_context.knowledge.application.services.import_outcomes impor
 from noesis.bounded_context.knowledge.application.services.import_request import (
     ImportHeaderSource,
 )
+from noesis.bounded_context.knowledge.application.services.link_set_request import (
+    LinkSetRequest,
+    LinkSetResultDto,
+)
 from noesis.bounded_context.knowledge.domain.value_objects import (
     Actor,
     ActorKindEnum,
@@ -31,6 +35,7 @@ from noesis.bounded_context.knowledge.domain.value_objects import (
     SourceKindEnum,
     Tag,
 )
+from noesis.bounded_context.knowledge.domain.value_objects.record_link import RecordLink
 from noesis.exceptions import (
     AppException,
     EntryAlreadyExistsError,
@@ -47,6 +52,10 @@ from noesis.shared_kernel.application.handlers import IHandler
 from noesis.shared_kernel.contracts.knowledge import (
     ImportKnowledgeOutcomeContract,
     ImportKnowledgeRequestContract,
+)
+from noesis.shared_kernel.contracts.knowledge.import_link_set_contract import (
+    ImportLinkSetOutcomeContract,
+    ImportLinkSetRequestContract,
 )
 
 _INVALID_METADATA: tuple[type[AppException], ...] = (
@@ -66,7 +75,11 @@ class KnowledgeImporterAdapter:
         *,
         importer: IHandler[ImportKnowledgeCommand, ImportKnowledgeResultDto],
         assessor: IHandler[AssessImportKnowledgeQuery, ImportKnowledgeResultDto],
+        link_replacer: IHandler[LinkSetRequest, LinkSetResultDto],
+        link_assessor: IHandler[LinkSetRequest, LinkSetResultDto],
     ) -> None:
+        self._link_replacer = link_replacer
+        self._link_assessor = link_assessor
         self._importer: IHandler[ImportKnowledgeCommand, ImportKnowledgeResultDto] = importer
         self._assessor: IHandler[AssessImportKnowledgeQuery, ImportKnowledgeResultDto] = assessor
 
@@ -105,6 +118,42 @@ class KnowledgeImporterAdapter:
         except EntryAlreadyExistsError:
             return _blocked(ImportBlockReasonEnum.ID_CONFLICT)
         return _outcome(result)
+
+    async def assess_links(
+        self, request: ImportLinkSetRequestContract
+    ) -> ImportLinkSetOutcomeContract:
+        """Assess without writes; return created/replaced as the planned outcome."""
+        result = await self._link_assessor.handle(_link_request(request))
+        return ImportLinkSetOutcomeContract(**result.model_dump())
+
+    async def replace_links(
+        self, request: ImportLinkSetRequestContract
+    ) -> ImportLinkSetOutcomeContract:
+        """Replace directly; unchanged is decided under the source lock."""
+        result = await self._link_replacer.handle(_link_request(request))
+        return ImportLinkSetOutcomeContract(**result.model_dump())
+
+
+def _link_request(request: ImportLinkSetRequestContract) -> LinkSetRequest:
+    return LinkSetRequest(
+        space_key=Key(value=request.space_key),
+        source_record_id=RecordId(value=request.source_record_id),
+        origin_tag=Tag(value=request.origin_tag),
+        actor=Actor(
+            kind=ActorKindEnum(request.actor.kind),
+            name=request.actor.name,
+            session=request.actor.session,
+        ),
+        links=tuple(
+            RecordLink(
+                target_record_id=RecordId(value=link.target_record_id),
+                link_type=link.link_type,
+                count=link.count,
+                anchors=link.anchors,
+            )
+            for link in request.links
+        ),
+    )
 
 
 def _unknown_header_source_kind(

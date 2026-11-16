@@ -11,6 +11,7 @@ from noesis.bounded_context.interop.application.dtos import (
     ImportWarningCountsDto,
     VaultImportResultDto,
 )
+from noesis.bounded_context.interop.application.dtos.vault_import_result_dto import AmbiguousLinkDto
 from noesis.bounded_context.interop.application.ports import (
     IHeaderParser,
     IKnowledgeImporter,
@@ -27,6 +28,9 @@ from noesis.bounded_context.interop.domain.services import (
     TextNormaliser,
     TitleRule,
 )
+from noesis.bounded_context.interop.domain.services.link_parser import LinkParser
+from noesis.bounded_context.interop.domain.services.link_set_builder import LinkSetBuilder
+from noesis.bounded_context.interop.domain.services.link_target_index import LinkTargetIndex
 from noesis.bounded_context.interop.domain.value_objects import (
     ImportActor,
     NoteBlockReasonEnum,
@@ -35,7 +39,17 @@ from noesis.bounded_context.interop.domain.value_objects import (
     NoteWarningEnum,
     SplitNote,
 )
+from noesis.bounded_context.interop.domain.value_objects.vault_link import VaultLink
 from noesis.exceptions import BlockingFindingsError
+
+LINK_CLASSES: tuple[str, ...] = (
+    "resolved",
+    "dangling",
+    "ambiguous",
+    "non_note",
+    "not_imported",
+    "self",
+)
 
 ORIGIN_TAG: str = "origin:migrated"
 APPLY_COMMAND: str = "noesis import run --yes"
@@ -55,6 +69,11 @@ class _Note:
     """A note on its way through the run."""
 
     path: str
+    parsed_links: tuple[VaultLink, ...] = ()
+    link_counts: dict[str, int] = field(default_factory=dict)
+    link_outcome: str | None = None
+    link_block_reason: str | None = None
+    ambiguous: tuple[AmbiguousLinkDto, ...] = ()
     mapping: NoteMapping | None = None
     block_reason: str | None = None
     skipped_empty: bool = False
@@ -115,6 +134,7 @@ class VaultImportPipeline:
             for note in notes:
                 if note.payload is not None and note.outcome in WRITING_OUTCOMES:
                     note.answer = await self._knowledge.apply(note.payload)
+        await self._links(notes, apply=apply)
         return self._report(notes, update=update, applied=apply)
 
     def _analyse(self, *, update: bool) -> list[_Note]:
@@ -144,6 +164,7 @@ class VaultImportPipeline:
         if split.failure is not None:
             note.block_reason = split.failure.value
             return note
+        note.parsed_links = LinkParser().parse(split.body)
         header: Mapping[str, object] | None = None
         if split.header_text is not None:
             header = self._parser.parse(split.header_text)
@@ -170,6 +191,60 @@ class VaultImportPipeline:
             on_change="update" if update else "report",
         )
         return note
+
+    async def _links(self, notes: list[_Note], *, apply: bool) -> None:
+        """Step 8: outgoing source set differs from the incoming target map."""
+        index = LinkTargetIndex([note.path for note in notes])
+        targets: dict[str, str] = {}
+        pending: set[str] = set()
+        for note in notes:
+            answer = note.answer
+            if answer is None:
+                continue
+            is_pending: bool = not apply and note.outcome in {
+                NoteOutcomeEnum.CREATED,
+                NoteOutcomeEnum.SUCCESSOR_PROPOSED,
+            }
+            if is_pending:
+                pending.add(note.path)
+            target: str | None = answer.target_record_id or answer.record_id
+            if answer.target_record_id:
+                targets[note.path] = answer.target_record_id
+            elif is_pending:
+                targets[note.path] = f"pending:{note.path}"
+            elif target is not None:
+                targets[note.path] = target
+        for note in notes:
+            built = LinkSetBuilder().build(
+                tuple(index.resolve(link, source=note.path) for link in note.parsed_links), targets
+            )
+            counts: Counter[str] = Counter(item.classification for item in built.occurrences)
+            note.link_counts = {name: counts[name] for name in LINK_CLASSES}
+            note.ambiguous = tuple(
+                AmbiguousLinkDto(target=item.link.target, candidates=item.candidates)
+                for item in built.occurrences
+                if item.classification == "ambiguous"
+            )
+            if note.outcome is NoteOutcomeEnum.CHANGED_IN_VAULT:
+                note.link_outcome = "deferred"
+            elif note.outcome in {NoteOutcomeEnum.BLOCKED, NoteOutcomeEnum.SKIPPED_EMPTY}:
+                # Header-only notes have no link set to account for.
+                note.link_outcome = "no_record" if note.parsed_links else None
+            elif note.path in pending:
+                note.link_outcome = "planned" if built.links else None
+            elif any(link.target_record_id.startswith("pending:") for link in built.links):
+                note.link_outcome = "planned"
+            elif note.answer is not None and note.answer.record_id is not None:
+                outcome, reason = await self._knowledge.links(
+                    note.answer.record_id, built.links, apply=apply
+                )
+                note.link_outcome = (
+                    "planned" if not apply and outcome in {"created", "replaced"} else outcome
+                )
+                note.link_block_reason = reason
+                if outcome == "unchanged" and not built.links:
+                    # Empty stored sets and absent sets both need no reported work.
+                    note.link_outcome = None
 
     def _refuse_blocked(self, notes: list[_Note]) -> None:
         blocked: list[ImportNoteRowDto] = [
@@ -210,6 +285,12 @@ class VaultImportPipeline:
             ),
             detail=answer.detail if answer else None,
             warnings=note.warnings,
+            links={
+                **note.link_counts,
+                "outcome": note.link_outcome,
+                **({"block_reason": note.link_block_reason} if note.link_block_reason else {}),
+            },
+            ambiguous=note.ambiguous,
         )
 
     def _report(self, notes: list[_Note], *, update: bool, applied: bool) -> VaultImportResultDto:
@@ -222,7 +303,21 @@ class VaultImportPipeline:
         totals: ImportTotalsDto = ImportTotalsDto(
             notes=len(rows), **{outcome.value: counts[outcome.value] for outcome in NoteOutcomeEnum}
         )
+        link_sets: Counter[str] = Counter(note.link_outcome for note in notes if note.link_outcome)
         return VaultImportResultDto(
+            links={
+                name: sum(
+                    note.link_counts.get(name, 0)
+                    for note in notes
+                    if note.outcome not in {NoteOutcomeEnum.SKIPPED_EMPTY, NoteOutcomeEnum.BLOCKED}
+                )
+                for name in LINK_CLASSES
+            },
+            link_sets={
+                name: link_sets[name]
+                for name in (("created", "replaced") if applied else ("planned",))
+                + ("unchanged", "deferred", "no_record", "blocked")
+            },
             applied=applied,
             update=update,
             vault_key=self._vault_key,

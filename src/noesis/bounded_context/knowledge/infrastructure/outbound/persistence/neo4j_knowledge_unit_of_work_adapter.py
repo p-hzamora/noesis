@@ -16,6 +16,9 @@ from noesis.bounded_context.knowledge.domain.repositories import (
     IProjectRepository,
     ISourceRepository,
 )
+from noesis.bounded_context.knowledge.domain.repositories.i_link_set_repository import (
+    ILinkSetRepository,
+)
 from noesis.exceptions import GraphStoreConstraintViolatedError
 from noesis.shared_kernel.infrastructure.outbound.neo4j import Neo4jClient, Neo4jTransaction
 
@@ -25,6 +28,7 @@ from .neo4j_experience_repository_adapter import Neo4jExperienceRepositoryAdapte
 from .neo4j_idempotency_ledger_adapter import Neo4jIdempotencyLedgerAdapter
 from .neo4j_knowledge_repository_adapter import Neo4jKnowledgeRepositoryAdapter
 from .neo4j_knowledge_space_repository_adapter import Neo4jKnowledgeSpaceRepositoryAdapter
+from .neo4j_link_set_repository_adapter import Neo4jLinkSetRepositoryAdapter
 from .neo4j_project_repository_adapter import Neo4jProjectRepositoryAdapter
 from .neo4j_record_change_log_adapter import Neo4jRecordChangeLogAdapter
 from .neo4j_record_reference_lookup_adapter import Neo4jRecordReferenceLookupAdapter
@@ -41,6 +45,7 @@ class Neo4jKnowledgeUnitOfWorkAdapter(IKnowledgeUnitOfWork):
 
     def __init__(self, client: Neo4jClient) -> None:
         self._client: Neo4jClient = client
+        self._link_sets = Neo4jLinkSetRepositoryAdapter(self._current)
         self._transaction: Neo4jTransaction | None = None
         self._spaces: Neo4jKnowledgeSpaceRepositoryAdapter = Neo4jKnowledgeSpaceRepositoryAdapter(
             self._current
@@ -124,6 +129,11 @@ class Neo4jKnowledgeUnitOfWorkAdapter(IKnowledgeUnitOfWork):
     def catalog_entries(self) -> ICatalogEntryRepository:
         """Catalog entries."""
         return self._catalog_entries
+
+    @property
+    def link_sets(self) -> ILinkSetRepository:
+        """Imported outgoing links."""
+        return self._link_sets
 
     async def __aenter__(self) -> Self:
         """Begin the transaction; an unreachable store fails here (INTEGRATION_103)."""

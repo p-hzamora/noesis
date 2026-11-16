@@ -1,6 +1,15 @@
 """What `import run` (and its preview) reports."""
 
+from pydantic import Field
+
 from noesis.shared_kernel.application.dtos import BaseDto
+
+
+class AmbiguousLinkDto(BaseDto):
+    """An unresolved target with the paths the user can disambiguate."""
+
+    target: str
+    candidates: tuple[str, ...]
 
 
 class ImportNoteRowDto(BaseDto):
@@ -39,6 +48,8 @@ class ImportNoteRowDto(BaseDto):
     reason: str | None = None
     detail: str | None = None
     warnings: tuple[str, ...] = ()
+    links: dict[str, int | str | None] = Field(default_factory=dict)
+    ambiguous: tuple[AmbiguousLinkDto, ...] = ()
 
 
 class ImportTotalsDto(BaseDto):
@@ -77,6 +88,8 @@ class VaultImportResultDto(BaseDto):
         next_steps: Commands to run next.
     """
 
+    links: dict[str, int] = Field(default_factory=dict)
+    link_sets: dict[str, int] = Field(default_factory=dict)
     applied: bool
     update: bool
     vault_key: str

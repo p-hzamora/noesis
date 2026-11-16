@@ -15,6 +15,9 @@ KNOWLEDGE_FULLTEXT_STEP: str = "knowledge_fulltext"
 REVIEW_STEP: str = "review"
 """The step C4 registers: uniqueness of decision keys and live assertion statements."""
 
+LINKS_STEP: str = "links"
+"""C3b: uniqueness of the per-source link set."""
+
 CATALOG_STEP: str = "catalog"
 """The step C6 registers: the uniqueness constraint on `CatalogEntry.catalog_key`."""
 

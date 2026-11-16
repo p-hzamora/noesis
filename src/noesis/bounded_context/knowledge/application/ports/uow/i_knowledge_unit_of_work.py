@@ -14,6 +14,9 @@ from noesis.bounded_context.knowledge.domain.repositories import (
     IProjectRepository,
     ISourceRepository,
 )
+from noesis.bounded_context.knowledge.domain.repositories.i_link_set_repository import (
+    ILinkSetRepository,
+)
 from noesis.shared_kernel.application.ports.uow import IUnitOfWork
 
 
@@ -83,4 +86,10 @@ class IKnowledgeUnitOfWork(IUnitOfWork["IKnowledgeUnitOfWork"]):
     @abc.abstractmethod
     def catalog_entries(self) -> ICatalogEntryRepository:
         """Catalog entries."""
+        ...
+
+    @property
+    @abc.abstractmethod
+    def link_sets(self) -> ILinkSetRepository:
+        """Imported outgoing links; endpoint locks change no record properties."""
         ...
