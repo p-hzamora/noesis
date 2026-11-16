@@ -183,7 +183,7 @@ def build_retrieval(client: Neo4jClient, environment: Environment) -> RetrievalH
         feed,
         projection_kinds=kinds,
     )
-    from .knowledge_handlers_builder import build_catalog_availability_adapter
+    from .knowledge_handlers_builder import build_catalog_availability_adapter  # import cycle
 
     reviews = ReviewReadersAdapter(client)
     settings = environment.retrieval

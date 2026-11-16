@@ -20,9 +20,8 @@ from noesis.interfaces.cli.bootstrap.retrieval_handlers_builder import (
 from noesis.interfaces.cli.options import JsonOption
 from noesis.interfaces.cli.responses.recall_response import RecallRecordResponse, RecallResponse
 from noesis.interfaces.cli.runtime_resolution import parse_runtimes, resolve_runtimes
+from noesis.interfaces.cli.search_presentation import resolve_project, search_response
 from noesis.interfaces.cli.state import cli_state
-
-from .search_commands import _resolve_project, _response
 
 
 def recall(
@@ -45,7 +44,7 @@ def recall(
         raise typer.BadParameter("Give a non-empty task.", ctx=context, param_hint="TASK")
     parse_runtimes(runtime or [])
     env = cli_state(context).environment()
-    key, source = _resolve_project(project, False)
+    key, source = resolve_project(project, False)
     runtimes = resolve_runtimes(runtime or [], env.identity)
 
     async def run(handlers: RetrievalHandlers, space_id: str) -> RecallResultDto:
@@ -63,7 +62,9 @@ def recall(
         return await handlers.recall.handle(request)
 
     result = asyncio.run(with_retrieval(env, run))
-    search = _response(result.search, space=env.knowledge.knowledge_space, key=key, source=source)
+    search = search_response(
+        result.search, space=env.knowledge.knowledge_space, key=key, source=source
+    )
     output.emit(
         RecallResponse(
             synthesis=result.synthesis,
