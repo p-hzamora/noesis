@@ -25,3 +25,19 @@ def default_env_file() -> Path:
 def default_state_dir() -> Path:
     """`$XDG_STATE_HOME/noesis` (normally `~/.local/state/noesis`)."""
     return _xdg_dir("XDG_STATE_HOME", ".local/state") / APP_DIR_NAME
+
+
+def default_cache_dir() -> Path:
+    """`$XDG_CACHE_HOME/noesis` (normally `~/.cache/noesis`)."""
+    return _xdg_dir("XDG_CACHE_HOME", ".cache") / APP_DIR_NAME
+
+
+def default_model_cache_dir() -> Path:
+    """`$XDG_CACHE_HOME/noesis/models`: prepared embedding model artifacts."""
+    return default_cache_dir() / "models"
+
+
+def default_runtime_root() -> Path | None:
+    """`$XDG_RUNTIME_DIR` when set and absolute; null otherwise (the cache is the fallback)."""
+    value: str = os.environ.get("XDG_RUNTIME_DIR", "")
+    return Path(value) if value and Path(value).is_absolute() else None
