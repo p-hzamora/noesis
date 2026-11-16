@@ -74,7 +74,7 @@ noesis store init [--json]
 Applies every registered schema step once and ensures the default space
 (`NOESIS_KNOWLEDGE_SPACE`, default `personal`). It is idempotent. Result: `applied_steps` (this
 call), `already_applied_steps` and `default_space` (`id`, `key`, `name`, `created`). There is no
-numeric schema version; the steps are named (`core`, `catalog`, then the steps later chunks add). Before it
+numeric schema version; the steps are named (`core`, `review`, `change_feed`, `knowledge_fulltext`, `retrieval_index`, `catalog`, then the steps later chunks add). Before it
 runs, the other commands fail with `KNOWLEDGE_204_STORE_NOT_INITIALISED`, naming the missing steps.
 
 ## Errors

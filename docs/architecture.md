@@ -71,7 +71,7 @@ InitialiseStoreHandler -> IStoreSchema.apply_step(...)        (`store init`)
 
 | Piece | Where | Notes |
 |---|---|---|
-| Aggregates | `domain/entities/` | Seven roots, each with its own repository and transaction, referencing each other by id: `KnowledgeSpace`, `Project`, `Source` (write-once), `Knowledge` (immutable numbered revisions, status `proposed` at creation, revise only while `proposed`), `Experience` (write-once, at least one source), `Assertion` (a type only: storage arrives with a later chunk) and `CatalogEntry` (immutable numbered revisions, unique by `catalog_key`). |
+| Aggregates | `domain/entities/` | Seven roots, each with its own repository and transaction, referencing each other by id: `KnowledgeSpace`, `Project`, `Source` (write-once), `Knowledge` (immutable numbered revisions, status `proposed` at creation, revise only while `proposed`), `Experience` (write-once, at least one source), `Assertion` (a reviewed statement about two records) and `CatalogEntry` (immutable numbered revisions, unique by `catalog_key`). |
 | Ownership | `Knowledge.ownership` | `file`-owned revisions carry only the content hash, the file-version `Source` id and the title as read, never editable text; `graph`-owned revisions carry title and body (after redaction). Fixed at creation. |
 | Value objects | `domain/value_objects/` | `RecordId` (ULID, unique across record types; existing frontmatter ULIDs accepted), `SpaceId`, `Key`, `Revision`, `ContentHash`, `Applicability`, `Tag`, `Actor`, `Slug`. |
 | Domain events | `domain/events/` | Past tense, internal to the context; no outbox yet. |
