@@ -254,6 +254,38 @@ noesis record get <ID> [--revision <N>] --json
   `KNOWLEDGE_204` store not initialised, `KNOWLEDGE_205` a `--source-id` not in the space,
   `KNOWLEDGE_207` not revisable, `KNOWLEDGE_208` space missing (`store init`).
 
+## Search the record store
+
+```text
+noesis search <query> [--project <key> | --all-projects] [--tag <t>]... [--type knowledge|experience]...
+                      [--status <s>]... [--limit 1..50] [--include-stale] [--require-semantic] [--json]
+```
+
+- Scope: the active space. Default project: the git repository you run it in (the same name
+  `record capture` uses), plus space-wide records. `--project` names another one; `--all-projects`
+  searches every project (not together with `--project`). Outside a repository, or for a project the
+  space does not have, it searches space-wide records only and says so in `result.warnings`
+  (`result.scope.space_wide_only: true`). Search never creates a project.
+- Hits (`result.hits[]`, best first): `id`, `type`, `subtype`, `title`, `revision`, `status`,
+  `authority`, `project`, `sources`, `revised_at`, `rank`. `authority` is a label, in this order:
+  `authoritative`, `experience`, `proposed` / `unreviewed`, `superseded`, `retracted`. Retracted records
+  are left out unless `--status retracted`. Treat only `authoritative` as settled; `proposed` is a
+  proposal.
+- `result.index`: `pending_changes`, `stale_hits`, `filter_shortfall` (fewer hits than `--limit`
+  matched the filters) and `semantic.state` (`absent` today: only text and shared-source search run).
+- Errors: `RETRIEVAL_101_SEMANTIC_INDEX_UNAVAILABLE` (`--require-semantic` while the state is `absent` or
+  `unavailable`), `RETRIEVAL_202_INDEX_REBUILD_REQUIRED` (run `noesis index rebuild --yes`),
+  `INTEGRATION_103_GRAPH_STORE_UNAVAILABLE` (Neo4j is down). An empty query, `--limit` outside 1..50, or
+  `--project` with `--all-projects` is a usage error (exit 2).
+
+## Index commands
+
+`noesis index sync [--wait-seconds <n>]`, `noesis index rebuild [--projection <name>] --yes` and
+`noesis index status [--verify]` keep search projections up to date. This release registers no
+projection, so each one reports `projections: []`, the feed's `head_sequence` and a warning, writes
+nothing and exits 0. `rebuild` without `--yes`, or naming an unregistered `--projection`, is a usage
+error (exit 2). Normal use needs none of them: text search reads the record store directly.
+
 ## Failed curations
 
 ```bash

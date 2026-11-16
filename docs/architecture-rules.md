@@ -35,8 +35,8 @@ Interfaces -> infrastructure -> application -> domain, per context and in the sh
 Each layer may import only the layers to its right.
 
 **Enforced by.** The layers contracts "Shared kernel layers point inward", "Diagnostics layers
-point inward", "Notes layers point inward", "Knowledge layers point inward" and "Capture layers
-point inward".
+point inward", "Notes layers point inward", "Knowledge layers point inward", "Retrieval layers
+point inward" and "Capture layers point inward".
 
 ## Nothing below the interface layer imports it
 
