@@ -37,6 +37,7 @@ from noesis.bounded_context.retrieval.application.services.record_searcher impor
 from noesis.exceptions import RecordNotFoundError
 from noesis.shared_kernel.contracts.knowledge import (
     GraphNeighbourContract,
+    GraphNeighboursContract,
     IndexableRecordContract,
     RecordChangedContract,
     RecordHitContract,
@@ -242,14 +243,16 @@ class FakeRecordNeighbourReader(IRecordNeighbourReader):
 
     async def neighbours(
         self, seed_ids: Sequence[str], *, space_id: str, limit: int
-    ) -> list[GraphNeighbourContract]:
+    ) -> GraphNeighboursContract:
         """The seeded pairs of the asked seeds; seeds are never neighbours."""
         self.calls.append((tuple(seed_ids), space_id, limit))
-        return [
-            item
-            for item in self._items.get(space_id, [])
-            if item.seed_id in seed_ids and item.record_id not in seed_ids
-        ]
+        return GraphNeighboursContract(
+            neighbours=tuple(
+                item
+                for item in self._items.get(space_id, [])
+                if item.seed_id in seed_ids and item.record_id not in seed_ids
+            )
+        )
 
 
 class FakeIndexableRecordReader(IIndexableRecordReader):

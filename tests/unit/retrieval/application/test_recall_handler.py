@@ -21,6 +21,7 @@ from noesis.shared_kernel.contracts.knowledge import (
     CatalogAvailabilityEntryContract,
     CatalogAvailabilityResultContract,
     CatalogAvailabilityRuntimeContract,
+    GraphNeighbourContract,
     RecordReviewStateContract,
 )
 
@@ -293,3 +294,45 @@ async def test_changed_head_with_retraction_is_hidden_before_revision_omission()
     world.indexables.get = changed
     result = await handler.handle(request())
     assert result.records == ()
+
+
+async def test_recheck_runs_after_tool_gathering_and_before_the_model() -> None:
+    handler, _, reviews, recommendations, _, model = setup_recall()
+    states = reviews.get_states.return_value
+    calls: list[str] = []
+
+    async def get_states(ids: list[str], *, space_id: str) -> list[RecordReviewStateContract]:
+        calls.append("states")
+        if calls.count("states") < 2:
+            return states
+        return [state.model_copy(update={"head_revision": 2}) for state in states]
+
+    async def by_subjects(ids: list[str], *, space_id: str) -> list[AssertionSummaryContract]:
+        calls.append("tools")
+        return []
+
+    reviews.get_states.side_effect = get_states
+    recommendations.by_subjects.side_effect = by_subjects
+    result = await handler.handle(request(digest=False))
+    assert calls == ["states", "tools", "states"]
+    assert result.synthesis == "no_evidence"
+    model.synthesize.assert_not_called()
+    assert all(record.omitted_reason == "review_changed" for record in result.records)
+
+
+def test_discovery_ids_and_labels_are_redacted() -> None:
+    handler, *_ = setup_recall()
+    secret = "ghp_" + "a" * 24
+    path = GraphNeighbourContract(
+        record_id=secret,
+        seed_id=secret,
+        relation="links_to",
+        shared_sources=0,
+        original_target_id=secret,
+        origin=secret,
+        anchors=(secret,),
+        supersession_path=(secret,),
+        warnings=(secret,),
+    )
+    masked = handler._mask_path(path)
+    assert secret not in masked.model_dump_json()
