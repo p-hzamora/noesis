@@ -98,6 +98,8 @@ WARM_CALLS = 100
 RUNS = 3
 WARM_UP = 10
 PER_CALL_SAMPLES = 20
+TAIL_SENTENCE = "The aquarium heater thermostat failed and the tropical fish tank froze overnight."
+TAIL_QUERY = "aquarium heater thermostat failure froze the fish tank"
 
 
 class NeverIdentifier:
@@ -433,8 +435,7 @@ async def run_scale(
         records = [
             dataclasses.replace(
                 record,
-                body=" ".join([record.body] * 60)
-                + (" The tailneedle phrase sits at the very end." if index == 7 else ""),
+                body=" ".join([record.body] * 60) + (" " + TAIL_SENTENCE if index == 7 else ""),
             )
             for index, record in enumerate(records)
         ]
@@ -447,7 +448,7 @@ async def run_scale(
         stats = await chunk_stats(arm, space_id)
         found: dict[str, Any] = {"records": len(records), "rebuild": rebuild, "chunks": stats}
         if long_documents:
-            hits = await arm.source.find("tailneedle phrase", space_id=space_id, limit=5)
+            hits = await arm.source.find(TAIL_QUERY, space_id=space_id, limit=10)
             needle = load.ids[records[7].key]
             found["tail_only_phrase_rank"] = next(
                 (rank for rank, key in enumerate(hits.hits, start=1) if key.record_id == needle),
@@ -487,7 +488,42 @@ def hardware() -> dict[str, Any]:
     }
 
 
-async def main_async(out: Path) -> None:
+async def relevance_only(out: Path, engine: OnnxBgeEngine) -> None:
+    """Rerun only the fixture relevance and filter evaluation (after a fusion tuning)."""
+    records = load_fixture()
+    queries = load_queries()
+    with running_neo4j() as settings:
+        env = await open_env(settings)
+        try:
+            space_id = await space_id_of(env)
+            load = await load_records(env, space_id, records)
+            to_key = {record_id: key for key, record_id in load.ids.items()}
+            arm = Arm(env, engine)
+            report: dict[str, Any] = {"rebuild": await arm.rebuild(space_id), "relevance": {}}
+            report["project_filter"] = {}
+            for name, searcher in arm.searchers().items():
+                found = await evaluate_relevance(searcher, space_id, queries, to_key, passes=1)
+                report["relevance"][name] = {
+                    "per_slice": found["per_slice"],
+                    "identifier_rows": [
+                        {key: row[key] for key in ("id", "ranked", "ndcg", "sources")}
+                        for row in found["per_query"]
+                        if row["slice"] == "identifier"
+                    ],
+                }
+                report["project_filter"][name] = await evaluate_filter(
+                    searcher, space_id, queries, records, to_key
+                )
+        finally:
+            await env.client.close()
+    out.mkdir(parents=True, exist_ok=True)
+    (out / "b-bge-production-relevance-rerun.json").write_text(
+        json.dumps(report, indent=2), encoding="utf-8"
+    )
+    print(json.dumps({n: r["per_slice"] for n, r in report["relevance"].items()}, indent=1))
+
+
+async def main_async(out: Path, *, only_relevance: bool = False) -> None:
     cache_root = Path(os.environ.get("NOESIS_RETRIEVAL_MODEL_CACHE_DIR", default_model_cache_dir()))
     cache = ModelCache(cache_root)
     started = time.perf_counter()
@@ -496,6 +532,16 @@ async def main_async(out: Path) -> None:
     started = time.perf_counter()
     engine = load_engine(cache)
     load_seconds = time.perf_counter() - started
+    if only_relevance:
+        await relevance_only(out, engine)
+        return
+    if os.environ.get("BGE_ONLY_LONG"):
+        with running_neo4j() as settings:
+            long_run = await run_scale(settings, engine, long_documents=True)
+        out.mkdir(parents=True, exist_ok=True)
+        (out / "b-bge-production-long-rerun.json").write_text(json.dumps(long_run, indent=2))
+        print(json.dumps(long_run, indent=1))
+        return
     report: dict[str, Any] = {
         "arm": "B-bge-production",
         "profile": engine.profile.as_json(),
@@ -552,7 +598,9 @@ def summary(report: dict[str, Any]) -> dict[str, Any]:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--out", type=Path, required=True)
-    asyncio.run(main_async(parser.parse_args().out))
+    parser.add_argument("--only-relevance", action="store_true")
+    args = parser.parse_args()
+    asyncio.run(main_async(args.out, only_relevance=args.only_relevance))
 
 
 if __name__ == "__main__":
