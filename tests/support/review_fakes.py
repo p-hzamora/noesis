@@ -737,6 +737,9 @@ def seed_catalog_entry(
         kind=kind,
         name=f"{kind.value}-entry",
         purpose="does a thing",
+        location="https://example.invalid/entry",
+        actor=AGENT,
+        source_ids=(env.ids.new_record_id(),),
         now=env.clock.now(),
     )
     env.store.catalog_entries[entry.id.value] = entry

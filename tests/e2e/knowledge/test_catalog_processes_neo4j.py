@@ -487,7 +487,16 @@ async def test_ac014_core_only_store_rejects_register_until_store_init_adds_cata
 
     assert registered.code == 0, (registered.stdout, registered.stderr)
     assert query(neo4j_settings, "MATCH (m:StoreMeta) RETURN m.applied_steps AS steps") == [
-        {"steps": ["core", "catalog"]}
+        {
+            "steps": [
+                "core",
+                "review",
+                "change_feed",
+                "knowledge_fulltext",
+                "retrieval_index",
+                "catalog",
+            ]
+        }
     ]
     constraints = [
         row

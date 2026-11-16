@@ -8,9 +8,9 @@ from noesis.shared_kernel.infrastructure.outbound.neo4j import Neo4jConnectionSe
 
 pytestmark = [pytest.mark.integration, pytest.mark.neo4j]
 
-ALL_STEPS = ["core", "review", "change_feed", "knowledge_fulltext", "retrieval_index"]
+ALL_STEPS = ["core", "review", "change_feed", "knowledge_fulltext", "retrieval_index", "catalog"]
 NEW_STEPS = ["change_feed", "knowledge_fulltext", "retrieval_index"]
-INIT_STEPS = ["review", *NEW_STEPS]
+INIT_STEPS = ["review", *NEW_STEPS, "catalog"]
 
 
 def _schema(settings: Neo4jConnectionSettings) -> tuple[list[object], list[object], list[object]]:
