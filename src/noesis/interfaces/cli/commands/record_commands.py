@@ -45,6 +45,7 @@ from noesis.core.git_root import find_common_dir, repository_name
 from noesis.interfaces.cli import output
 from noesis.interfaces.cli.actor import resolve_actor
 from noesis.interfaces.cli.bootstrap import with_knowledge
+from noesis.interfaces.cli.bootstrap.retrieval_handlers_builder import trigger_index_sync
 from noesis.interfaces.cli.options import JsonOption
 from noesis.interfaces.cli.responses import (
     RecordCaptureResponse,
@@ -243,6 +244,8 @@ def capture(
                 env, lambda handlers: handlers.capture_experience.handle(experience_command)
             )
         )
+    if not result.replayed:
+        trigger_index_sync(env)
     output.emit(RecordCaptureResponse.model_validate(result, from_attributes=True))
 
 
@@ -292,6 +295,8 @@ def revise(
     result: ReviseResultDto = asyncio.run(
         with_knowledge(env, lambda handlers: handlers.revise_knowledge.handle(command))
     )
+    if not result.replayed:
+        trigger_index_sync(env)
     output.emit(RecordReviseResponse.model_validate(result, from_attributes=True))
 
 

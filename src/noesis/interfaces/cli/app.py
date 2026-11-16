@@ -38,6 +38,8 @@ app.add_typer(commands.update_app, name="update")
 app.add_typer(commands.vault_app, name="vault")
 app.add_typer(commands.record_app, name="record")
 app.add_typer(commands.store_app, name="store")
+app.add_typer(commands.index_app, name="index")
+app.command("search")(commands.search)
 app.command("doctor")(commands.doctor)
 
 

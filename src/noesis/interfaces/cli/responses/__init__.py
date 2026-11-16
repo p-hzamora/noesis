@@ -19,6 +19,15 @@ from .curation_response import CurationPreviewResponse, CurationResponse, Skippe
 from .doctor_response import DoctorCheckResponse, DoctorResponse
 from .error_response import ErrorDetail, ErrorResponse
 from .i_renderable_response import IRenderableResponse
+from .index_response import (
+    IndexDivergenceResponse,
+    IndexProjectionStatusResponse,
+    IndexRebuildResponse,
+    IndexRebuiltProjectionResponse,
+    IndexStatusResponse,
+    IndexSyncedProjectionResponse,
+    IndexSyncResponse,
+)
 from .integration_response import (
     IntegrationBaseResponse,
     IntegrationResponse,
@@ -49,12 +58,31 @@ from .record_response import (
     StoreInitResponse,
     StoreSpaceResponse,
 )
+from .search_response import (
+    SearchHitResponse,
+    SearchIndexResponse,
+    SearchResponse,
+    SearchScopeResponse,
+    SearchSemanticResponse,
+)
 from .skill_guide_response import SkillGuideListResponse, SkillGuideResponse
 from .success_response import SuccessResponse
 from .update_check_response import UpdateCheckResponse
 from .vault_response import DuplicateProjectResponse, VaultDoctorResponse, VaultMigrationResponse
 
 __all__ = [
+    "IndexDivergenceResponse",
+    "IndexProjectionStatusResponse",
+    "IndexRebuildResponse",
+    "IndexRebuiltProjectionResponse",
+    "IndexStatusResponse",
+    "IndexSyncResponse",
+    "IndexSyncedProjectionResponse",
+    "SearchHitResponse",
+    "SearchIndexResponse",
+    "SearchResponse",
+    "SearchScopeResponse",
+    "SearchSemanticResponse",
     "CaptureRunListResponse",
     "CaptureRunResponse",
     "CaptureStatusResponse",

@@ -34,7 +34,9 @@ from noesis.core import Environment
 from noesis.shared_kernel.infrastructure.outbound.clock import SystemClockAdapter
 from noesis.shared_kernel.infrastructure.outbound.neo4j import Neo4jClient
 
-EXTRA_SCHEMA_STEPS: tuple[Neo4jSchemaStep, ...] = ()
+from .retrieval_handlers_builder import RETRIEVAL_SCHEMA_STEPS
+
+EXTRA_SCHEMA_STEPS: tuple[Neo4jSchemaStep, ...] = (*RETRIEVAL_SCHEMA_STEPS,)
 """Schema steps other modules register after `core` (A-3); later chunks append here."""
 
 
