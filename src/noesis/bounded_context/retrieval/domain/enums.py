@@ -37,3 +37,18 @@ class ProjectScopeEnum(StrEnum):
     PROJECT = "project"
     ALL_PROJECTS = "all_projects"
     SPACE_WIDE_ONLY = "space_wide_only"
+
+
+class BuildStateEnum(StrEnum):
+    """Whether a projection's last build of a space finished."""
+
+    REBUILDING = "rebuilding"
+    COMPLETE = "complete"
+
+
+class SemanticModeEnum(StrEnum):
+    """How the semantic source runs (`NOESIS_RETRIEVAL_SEMANTIC_MODE`)."""
+
+    RESIDENT = "resident"
+    PER_CALL = "per-call"
+    OFF = "off"
