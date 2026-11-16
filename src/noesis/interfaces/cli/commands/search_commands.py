@@ -10,10 +10,12 @@ from noesis.bounded_context.retrieval.application.dtos.record_search_dtos import
     RecordSearchRequestDto,
     RecordSearchResultDto,
 )
+from noesis.bounded_context.retrieval.domain.enums import SemanticModeEnum
 from noesis.core import Environment
 from noesis.interfaces.cli import output
 from noesis.interfaces.cli.bootstrap.retrieval_handlers_builder import (
     RetrievalHandlers,
+    semantic_mode,
     with_retrieval,
 )
 from noesis.interfaces.cli.options import JsonOption
@@ -66,9 +68,16 @@ def search(
         bool,
         typer.Option("--require-semantic", help="Fail unless a semantic index can answer."),
     ] = False,
+    semantic: Annotated[
+        bool,
+        typer.Option(
+            "--semantic",
+            help="Use semantic search in per-call mode (loads the model in this process).",
+        ),
+    ] = False,
     as_json: JsonOption = False,
 ) -> None:
-    """Find records by text and shared sources, best first, labelled by authority."""
+    """Find records by text, shared sources and (when available) meaning, labelled by authority."""
     if not query.strip():
         raise typer.BadParameter("Give a non-empty query.", ctx=context, param_hint="QUERY")
     if project is not None and all_projects:
@@ -78,6 +87,12 @@ def search(
             param_hint="--project",
         )
     env: Environment = cli_state(context).environment()
+    if semantic and semantic_mode(env) is SemanticModeEnum.OFF:
+        raise typer.BadParameter(
+            "--semantic needs NOESIS_RETRIEVAL_SEMANTIC_MODE=resident or per-call (it is off).",
+            ctx=context,
+            param_hint="--semantic",
+        )
     key, source = resolve_project(project, all_projects)
     space: str = env.knowledge.knowledge_space
 
@@ -96,5 +111,7 @@ def search(
         )
         return await handlers.search.handle(request)
 
-    result: RecordSearchResultDto = asyncio.run(with_retrieval(env, run))
+    result: RecordSearchResultDto = asyncio.run(
+        with_retrieval(env, run, semantic_opt_in=semantic or require_semantic)
+    )
     output.emit(search_response(result, space=space, key=key, source=source))

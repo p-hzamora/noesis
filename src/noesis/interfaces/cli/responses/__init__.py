@@ -75,6 +75,7 @@ from .import_run_response import (
     ImportWarningCountsResponse,
 )
 from .index_response import (
+    EmbedderServeResponse,
     IndexDivergenceResponse,
     IndexProjectionStatusResponse,
     IndexRebuildResponse,
@@ -82,6 +83,7 @@ from .index_response import (
     IndexStatusResponse,
     IndexSyncedProjectionResponse,
     IndexSyncResponse,
+    ModelPrepareResponse,
 )
 from .integration_response import (
     IntegrationBaseResponse,
@@ -154,6 +156,8 @@ __all__ = [
     "IndexRebuiltProjectionResponse",
     "IndexStatusResponse",
     "IndexSyncResponse",
+    "ModelPrepareResponse",
+    "EmbedderServeResponse",
     "IndexSyncedProjectionResponse",
     "ReviewAcceptResponse",
     "ReviewBulkAcceptResponse",

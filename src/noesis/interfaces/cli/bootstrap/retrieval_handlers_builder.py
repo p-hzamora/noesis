@@ -1,8 +1,11 @@
 """Wires the Retrieval handlers over the invocation's Neo4j client, and the index sync trigger.
 
-Projections and candidate sources are registered in one place, `registered_projections`; C5a's
-production wiring registers none (D-025), so every `index` command reports that nothing is
-registered and a capture starts no detached sync.
+Projections and candidate sources are registered in one place, `registered_projections`. C5b
+registers the `semantic` writer and source there (D30) according to
+`NOESIS_RETRIEVAL_SEMANTIC_MODE`: `resident` (default) talks to a running
+`noesis index embedder serve`; `per-call` loads the model in this process, and registers the
+source only for explicit opt-ins; `off`, or the optional `semantic` extra not installed,
+registers nothing and search stays lexical+graph.
 """
 
 import os
@@ -11,6 +14,7 @@ import subprocess
 import sys
 from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass
+from pathlib import Path
 
 from noesis.bounded_context.knowledge.application.services.schema_steps import (
     CHANGE_FEED_STEP,
@@ -64,19 +68,47 @@ from noesis.bounded_context.retrieval.application.handlers.queries.search_record
 from noesis.bounded_context.retrieval.application.ports.candidates.i_candidate_source import (
     ICandidateSource,
 )
+from noesis.bounded_context.retrieval.application.ports.embedding import ITextEmbedder
 from noesis.bounded_context.retrieval.application.ports.indexing.i_index_cursor_store import (
     IIndexCursorStore,
 )
 from noesis.bounded_context.retrieval.application.ports.indexing.i_index_writer import IIndexWriter
 from noesis.bounded_context.retrieval.application.services.briefing_redactor import BriefingRedactor
 from noesis.bounded_context.retrieval.application.services.record_searcher import RecordSearcher
+from noesis.bounded_context.retrieval.domain.enums import SemanticModeEnum
+from noesis.bounded_context.retrieval.domain.value_objects import EmbeddingProfile
 from noesis.bounded_context.retrieval.infrastructure.outbound.briefing.claude_cli_briefing_adapter import (
     ClaudeCliBriefingAdapter,
+)
+from noesis.bounded_context.retrieval.infrastructure.outbound.embedding.embedder_protocol import (
+    runtime_directory,
+    socket_path,
+)
+from noesis.bounded_context.retrieval.infrastructure.outbound.embedding.model_artifacts import (
+    ModelCache,
+)
+from noesis.bounded_context.retrieval.infrastructure.outbound.embedding.semantic_runtime_probe import (
+    SemanticRuntimeProbe,
+    semantic_dependency_installed,
+)
+from noesis.bounded_context.retrieval.infrastructure.outbound.embedding.socket_text_embedder import (
+    SocketTextEmbedder,
 )
 from noesis.bounded_context.retrieval.infrastructure.outbound.persistence import (
     RETRIEVAL_INDEX_STATEMENTS,
     RETRIEVAL_INDEX_STEP,
+    RETRIEVAL_SEMANTIC_STATEMENTS,
+    RETRIEVAL_SEMANTIC_STEP,
     Neo4jIndexCursorStoreAdapter,
+)
+from noesis.bounded_context.retrieval.infrastructure.outbound.semantic import (
+    SEMANTIC_KIND,
+    Neo4jSemanticCandidateSource,
+    Neo4jSemanticProjectionAdapter,
+    Neo4jVectorIndexInspector,
+)
+from noesis.bounded_context.retrieval.infrastructure.outbound.semantic.neo4j_vector_index_inspector import (
+    check_semantic_vector_index,
 )
 from noesis.core import Environment
 from noesis.exceptions import InvalidConfigurationError, SpaceNotFoundError
@@ -88,12 +120,19 @@ RETRIEVAL_INDEX_SCHEMA_STEP: Neo4jSchemaStep = Neo4jSchemaStep(
     name=RETRIEVAL_INDEX_STEP, statements=RETRIEVAL_INDEX_STATEMENTS
 )
 
+RETRIEVAL_SEMANTIC_SCHEMA_STEP: Neo4jSchemaStep = Neo4jSchemaStep(
+    name=RETRIEVAL_SEMANTIC_STEP,
+    statements=RETRIEVAL_SEMANTIC_STATEMENTS,
+    check=check_semantic_vector_index,
+)
+
 RETRIEVAL_SCHEMA_STEPS: tuple[Neo4jSchemaStep, ...] = (
     CHANGE_FEED_SCHEMA_STEP,
     KNOWLEDGE_FULLTEXT_SCHEMA_STEP,
     RETRIEVAL_INDEX_SCHEMA_STEP,
+    RETRIEVAL_SEMANTIC_SCHEMA_STEP,
 )
-"""The schema steps C5a registers with `store init`, in application order."""
+"""The schema steps C5a and C5b register with `store init`, in application order."""
 
 REQUIRED_STEPS: tuple[str, ...] = (CHANGE_FEED_STEP, KNOWLEDGE_FULLTEXT_STEP, RETRIEVAL_INDEX_STEP)
 
@@ -115,9 +154,65 @@ class RegisteredProjections:
     cursors: IIndexCursorStore | None = None
 
 
-def registered_projections(client: Neo4jClient, environment: Environment) -> RegisteredProjections:
-    """The one place projections are registered; production registers none (D-025)."""
-    return RegisteredProjections(writers=(), candidate_sources=())
+def semantic_mode(environment: Environment) -> SemanticModeEnum:
+    """The configured semantic mode."""
+    return SemanticModeEnum(environment.retrieval.retrieval_semantic_mode)
+
+
+def model_cache(environment: Environment) -> ModelCache:
+    """The pinned model's cache under the configured directory."""
+    return ModelCache(environment.retrieval.retrieval_model_cache_dir)
+
+
+def embedder_socket(environment: Environment) -> Path:
+    """The resident embedder's socket for this cache and profile."""
+    cache: ModelCache = model_cache(environment)
+    root: Path = environment.retrieval.retrieval_model_cache_dir
+    return socket_path(
+        runtime_directory(environment.retrieval.retrieval_runtime_dir, root),
+        cache_root=root,
+        profile_hash=cache.artifact.profile().fingerprint(),
+    )
+
+
+def _embedder(environment: Environment, mode: SemanticModeEnum) -> ITextEmbedder:
+    """The embedder of `mode`; the in-process one is imported only here (numpy is optional)."""
+    cache: ModelCache = model_cache(environment)
+    profile: EmbeddingProfile = cache.artifact.profile()
+    if mode is SemanticModeEnum.RESIDENT:
+        return SocketTextEmbedder(profile, embedder_socket(environment))
+    from noesis.bounded_context.retrieval.infrastructure.outbound.embedding.in_process_text_embedder import (
+        InProcessTextEmbedder,
+    )
+    from noesis.bounded_context.retrieval.infrastructure.outbound.embedding.onnx_bge_engine import (
+        load_engine,
+    )
+
+    threads: int | None = environment.retrieval.retrieval_embedder_threads
+    return InProcessTextEmbedder(profile, lambda: load_engine(cache, threads=threads))
+
+
+def registered_projections(
+    client: Neo4jClient, environment: Environment, *, semantic_opt_in: bool = False
+) -> RegisteredProjections:
+    """The one place projections are registered.
+
+    `semantic` is registered when the mode is not `off` and the optional extra is installed.
+    In `per-call` mode its source is registered only with `semantic_opt_in` (an explicit
+    `search --semantic` or `--require-semantic`), so no ordinary call pays the model load.
+    """
+    mode: SemanticModeEnum = semantic_mode(environment)
+    if mode is SemanticModeEnum.OFF or not semantic_dependency_installed():
+        return RegisteredProjections(writers=(), candidate_sources=())
+    embedder: ITextEmbedder = _embedder(environment, mode)
+    cursors = Neo4jIndexCursorStoreAdapter(client, SystemClockAdapter())
+    writer = Neo4jSemanticProjectionAdapter(client, embedder, cursors)
+    sources: tuple[ICandidateSource, ...] = ()
+    if mode is SemanticModeEnum.RESIDENT or semantic_opt_in:
+        sources = (
+            Neo4jSemanticCandidateSource(client, embedder, Neo4jVectorIndexInspector(client)),
+        )
+    return RegisteredProjections(writers=(writer,), candidate_sources=sources, cursors=cursors)
 
 
 def registered_projection_kinds(environment: Environment) -> tuple[str, ...]:
@@ -153,13 +248,17 @@ class RetrievalHandlers:
     recall: RecallHandler | None = None
 
 
-def build_retrieval(client: Neo4jClient, environment: Environment) -> RetrievalHandlers:
+def build_retrieval(
+    client: Neo4jClient, environment: Environment, *, semantic_opt_in: bool = False
+) -> RetrievalHandlers:
     """Wire the handlers over `client` (the caller closes it); opens no connection.
 
     Raises:
         InvalidConfigurationError: Two registered projections share a `kind`.
     """
-    registered: RegisteredProjections = registered_projections(client, environment)
+    registered: RegisteredProjections = registered_projections(
+        client, environment, semantic_opt_in=semantic_opt_in
+    )
     kinds: tuple[str, ...] = tuple(writer.kind for writer in registered.writers)
     duplicates: list[str] = sorted({kind for kind in kinds if kinds.count(kind) > 1})
     if duplicates:
@@ -222,21 +321,46 @@ def build_retrieval(client: Neo4jClient, environment: Environment) -> RetrievalH
             lock_ttl_seconds=ttl,
         ),
         index_status=GetIndexStatusHandler(
-            writers=registered.writers, cursors=cursors, feed=feed, states=states
+            writers=registered.writers,
+            cursors=cursors,
+            feed=feed,
+            states=states,
+            semantic_probe=_probe(client, environment),
         ),
         searcher=searcher,
         projection_kinds=kinds,
     )
 
 
+def _probe(client: Neo4jClient, environment: Environment) -> SemanticRuntimeProbe:
+    mode: SemanticModeEnum = semantic_mode(environment)
+    cache: ModelCache = model_cache(environment)
+    return SemanticRuntimeProbe(
+        mode=mode,
+        cache=cache,
+        client=(
+            SocketTextEmbedder(cache.artifact.profile(), embedder_socket(environment))
+            if mode is SemanticModeEnum.RESIDENT
+            else None
+        ),
+        inspector=Neo4jVectorIndexInspector(client),
+    )
+
+
 async def with_retrieval[T](
-    environment: Environment, use: Callable[[RetrievalHandlers, str], Awaitable[T]]
+    environment: Environment,
+    use: Callable[[RetrievalHandlers, str], Awaitable[T]],
+    *,
+    semantic_opt_in: bool = False,
+    indexing: bool = False,
 ) -> T:
     """Run `use(handlers, space_id)` over a client that is closed afterwards.
 
     The C5a schema steps must be applied and the configured space must exist; both are checked
-    before `use` runs and nothing is written. An unreachable store surfaces from the first
-    store call as `INTEGRATION_103`.
+    before `use` runs and nothing is written. An `indexing` command with the semantic
+    projection registered also needs the `retrieval_semantic` step; searches do not (a missing
+    vector index makes semantic unavailable, not the search). An unreachable store surfaces from
+    the first store call as `INTEGRATION_103`.
 
     Raises:
         InvalidConfigurationError: `NOESIS_NEO4J_PASSWORD` is not set, or two projections share
@@ -251,6 +375,8 @@ async def with_retrieval[T](
             client, clock=SystemClockAdapter(), extra_steps=EXTRA_SCHEMA_STEPS
         )
         await require_steps(persistence.schema, *REQUIRED_STEPS)
+        if indexing and SEMANTIC_KIND in registered_projection_kinds(environment):
+            await require_steps(persistence.schema, RETRIEVAL_SEMANTIC_STEP)
         space_key: str = environment.knowledge.knowledge_space
         space_id: SpaceId | None = await persistence.read_repository.get_space_id(
             Key(value=space_key)
@@ -261,7 +387,9 @@ async def with_retrieval[T](
                 {"space_key": space_key},
                 next_steps=["Run `noesis store init` or check the configured space key."],
             )
-        return await use(build_retrieval(client, environment), space_id.value)
+        return await use(
+            build_retrieval(client, environment, semantic_opt_in=semantic_opt_in), space_id.value
+        )
 
 
 class IndexSyncTrigger:
@@ -335,8 +463,11 @@ __all__ = [
     "RegisteredProjections",
     "RetrievalHandlers",
     "build_retrieval",
+    "embedder_socket",
+    "model_cache",
     "registered_projection_kinds",
     "registered_projections",
+    "semantic_mode",
     "start_detached",
     "trigger_index_sync",
     "with_retrieval",
