@@ -319,6 +319,16 @@ async def test_row_carries_the_outcome_fields_of_the_note() -> None:
         "reason": "assertions unavailable: target not linked",
         "detail": None,
         "warnings": [],
+        "ambiguous": [],
+        "links": {
+            "resolved": 0,
+            "dangling": 0,
+            "ambiguous": 0,
+            "non_note": 0,
+            "not_imported": 0,
+            "self": 0,
+            "outcome": None,
+        },
     }
 
 

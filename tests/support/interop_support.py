@@ -20,6 +20,10 @@ from noesis.shared_kernel.contracts.knowledge import (
     ImportKnowledgeOutcomeContract,
     ImportKnowledgeRequestContract,
 )
+from noesis.shared_kernel.contracts.knowledge.import_link_set_contract import (
+    ImportLinkSetOutcomeContract,
+    ImportLinkSetRequestContract,
+)
 
 MINTED_PREFIX: str = "01JCKMNPM"
 ACTOR: ImportActor = ImportActor(kind="user", name="tester", session=None)
@@ -111,6 +115,7 @@ class FakeKnowledgeImporter:
         )
         self.calls: list[tuple[str, ImportKnowledgeRequestContract]] = []
         self._minted: int = 0
+        self.link_calls: list[tuple[str, ImportLinkSetRequestContract]] = []
 
     @staticmethod
     def _default_assess(request: ImportKnowledgeRequestContract) -> ImportKnowledgeOutcomeContract:
@@ -136,6 +141,26 @@ class FakeKnowledgeImporter:
         """Record the call and return the scripted outcome (or raise what the script raises)."""
         self.calls.append(("apply", request))
         return self._apply(request)
+
+    async def assess_links(
+        self, request: ImportLinkSetRequestContract
+    ) -> ImportLinkSetOutcomeContract:
+        self.link_calls.append(("assess", request))
+        return ImportLinkSetOutcomeContract(
+            outcome="created" if request.links else "unchanged",
+            source_record_id=request.source_record_id,
+            edges=len(request.links),
+        )
+
+    async def replace_links(
+        self, request: ImportLinkSetRequestContract
+    ) -> ImportLinkSetOutcomeContract:
+        self.link_calls.append(("replace", request))
+        return ImportLinkSetOutcomeContract(
+            outcome="created" if request.links else "unchanged",
+            source_record_id=request.source_record_id,
+            edges=len(request.links),
+        )
 
     def requests(self, kind: str = "assess") -> dict[str, ImportKnowledgeRequestContract]:
         """The requests of one call kind, keyed by `source_locator`."""

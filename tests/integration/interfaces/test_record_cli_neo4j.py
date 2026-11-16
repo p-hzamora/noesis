@@ -27,6 +27,7 @@ ALL_STEPS = [
     "knowledge_fulltext",
     "retrieval_index",
     "catalog",
+    "links",
 ]
 
 

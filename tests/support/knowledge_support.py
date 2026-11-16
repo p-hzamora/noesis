@@ -450,6 +450,11 @@ class FakeKnowledgeUnitOfWork(IKnowledgeUnitOfWork):
         """Not stored here: `FakeCatalogUnitOfWork` (catalog_support) overrides it."""
         raise NotImplementedError("use FakeCatalogUnitOfWork for catalog entries")
 
+    @property
+    def link_sets(self):
+        """Link tests override this member with a staged repository."""
+        raise NotImplementedError("use a link-set unit of work")
+
     async def __aenter__(self) -> Self:
         self._staged.clear()
         return self

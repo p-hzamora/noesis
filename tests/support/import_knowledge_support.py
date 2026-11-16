@@ -215,7 +215,16 @@ def build_importer(
     proposer: ISupersessionProposer | None = None,
 ) -> KnowledgeImporterAdapter:
     """The inbound adapter over both handlers (`ImportKnowledgeHandler(proposer=None)` = no C4)."""
+    from noesis.bounded_context.knowledge.application.handlers.commands.replace_link_set_handler import (
+        ReplaceLinkSetHandler,
+    )
+    from noesis.bounded_context.knowledge.application.handlers.queries.assess_link_set_handler import (
+        AssessLinkSetHandler,
+    )
+
     return KnowledgeImporterAdapter(
+        link_replacer=ReplaceLinkSetHandler(uow_factory=uow_factory, clock=clock),
+        link_assessor=AssessLinkSetHandler(uow_factory=uow_factory, clock=clock),
         importer=ImportKnowledgeHandler(
             uow_factory=uow_factory,
             clock=clock,
