@@ -280,6 +280,39 @@ noesis review repair [--yes] --json
   `KNOWLEDGE_224` the record has no status (an Experience, Source, Project), `INTERFACE_006` above.
   A usage error is exit 2. The same key with another request is `KNOWLEDGE_203`.
 
+## Consolidation (overlapping accepted Knowledge)
+
+A consolidation proposes one new Knowledge record (the successor) for 2..10 overlapping accepted
+Knowledge records and a proposed `supersedes` from it to each original. It needs the
+`consolidation` schema step (`noesis store init`). Originals, their links and assertions are never
+changed, merged or deleted; nothing is accepted until review.
+
+```bash
+noesis consolidation scan --record <ID> | --project <key> | --global [--limit 5] [--anchors 20] [--cursor <c>] [--include-dismissed] --json
+noesis consolidation propose --member <ID> --member <ID> [...] --title "<t>" --body "<b>" --rationale "<why>" \
+  [--tag <tag>]... [--source <kind>:<locator>]... [--reconsider <CID>] [--dry-run] --idempotency-key <key> --json
+noesis consolidation show <CID> --json
+noesis consolidation list --project <key> | --global [--state <s>] [--limit 20] [--cursor <c>] --json
+noesis consolidation accept <CID> [--reason "<why>"] [--yes --idempotency-key <key>] --json
+noesis consolidation reject <CID> --reason-kind distinct|poor_draft|other --reason "<why>" [--yes --idempotency-key <key>] --json
+```
+
+- `scan` is read-only and ranks candidates from lexical search and shared graph neighbours; ranks
+  are not a semantic-equivalence claim. You write the successor's title and body yourself.
+- Members: accepted, not superseded, same subtype and project. A proposed `origin:migrated` member
+  is refused with the next step `noesis review accept --tag origin:migrated --all --yes`: report
+  it to the user, never run it.
+- `accept`/`reject` without `--yes` preview. Authority follows review: project consolidations are
+  yours or the user's, space-wide ones only the user's. Accepting supersedes the originals; their
+  recommendations and supports are not transferred to the successor.
+- A failed step exits 1 (`KNOWLEDGE_295` with `metadata.steps`, or the step's own code) after earlier
+  steps committed; nothing is rolled back. Rerun the same command with the same idempotency key.
+- Codes: `KNOWLEDGE_090` invalid request, `KNOWLEDGE_091` ineligible member (`metadata.cause`),
+  `KNOWLEDGE_093` closed, `KNOWLEDGE_190` similarity lookup unavailable, `KNOWLEDGE_290` not found,
+  `KNOWLEDGE_291` member already in an open consolidation, `KNOWLEDGE_292` pair judged distinct
+  (pass `--reconsider <CID>` only if the user wants it), `KNOWLEDGE_294` proposals incomplete
+  (rerun propose with its key).
+
 ## The catalog (what you may use, and what is available now)
 
 `catalog` keeps a record of capabilities (`skill`, `agent`, `cli_tool`, `mcp_server`) in the same
