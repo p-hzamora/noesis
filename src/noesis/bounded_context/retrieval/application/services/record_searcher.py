@@ -6,7 +6,6 @@ from dataclasses import dataclass, field
 from noesis.exceptions import IndexRebuildRequiredError, SemanticIndexUnavailableError
 from noesis.shared_kernel.contracts.knowledge import (
     GraphNeighbourContract,
-    GraphNeighboursContract,
     RecordHitContract,
     RecordStateContract,
 )
@@ -359,11 +358,8 @@ class RecordSearcher:
     ) -> list[str]:
         """Q-013: neighbours by Sources shared (summed over seeds), best seed rank, record id."""
         batch = await self._neighbours.neighbours(seeds, space_id=space_id, limit=limit)
-        if isinstance(batch, GraphNeighboursContract):
-            warnings.extend(batch.warnings)
-            pairs = list(batch.neighbours)
-        else:
-            pairs = batch
+        warnings.extend(batch.warnings)
+        pairs = list(batch.neighbours)
         pairs = [
             pair for pair in pairs if pair.record_id not in seeds and pair.record_id != exclude
         ]

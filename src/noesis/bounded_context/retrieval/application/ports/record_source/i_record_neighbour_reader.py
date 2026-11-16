@@ -3,7 +3,7 @@
 from collections.abc import Sequence
 from typing import Protocol
 
-from noesis.shared_kernel.contracts.knowledge import GraphNeighbourContract, GraphNeighboursContract
+from noesis.shared_kernel.contracts.knowledge import GraphNeighboursContract
 
 
 class IRecordNeighbourReader(Protocol):
@@ -11,6 +11,6 @@ class IRecordNeighbourReader(Protocol):
 
     async def neighbours(
         self, seed_ids: Sequence[str], *, space_id: str, limit: int
-    ) -> list[GraphNeighbourContract] | GraphNeighboursContract:
+    ) -> GraphNeighboursContract:
         """One item per (neighbour, seed) pair; Knowledge and Experience records only."""
         ...

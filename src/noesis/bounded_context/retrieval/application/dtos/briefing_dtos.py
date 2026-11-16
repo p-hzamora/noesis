@@ -74,12 +74,16 @@ class RecommendedToolDto(FrozenObject):
     usable: bool
 
 
-class RecallResultDto(BriefingDraftDto):
+class RecallResultDto(FrozenObject):
     """The complete deterministic envelope around the optional synthesis."""
 
     synthesis: Literal["briefing", "digest", "no_evidence"]
     search: RecordSearchResultDto
     records: tuple[EvidenceDto, ...]
+    constraints: tuple[BriefingItemDto, ...] = ()
+    decisions: tuple[BriefingItemDto, ...] = ()
+    context: tuple[BriefingItemDto, ...] = ()
+    unconfirmed: tuple[BriefingItemDto, ...] = ()
     unsupported: tuple[BriefingItemDto, ...] = ()
     tools: tuple[RecommendedToolDto, ...] = ()
     tools_state: str

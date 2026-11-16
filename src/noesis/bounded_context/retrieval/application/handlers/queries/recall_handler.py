@@ -3,6 +3,7 @@
 from noesis.exceptions import RecordNotFoundError
 from noesis.shared_kernel.contracts.knowledge import (
     CatalogAvailabilityRequestContract,
+    GraphNeighbourContract,
     RecordBodyMissingError,
     RecordReviewStateContract,
 )
@@ -88,8 +89,8 @@ class RecallHandler:
                     status=(state.effective_status or state.status) if state else hit.status,
                     superseded_by=tuple(state.superseded_by_record_ids) if state else (),
                     migrated=bool(state and "origin:migrated" in state.tags),
-                    discovery=hit.discovery,
-                    warnings=hit.warnings,
+                    discovery=tuple(self._mask_path(path) for path in hit.discovery),
+                    warnings=tuple(self._redactor.redact(item)[0] for item in hit.warnings),
                 )
             )
         records.sort(key=lambda record: BriefingPolicy.rank(record.type, record.authority))
@@ -120,23 +121,6 @@ class RecallHandler:
             records[index] = record.model_copy(
                 update={"title": title or None, "body": text, "read": True}
             )
-        # A second state/head change invalidates evidence; never retry indefinitely.
-        checked = await self._states([record.id for record in records if record.read], space)
-        for index, record in enumerate(records):
-            if (
-                record.read
-                and self._reviews is not None
-                and (checked.get(record.id) is None or not _admitted(checked[record.id], project))
-            ):
-                hidden.add(record.id)
-            if (
-                record.read
-                and self._reviews is not None
-                and checked.get(record.id) != states.get(record.id)
-            ):
-                records[index] = record.model_copy(
-                    update={"body": None, "read": False, "omitted_reason": "review_changed"}
-                )
         records = [record for record in records if record.id not in hidden]
         evidence = [record for record in records if record.read]
         tools: tuple[RecommendedToolDto, ...] = ()
@@ -146,6 +130,37 @@ class RecallHandler:
         synthesis = "no_evidence"
         if evidence:
             tools, tools_state = await self._tools(request, evidence, project, warnings)
+            # A second state/head change invalidates evidence; never retry indefinitely.
+            checked = await self._states([record.id for record in records if record.read], space)
+            for index, record in enumerate(records):
+                if (
+                    record.read
+                    and self._reviews is not None
+                    and (
+                        checked.get(record.id) is None or not _admitted(checked[record.id], project)
+                    )
+                ):
+                    hidden.add(record.id)
+                if (
+                    record.read
+                    and self._reviews is not None
+                    and checked.get(record.id) != states.get(record.id)
+                ):
+                    records[index] = record.model_copy(
+                        update={"body": None, "read": False, "omitted_reason": "review_changed"}
+                    )
+            records = [record for record in records if record.id not in hidden]
+            rechecked = [record for record in records if record.read]
+            if len(rechecked) != len(evidence):
+                evidence = rechecked
+                if evidence:
+                    tools, tools_state = await self._tools(request, evidence, project, [])
+                else:
+                    tools, tools_state = (
+                        (),
+                        "not_available" if self._catalog is None else "not_verified",
+                    )
+        if evidence:
             if request.no_synthesis:
                 draft = _digest(evidence)
                 synthesis = "digest"
@@ -174,6 +189,26 @@ class RecallHandler:
             next_steps=("noesis review accept --tag origin:migrated --all --yes",)
             if migrated
             else (),
+        )
+
+    def _mask_path(self, path: GraphNeighbourContract) -> GraphNeighbourContract:
+        """Discovery ids and labels are output too; mask them like title and body."""
+
+        def mask(text: str) -> str:
+            return self._redactor.redact(text)[0]
+
+        return path.model_copy(
+            update={
+                "record_id": mask(path.record_id),
+                "seed_id": mask(path.seed_id),
+                "original_target_id": None
+                if path.original_target_id is None
+                else mask(path.original_target_id),
+                "origin": None if path.origin is None else mask(path.origin),
+                "anchors": tuple(mask(item) for item in path.anchors),
+                "supersession_path": tuple(mask(item) for item in path.supersession_path),
+                "warnings": tuple(mask(item) for item in path.warnings),
+            }
         )
 
     async def _states(self, ids: list[str], space: str) -> dict[str, RecordReviewStateContract]:
