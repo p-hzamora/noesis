@@ -30,6 +30,7 @@ from noesis.bounded_context.knowledge.domain.value_objects import (
 )
 from noesis.bounded_context.knowledge.infrastructure.outbound.persistence import Neo4jSchemaStep
 from noesis.exceptions import StoreNotInitialisedError
+from noesis.interfaces.cli.bootstrap.retrieval_handlers_builder import RETRIEVAL_SCHEMA_STEPS
 from noesis.shared_kernel.infrastructure.outbound.neo4j import Neo4jConnectionSettings
 
 pytestmark = [pytest.mark.integration, pytest.mark.neo4j]
@@ -38,6 +39,7 @@ FAKE_STEP: Neo4jSchemaStep = Neo4jSchemaStep(
     name="c9_fake",
     statements=("CREATE INDEX c9_fake_index IF NOT EXISTS FOR (n:FakeC9) ON (n.value)",),
 )
+ALL_STEPS: tuple[str, ...] = ("core", "change_feed", "knowledge_fulltext", "retrieval_index")
 CORE_CONSTRAINTS: set[tuple[str, str]] = {
     ("Record", "id"),
     ("Space", "id"),
@@ -68,21 +70,26 @@ async def test_record_get_on_an_empty_store_names_the_missing_step_and_writes_no
     assert node_counts(neo4j_settings) == {}
 
 
-async def test_store_init_twice_applies_core_once_and_ensures_one_default_space(
-    bare_env: Neo4jKnowledgeEnv, neo4j_settings: Neo4jConnectionSettings
+async def test_store_init_twice_applies_every_registered_step_once_and_ensures_one_default_space(
+    neo4j_settings: Neo4jConnectionSettings,
 ) -> None:
-    first: StoreInitialisedDto = await bare_env.initialise_store.handle(_init())
-    second: StoreInitialisedDto = await bare_env.initialise_store.handle(_init())
+    """With C5a's three steps registered after `core` (the production registry)."""
+    env: Neo4jKnowledgeEnv = make_neo4j_env(neo4j_settings, extra_steps=RETRIEVAL_SCHEMA_STEPS)
+    try:
+        first: StoreInitialisedDto = await env.initialise_store.handle(_init())
+        second: StoreInitialisedDto = await env.initialise_store.handle(_init())
+    finally:
+        await env.client.close()
 
-    assert first.applied_steps == ("core",)
+    assert first.applied_steps == ALL_STEPS
     assert first.default_space.created
     assert second.applied_steps == ()
-    assert second.already_applied_steps == ("core",)
+    assert second.already_applied_steps == ALL_STEPS
     assert not second.default_space.created
     assert second.default_space.id == first.default_space.id
     assert query(neo4j_settings, "MATCH (s:Space) RETURN s.key AS key") == [{"key": "default"}]
     assert query(neo4j_settings, "MATCH (m:StoreMeta) RETURN m.applied_steps AS steps") == [
-        {"steps": ["core"]}
+        {"steps": list(ALL_STEPS)}
     ]
 
 

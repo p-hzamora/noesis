@@ -20,6 +20,7 @@ from noesis.shared_kernel.infrastructure.outbound.neo4j import Neo4jConnectionSe
 pytestmark = [pytest.mark.integration, pytest.mark.neo4j]
 
 MISSING_ID = "01ARZ3NDEKTSV4RRFFQ69G5FAV"
+ALL_STEPS = ["core", "change_feed", "knowledge_fulltext", "retrieval_index"]
 
 
 @pytest.fixture
@@ -60,11 +61,11 @@ def test_store_init_twice_applies_the_steps_once_and_keeps_one_default_space(
     code_again, second = run_json(capsys, ["store", "init"])
 
     assert code == code_again == 0
-    assert _result(first)["applied_steps"] == ["core"]
+    assert _result(first)["applied_steps"] == ALL_STEPS
     assert _result(first)["already_applied_steps"] == []
     assert _result(first)["default_space"]["created"] is True  # type: ignore[index]
     assert _result(second)["applied_steps"] == []
-    assert _result(second)["already_applied_steps"] == ["core"]
+    assert _result(second)["already_applied_steps"] == ALL_STEPS
     assert _result(second)["default_space"]["created"] is False  # type: ignore[index]
     assert _result(second)["default_space"]["key"] == "personal"  # type: ignore[index]
     assert "schema_version" not in _result(first)
@@ -105,7 +106,7 @@ def test_every_command_on_an_uninitialised_store_points_to_store_init(
         assert code == 1
         error = _error(envelope)
         assert error["code"] == "KNOWLEDGE_204_STORE_NOT_INITIALISED"
-        assert error["metadata"] == {"missing_steps": ["core"]}
+        assert error["metadata"] == {"missing_steps": ALL_STEPS}
         assert "Run `noesis store init`." in error["next_steps"]  # type: ignore[operator]
 
 

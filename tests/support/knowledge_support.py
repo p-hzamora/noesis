@@ -4,7 +4,8 @@ import copy
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from types import TracebackType
-from typing import Self
+from typing import TYPE_CHECKING, Self
+from uuid import uuid4
 
 from noesis.bounded_context.knowledge.application.dtos import (
     ActorDto,
@@ -69,6 +70,12 @@ from noesis.bounded_context.knowledge.domain.value_objects import (
 from noesis.exceptions import EntryAlreadyExistsError, RevisionConflictError
 from noesis.shared_kernel.application.ports.clock import IClock
 
+if TYPE_CHECKING:
+    from noesis.bounded_context.knowledge.application.dtos.pending_record_change import (
+        PendingRecordChange,
+    )
+    from noesis.shared_kernel.contracts.knowledge import RecordChangedContract
+
 NOW: datetime = datetime(2026, 11, 14, 12, 0, tzinfo=UTC)
 DEFAULT_SPACE_KEY: Key = Key(value="default")
 AGENT: Actor = Actor(kind=ActorKindEnum.AGENT, name="claude", session="s-1")
@@ -120,6 +127,8 @@ class FakeKnowledgeStore:
     revisions: dict[str, list[Revision]] = field(default_factory=dict)
     ledger: dict[tuple[str, str], LedgerEntry] = field(default_factory=dict)
     commits: int = 0
+    changes: list[RecordChangedContract] = field(default_factory=list)
+    change_counters: dict[str, int] = field(default_factory=dict)
 
     def source_key(self, source: Source) -> tuple[str, str, str, str | None]:
         """The natural key of a source, as a plain tuple."""
@@ -138,6 +147,7 @@ class _Staged:
         self.experiences: dict[str, Experience] = {}
         self.revisions: list[tuple[Knowledge, Revision]] = []
         self.ledger: dict[tuple[str, str], LedgerEntry] = {}
+        self.changes: list[RecordChangedContract] = []
 
     def clear(self) -> None:
         """Forget everything staged (the repositories keep sharing this object)."""
@@ -148,6 +158,7 @@ class _Staged:
         self.experiences.clear()
         self.revisions.clear()
         self.ledger.clear()
+        self.changes.clear()
 
 
 def _exists(kind: str, key: str) -> EntryAlreadyExistsError:
@@ -292,6 +303,41 @@ class _Ledger(IIdempotencyLedger):
         self._staged.ledger[slot] = entry
 
 
+class FakeRecordChangeLog:
+    """The change log of one fake unit of work (structural `IRecordChangeLog`).
+
+    `append` assigns the next per-space sequence at once, like the `:ChangeCounter` increment in
+    the real transaction; the change joins the store on `commit` and is dropped on rollback.
+    The port and kernel contract are imported lazily so this module loads before they exist.
+    """
+
+    def __init__(self, store: FakeKnowledgeStore, staged: _Staged) -> None:
+        self._store, self._staged = store, staged
+
+    async def append(self, change: PendingRecordChange) -> RecordChangedContract:
+        """Stage `change` with the next sequence of its space and return the contract."""
+        from noesis.shared_kernel.contracts.knowledge import RecordChangedContract
+
+        sequence: int = (
+            self._store.change_counters.get(change.space_id, 0)
+            + sum(1 for staged in self._staged.changes if staged.space_id == change.space_id)
+            + 1
+        )
+        contract = RecordChangedContract(
+            event_id=uuid4().hex,
+            occurred_at=change.occurred_at,
+            sequence=sequence,
+            space_id=change.space_id,
+            record_id=change.record_id,
+            record_type=change.record_type,
+            change_kind=change.change_kind,
+            revision=change.revision,
+            status=change.status,
+        )
+        self._staged.changes.append(contract)
+        return contract
+
+
 class FakeKnowledgeUnitOfWork(IKnowledgeUnitOfWork):
     """Stages writes and applies them on `commit`, re-checking uniqueness against the store.
 
@@ -308,6 +354,12 @@ class FakeKnowledgeUnitOfWork(IKnowledgeUnitOfWork):
         self._knowledge = _KnowledgeRepo(store, self._staged)
         self._experiences = _ExperienceRepo(store, self._staged)
         self._ledger = _Ledger(store, self._staged)
+        self._changes = FakeRecordChangeLog(store, self._staged)
+
+    @property
+    def changes(self) -> FakeRecordChangeLog:
+        """Fake change log (staged until commit)."""
+        return self._changes
 
     @property
     def spaces(self) -> IKnowledgeSpaceRepository:
@@ -396,6 +448,9 @@ class FakeKnowledgeUnitOfWork(IKnowledgeUnitOfWork):
         for knowledge, revision in staged.revisions:
             store.knowledge[knowledge.id.value] = knowledge
             store.revisions[knowledge.id.value].append(revision)
+        for change in staged.changes:
+            store.changes.append(change)
+            store.change_counters[change.space_id] = change.sequence
         store.commits += 1
         await self.rollback()
 

@@ -1,0 +1,98 @@
+{"version": 1, "clusters": [
+{"id": "F01", "project": "platform-core", "lang": "en", "records": [
+{"n": 1, "t": "k", "sub": "convention", "st": "accepted", "title": "Feature flags have an owner and an expiry date", "body": "Every flag is created with an owner and a removal date. Expired flags show up in a weekly report so dead code paths are deleted."},
+{"n": 2, "t": "k", "sub": "gotcha", "st": "accepted", "lang": "es", "title": "Las flags evaluadas en cada petición añaden latencia", "body": "Consultar el servicio de flags en cada petición añadió 15 ms. Cachear la configuración en memoria durante 30 segundos."},
+{"n": 3, "t": "k", "sub": "decision", "st": "proposed", "title": "Gradual rollout by percentage of users", "body": "Roll flags out to 1, 10 and 50 percent of users, keyed on a stable user hash."},
+{"n": 4, "t": "k", "sub": "decision", "st": "superseded", "lang": "es", "title": "Flags en archivos de configuración", "body": "Las flags eran claves en un YAML desplegado con la aplicación. Cambiar una exigía un despliegue completo."},
+{"n": 5, "t": "e", "sub": "outcome", "body": "A faulty checkout change was disabled with a flag in 20 seconds instead of a 15 minute redeploy."}]},
+{"id": "F02", "project": "design-system", "lang": "en", "records": [
+{"n": 1, "t": "k", "sub": "convention", "st": "accepted", "title": "Design tokens live in CSS custom properties", "body": "Colors, spacing and type sizes are design tokens exposed as CSS variables. Components never hard-code hex values."},
+{"n": 2, "t": "k", "sub": "gotcha", "st": "accepted", "lang": "es", "title": "Los tokens de color deben tener variante para modo oscuro", "body": "Definir cada token de color también en la variante oscura; un token sin pareja dejó texto ilegible en pantallas oscuras."},
+{"n": 3, "t": "k", "sub": "decision", "st": "proposed", "title": "Generate tokens from a single JSON source", "body": "Build the CSS, iOS and Android tokens from one JSON file with a script."},
+{"n": 4, "t": "k", "sub": "convention", "st": "superseded", "lang": "es", "title": "Colores directamente en cada componente", "body": "Cada componente tenía sus propios valores hexadecimales. Se unificó en tokens para poder cambiar la marca."},
+{"n": 5, "t": "e", "sub": "observation", "body": "Because all colors were tokens, the rebrand was a change to one file and two days of visual review."}]},
+{"id": "F03", "project": "db-tuning", "lang": "en", "records": [
+{"n": 1, "t": "k", "sub": "gotcha", "st": "accepted", "title": "Create Postgres indexes with CONCURRENTLY on live tables", "body": "CREATE INDEX takes a lock that blocks writes. Use CREATE INDEX CONCURRENTLY on production tables; it takes longer but does not block inserts or updates."},
+{"n": 2, "t": "k", "sub": "convention", "st": "accepted", "lang": "es", "title": "Índices parciales para consultas con filtro frecuente", "body": "Si el 95 por ciento de las consultas filtra por estado activo, un índice parcial WHERE activo es más pequeño y rápido que uno completo."},
+{"n": 3, "t": "k", "sub": "convention", "st": "proposed", "title": "Review unused indexes quarterly", "body": "Query pg_stat_user_indexes and drop indexes that have not been scanned in 90 days."},
+{"n": 4, "t": "k", "sub": "convention", "st": "superseded", "lang": "es", "title": "Un índice por cada columna", "body": "Se creaba un índice por columna. Ralentizaba las escrituras y se sustituyó por índices compuestos según las consultas reales."},
+{"n": 5, "t": "e", "sub": "outcome", "body": "After removing eleven indexes that were never read, bulk inserts into the events table became about 30 percent faster."}]},
+{"id": "F04", "project": "containers", "lang": "en", "records": [
+{"n": 1, "t": "k", "sub": "convention", "st": "accepted", "lang": "es", "title": "Imágenes Docker multi-etapa para reducir el tamaño", "body": "Compilar en una etapa con todas las herramientas y copiar solo el artefacto a una imagen base mínima. La imagen pasó de 1,2 GB a 180 MB."},
+{"n": 2, "t": "k", "sub": "gotcha", "st": "accepted", "title": "Order Dockerfile layers by change frequency", "body": "Copy dependency manifests and install first, then copy source, so code edits do not invalidate the cached dependency layer."},
+{"n": 3, "t": "k", "sub": "decision", "st": "proposed", "lang": "es", "title": "Escanear las imágenes en cada build", "body": "Ejecutar un escáner de vulnerabilidades sobre la imagen antes de publicarla."},
+{"n": 4, "t": "k", "sub": "convention", "st": "superseded", "title": "Latest tag for base images", "body": "Dockerfiles used the latest tag for the base image. Replaced by pinned digests after a surprise upgrade broke the build."},
+{"n": 5, "t": "e", "sub": "failure", "lang": "es", "body": "Un build del viernes usó una imagen base nueva con otra versión de OpenSSL y la aplicación no arrancó. Se fijó la versión exacta."}]},
+{"id": "F05", "project": "code-review", "lang": "en", "records": [
+{"n": 1, "t": "k", "sub": "convention", "st": "accepted", "title": "Keep pull requests under 400 changed lines", "body": "Review quality drops sharply on large diffs. Split work into reviewable pieces of under four hundred lines whenever possible."},
+{"n": 2, "t": "k", "sub": "convention", "st": "accepted", "lang": "es", "title": "Revisar en 24 horas laborables", "body": "Quien abre una PR espera revisión en un día laborable como máximo; quien revisa avisa si no podrá."},
+{"n": 3, "t": "k", "sub": "decision", "st": "proposed", "title": "Use checklists for security-sensitive reviews", "body": "Add a short checklist for changes touching authentication or payments."},
+{"n": 4, "t": "k", "sub": "decision", "st": "superseded", "lang": "es", "title": "Aprobación obligatoria de dos revisores", "body": "Se exigían dos aprobaciones en todo cambio. Se redujo a una, con dos solo en módulos críticos."},
+{"n": 5, "t": "e", "sub": "observation", "body": "Smaller pull requests and the 24 hour expectation cut the median time to first review from three days to one."}]},
+{"id": "F06", "project": "api-gateway", "lang": "en", "records": [
+{"n": 1, "t": "k", "sub": "decision", "st": "accepted", "title": "Rate limit per API key with a token bucket", "body": "Each API key gets a token bucket of 100 requests per minute with bursts of 20. Exceeding it returns 429 with a Retry-After header."},
+{"n": 2, "t": "k", "sub": "gotcha", "st": "accepted", "lang": "es", "title": "Los límites por IP castigan a los usuarios tras un NAT", "body": "Limitar por dirección IP bloqueó oficinas enteras que salen por una sola IP. Limitar por clave de API o usuario autenticado."},
+{"n": 3, "t": "k", "sub": "decision", "st": "proposed", "title": "Separate limits for read and write endpoints", "body": "Writes get a lower quota than reads."},
+{"n": 4, "t": "k", "sub": "decision", "st": "superseded", "lang": "es", "title": "Límite global por servidor", "body": "Un único contador por instancia no se compartía entre réplicas, así que el límite real era n veces mayor."},
+{"n": 5, "t": "e", "sub": "failure", "body": "A partner nightly sync hit the rate limit and was throttled for an hour because it ignored the Retry-After header."}]},
+{"id": "F07", "project": "cdn-edge", "lang": "en", "records": [
+{"n": 1, "t": "k", "sub": "convention", "st": "accepted", "title": "Fingerprint static assets and cache them for a year", "body": "Static files get a content hash in the file name and Cache-Control: public, max-age=31536000, immutable. HTML is never cached for long."},
+{"n": 2, "t": "k", "sub": "gotcha", "st": "accepted", "lang": "es", "title": "Purgar la CDN no limpia la caché del navegador", "body": "Tras purgar la CDN algunos usuarios seguían viendo la versión antigua por la caché local. Usar nombres con hash en lugar de purgar."},
+{"n": 3, "t": "k", "sub": "decision", "st": "proposed", "title": "Stale-while-revalidate for API responses", "body": "Serve slightly stale API responses while refreshing in the background."},
+{"n": 4, "t": "k", "sub": "convention", "st": "superseded", "lang": "es", "title": "Parámetros de versión en la URL", "body": "Se añadía ?v=123 a los recursos. Algunos proxies ignoran el parámetro, así que se cambió por hash en el nombre."},
+{"n": 5, "t": "e", "sub": "outcome", "body": "Moving images and scripts behind the CDN with long cache lifetimes cut the median page load time from 3.1 to 1.9 seconds."}]},
+{"id": "F08", "project": "graphql-bff", "lang": "en", "records": [
+{"n": 1, "t": "k", "sub": "gotcha", "st": "accepted", "title": "GraphQL resolvers cause N+1 queries without batching", "body": "A list of 50 orders fired 50 queries for their customers. Use a DataLoader per request to batch and cache lookups by key."},
+{"n": 2, "t": "k", "sub": "convention", "st": "accepted", "lang": "es", "title": "Limitar la profundidad de consulta en GraphQL", "body": "Rechazar consultas con más de diez niveles de anidación para evitar abusos que saturen la base de datos."},
+{"n": 3, "t": "k", "sub": "decision", "st": "proposed", "title": "Persisted queries for the mobile client", "body": "Clients send a hash instead of the full query text."},
+{"n": 4, "t": "k", "sub": "decision", "st": "superseded", "lang": "es", "title": "Un endpoint REST por pantalla", "body": "El móvil usaba un endpoint por pantalla con campos fijos. Se reemplazó por GraphQL para evitar sobrecarga de datos."},
+{"n": 5, "t": "e", "sub": "failure", "lang": "es", "body": "Un cliente envió una consulta con anidación de quince niveles y la base de datos llegó al 100 por ciento de CPU durante cinco minutos."}]},
+{"id": "F09", "project": "onboarding", "lang": "en", "records": [
+{"n": 1, "t": "k", "sub": "convention", "st": "accepted", "title": "The README of each service explains how to run it in five minutes", "body": "Every service README has prerequisites, one command to start dependencies, one to run tests and one to start the service."},
+{"n": 2, "t": "k", "sub": "convention", "st": "accepted", "lang": "es", "title": "Un buddy asignado durante las primeras dos semanas", "body": "Cada persona nueva tiene un compañero asignado que resuelve dudas y revisa su primera PR."},
+{"n": 3, "t": "k", "sub": "decision", "st": "proposed", "title": "Record short architecture walkthrough videos", "body": "Ten minute videos on the main services would reduce repeated explanations."},
+{"n": 4, "t": "k", "sub": "decision", "st": "superseded", "lang": "es", "title": "Documentación en una wiki separada", "body": "La documentación vivía en una wiki que quedaba desactualizada. Se movió a archivos markdown junto al código."},
+{"n": 5, "t": "e", "sub": "outcome", "body": "With the five minute README the last two engineers merged a small fix on their second day."}]},
+{"id": "F10", "project": "incident-mgmt", "lang": "en", "records": [
+{"n": 1, "t": "k", "sub": "convention", "st": "accepted", "title": "Blameless postmortem within five working days", "body": "Every incident above severity 2 gets a written postmortem within a week describing timeline, causes and follow-ups, without naming individuals."},
+{"n": 2, "t": "k", "sub": "convention", "st": "accepted", "lang": "es", "title": "Un responsable de incidente y un escriba", "body": "Durante un incidente una persona coordina y otra anota la cronología en el canal, para no depender de la memoria."},
+{"n": 3, "t": "k", "sub": "decision", "st": "proposed", "title": "Track follow-up actions in a shared board", "body": "Postmortem actions get an owner and a due date on one board reviewed monthly."},
+{"n": 4, "t": "k", "sub": "convention", "st": "superseded", "lang": "es", "title": "Postmortem solo para caídas totales", "body": "Se escribía solo cuando el servicio caía por completo. Se amplió a las degradaciones por su valor de aprendizaje."},
+{"n": 5, "t": "e", "sub": "observation", "lang": "es", "body": "Gracias a las notas de cronología en el canal se identificó que el fallo empezó con un despliegue 20 minutos antes de la alerta."}]},
+{"id": "F11", "project": "accessibility", "lang": "en", "records": [
+{"n": 1, "t": "k", "sub": "convention", "st": "accepted", "title": "Every image has meaningful alt text or an empty alt attribute", "body": "Informative images get descriptive alt text; decorative ones use an empty alt attribute so screen readers skip them."},
+{"n": 2, "t": "k", "sub": "gotcha", "st": "accepted", "lang": "es", "title": "El contraste de color mínimo es 4,5 a 1 para texto normal", "body": "Comprobar el contraste con la herramienta de diseño; los grises claros sobre blanco fallaban en la auditoría de accesibilidad."},
+{"n": 3, "t": "k", "sub": "decision", "st": "proposed", "title": "Automated axe checks in CI", "body": "Run axe-core against key pages in the pipeline."},
+{"n": 4, "t": "k", "sub": "decision", "st": "superseded", "lang": "es", "title": "Revisión de accesibilidad solo antes del lanzamiento", "body": "Se revisaba al final y los arreglos eran caros. Ahora se revisa en cada componente."},
+{"n": 5, "t": "e", "sub": "failure", "body": "An audit found the payment form trapped keyboard focus in a modal, making checkout impossible without a mouse."}]},
+{"id": "F12", "project": "i18n", "lang": "en", "records": [
+{"n": 1, "t": "k", "sub": "convention", "st": "accepted", "title": "Use ICU message format for plurals", "body": "Translation strings use ICU plural rules rather than concatenation, because languages like Polish have several plural forms."},
+{"n": 2, "t": "k", "sub": "gotcha", "st": "accepted", "lang": "es", "title": "No concatenar fragmentos traducidos", "body": "Construir frases uniendo cadenas rompe el orden de las palabras en otros idiomas. Usar mensajes completos con marcadores."},
+{"n": 3, "t": "k", "sub": "decision", "st": "proposed", "title": "Machine-translate drafts, review by humans", "body": "Use machine translation for a first draft and have a native speaker review it before release."},
+{"n": 4, "t": "k", "sub": "convention", "st": "superseded", "lang": "es", "title": "Textos en español escritos directamente en las plantillas", "body": "Los textos estaban en el código. Se movieron a archivos de recursos para soportar inglés."},
+{"n": 5, "t": "e", "sub": "observation", "lang": "es", "body": "Las traducciones al alemán eran un 35 por ciento más largas y desbordaron varios botones; se permitió que crecieran en vertical."}]},
+{"id": "F13", "project": "experiments", "lang": "en", "records": [
+{"n": 1, "t": "k", "sub": "convention", "st": "accepted", "title": "Fix the sample size before starting an A/B test", "body": "Compute the required sample size from the minimum detectable effect and do not stop the test early when the p-value dips below 0.05."},
+{"n": 2, "t": "k", "sub": "gotcha", "st": "accepted", "lang": "es", "title": "Mirar los resultados a diario infla los falsos positivos", "body": "Mirar los resultados cada día y parar cuando sale significativo multiplica los falsos positivos. Fijar la duración de antemano."},
+{"n": 3, "t": "k", "sub": "decision", "st": "proposed", "title": "Sequential testing for long-running experiments", "body": "Evaluate sequential methods that allow safe early stopping."},
+{"n": 4, "t": "k", "sub": "convention", "st": "superseded", "lang": "es", "title": "Medir solo la tasa de clics", "body": "Los experimentos solo miraban clics. Ahora se miden también ingresos y retención."},
+{"n": 5, "t": "e", "sub": "outcome", "body": "A variant launched after three days looked like a 9 percent lift and showed no effect once the full sample was in."}]},
+{"id": "F14", "project": "monorepo", "lang": "en", "records": [
+{"n": 1, "t": "k", "sub": "decision", "st": "accepted", "title": "Use affected-only builds in the monorepo", "body": "CI computes the packages changed since main and their dependents, and builds and tests only those, cutting pipeline time by two thirds."},
+{"n": 2, "t": "k", "sub": "gotcha", "st": "accepted", "lang": "es", "title": "Las dependencias circulares rompen la caché de build", "body": "Dos paquetes que se importaban mutuamente hacían que cualquier cambio invalidara ambos. Extraer el código común a un tercer paquete."},
+{"n": 3, "t": "k", "sub": "decision", "st": "proposed", "title": "Code owners per package directory", "body": "Use a CODEOWNERS file so reviews route to the owning team."},
+{"n": 4, "t": "k", "sub": "decision", "st": "superseded", "lang": "es", "title": "Un repositorio por servicio", "body": "Cada servicio tenía su repositorio y las librerías compartidas se copiaban. Se pasó a monorepo."},
+{"n": 5, "t": "e", "sub": "outcome", "lang": "es", "body": "Con builds solo de lo afectado el pipeline medio bajó de treinta y cinco a doce minutos."}]},
+{"id": "F15", "project": "queue-workers", "lang": "en", "records": [
+{"n": 1, "t": "k", "sub": "convention", "st": "accepted", "title": "Every queue has a dead letter queue", "body": "Messages that fail five times move to a dead letter queue with the error attached, so one poison message cannot block the consumer."},
+{"n": 2, "t": "k", "sub": "gotcha", "st": "accepted", "lang": "es", "title": "Los consumidores deben ser idempotentes porque hay entrega al menos una vez", "body": "El broker puede entregar un mensaje dos veces. Procesarlo dos veces no debe duplicar efectos; guardar el id del mensaje procesado."},
+{"n": 3, "t": "k", "sub": "decision", "st": "proposed", "title": "Alert on dead letter queue depth", "body": "Page the on-call when the DLQ holds more than ten messages."},
+{"n": 4, "t": "k", "sub": "decision", "st": "superseded", "lang": "es", "title": "Descartar los mensajes que fallan", "body": "Los mensajes fallidos se descartaban tras tres intentos y se perdían pedidos. Se sustituyó por una cola de mensajes muertos."},
+{"n": 5, "t": "e", "sub": "failure", "body": "A malformed message was retried forever and blocked the queue overnight, so 8,000 emails were sent late."}]},
+{"id": "G", "project": null, "lang": "en", "records": [
+{"n": 1, "t": "k", "sub": "convention", "st": "accepted", "title": "Store and exchange timestamps in UTC", "body": "Persist all timestamps in UTC with an explicit offset and convert to local time only at the display edge."},
+{"n": 2, "t": "k", "sub": "convention", "st": "accepted", "title": "Write an ADR for every irreversible decision", "body": "Decisions that are costly to reverse get a short architecture decision record with context, options and consequences."},
+{"n": 3, "t": "k", "sub": "convention", "st": "accepted", "lang": "es", "title": "No registrar datos personales en los logs", "body": "Los logs no contienen correos, teléfonos ni documentos de identidad; enmascarar o usar identificadores internos."},
+{"n": 4, "t": "k", "sub": "convention", "st": "accepted", "lang": "es", "title": "Los secretos van al gestor de secretos, nunca al repositorio", "body": "Ninguna clave, contraseña ni token se guarda en git ni en archivos .env versionados; se leen del gestor en tiempo de ejecución."},
+{"n": 5, "t": "e", "sub": "observation", "body": "Deprecations without notice caused three partner escalations in one quarter, because breaking changes were only announced in release notes. A deprecation notice with a date is now required."}]}
+]}
