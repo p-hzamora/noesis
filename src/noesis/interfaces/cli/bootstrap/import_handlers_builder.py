@@ -1,9 +1,9 @@
 """Wires the vault import: interop's handlers over Knowledge's inbound adapter.
 
 Interop never imports Knowledge; this is the one place that hands Knowledge's
-`KnowledgeImporterAdapter` to interop as its `IKnowledgeImporter`. The importer is built
-without a supersession proposer (C4 binds one when it exists), so an accepted record whose
-note changed gets a plain new proposal that names its target.
+`KnowledgeImporterAdapter` to interop as its `IKnowledgeImporter`. The importer is built with
+the supersession proposer over C4's `assertion propose`, so an accepted record whose note
+changed gets a new proposal linked to it by a proposed `supersedes` assertion.
 """
 
 from collections.abc import AsyncIterator
@@ -25,8 +25,14 @@ from noesis.bounded_context.interop.infrastructure.outbound import (
 from noesis.bounded_context.knowledge.application.handlers.commands.import_knowledge_handler import (
     ImportKnowledgeHandler,
 )
+from noesis.bounded_context.knowledge.application.handlers.commands.propose_assertion_handler import (
+    ProposeAssertionHandler,
+)
 from noesis.bounded_context.knowledge.application.handlers.queries.assess_import_knowledge_handler import (
     AssessImportKnowledgeHandler,
+)
+from noesis.bounded_context.knowledge.application.services.assertion_supersession_proposer import (
+    AssertionSupersessionProposer,
 )
 from noesis.bounded_context.knowledge.infrastructure.inbound.import_contracts import (
     KnowledgeImporterAdapter,
@@ -64,6 +70,15 @@ def _importer(client: Neo4jClient) -> KnowledgeImporterAdapter:
         client, clock=clock, extra_steps=EXTRA_SCHEMA_STEPS
     )
     candidates = Neo4jImportCandidateReadRepositoryAdapter(client)
+    proposer = AssertionSupersessionProposer(
+        uow_factory=persistence.uow_factory,
+        propose=ProposeAssertionHandler(
+            uow_factory=persistence.uow_factory,
+            clock=clock,
+            ids=persistence.ids,
+            schema=persistence.schema,
+        ),
+    )
     return KnowledgeImporterAdapter(
         importer=ImportKnowledgeHandler(
             uow_factory=persistence.uow_factory,
@@ -71,7 +86,7 @@ def _importer(client: Neo4jClient) -> KnowledgeImporterAdapter:
             ids=persistence.ids,
             schema=persistence.schema,
             candidates=candidates,
-            proposer=None,
+            proposer=proposer,
         ),
         assessor=AssessImportKnowledgeHandler(
             uow_factory=persistence.uow_factory,
@@ -79,7 +94,7 @@ def _importer(client: Neo4jClient) -> KnowledgeImporterAdapter:
             ids=persistence.ids,
             schema=persistence.schema,
             candidates=candidates,
-            can_link_successor=False,
+            can_link_successor=True,
         ),
     )
 
