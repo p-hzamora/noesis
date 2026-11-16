@@ -4,6 +4,7 @@ from datetime import datetime
 
 from pydantic import Field
 
+from noesis.shared_kernel.contracts.knowledge import GraphNeighbourContract
 from noesis.utils import FrozenObject
 
 from ...domain.enums import (
@@ -70,6 +71,8 @@ class RecordSearchHitDto(FrozenObject):
     sources: tuple[CandidateKindEnum, ...]
     revised_at: datetime
     rank: int
+    discovery: tuple[GraphNeighbourContract, ...] = ()
+    warnings: tuple[str, ...] = ()
 
 
 class RecordSearchResultDto(FrozenObject):
@@ -92,3 +95,5 @@ class RecordSearchResultDto(FrozenObject):
     filter_shortfall: bool
     project_scope: ProjectScopeEnum
     project_id: str | None
+
+    warnings: tuple[str, ...] = ()

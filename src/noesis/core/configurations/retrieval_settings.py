@@ -19,3 +19,8 @@ class RetrievalSettings(AppBaseSettings):
     model_config = SettingsConfigDict(env_prefix="NOESIS_")
 
     index_lock_ttl_seconds: int = Field(default=DEFAULT_INDEX_LOCK_TTL_SECONDS, gt=0)
+
+    retrieval_briefing_timeout_seconds: float = Field(default=60, gt=0)
+    retrieval_briefing_max_budget_usd: float = Field(default=0.50, gt=0)
+    retrieval_briefing_max_evidence_chars: int = Field(default=24000, gt=0)
+    retrieval_briefing_claude_bin: str = "claude"

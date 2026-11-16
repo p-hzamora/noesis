@@ -17,6 +17,7 @@ class ProjectionSyncDto(FrozenObject):
     kind: str
     applied: int
     skipped: int
+    unknown_changes: int = 0
     cursor: int
 
 

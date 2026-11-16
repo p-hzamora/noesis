@@ -1,6 +1,6 @@
 """Errors of the Retrieval context.
 
-Codes in use: 101 (infrastructure) and 201 to 203 (application). Codes 102..109 and 204..209
+Codes in use: 101 to 102 (infrastructure) and 201 to 203 (application). Codes 103..109 and 204..209
 are reserved for later chunks (C5b, C8, C9) and must not be reused.
 """
 
@@ -29,3 +29,9 @@ class IndexSyncInProgressError(ApplicationException):
     """Another sync or rebuild holds the projection's lock and did not finish in time."""
 
     __error_code__ = "RETRIEVAL_203_INDEX_SYNC_IN_PROGRESS"
+
+
+class BriefingRunFailedError(InfrastructureException):
+    """Synthesis could not produce a validated briefing."""
+
+    __error_code__ = "RETRIEVAL_102_BRIEFING_RUN_FAILED"

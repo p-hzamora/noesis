@@ -62,6 +62,7 @@ class ProjectionSynchroniser:
             raise _rebuild_required(kind, f"its cursor {cursor} is ahead of the head {head}")
         applied: int = 0
         skipped: int = 0
+        unknown: int = 0
         while cursor < head:
             batch: list[RecordChangedContract] = await self._feed.changes_after(
                 cursor, space_id=space_id, limit=BATCH_SIZE
@@ -73,12 +74,18 @@ class ProjectionSynchroniser:
                 expected += 1
             if not batch:
                 raise _rebuild_required(kind, f"change {cursor + 1} is missing from the feed")
+            unknown += sum(
+                change.change_kind not in {"created", "revised", "status_changed"}
+                for change in batch
+            )
             batch_applied, batch_skipped = await self._apply(writer, batch, space_id=space_id)
             applied += batch_applied
             skipped += batch_skipped
             cursor = batch[-1].sequence
             await self._cursors.advance(kind, space_id, cursor)
-        return ProjectionSyncDto(kind=kind, applied=applied, skipped=skipped, cursor=cursor)
+        return ProjectionSyncDto(
+            kind=kind, applied=applied, skipped=skipped, cursor=cursor, unknown_changes=unknown
+        )
 
     async def index_state(
         self, writer: IIndexWriter, state: RecordStateContract, *, space_id: str
@@ -105,7 +112,14 @@ class ProjectionSynchroniser:
         self, writer: IIndexWriter, batch: Sequence[RecordChangedContract], *, space_id: str
     ) -> tuple[int, int]:
         """Index each distinct record of the batch once; count changes applied and skipped."""
-        record_ids: list[str] = list(dict.fromkeys(change.record_id for change in batch))
+        known = [
+            change
+            for change in batch
+            if change.change_kind in {"created", "revised", "status_changed"}
+        ]
+        if not known:
+            return 0, len(batch)
+        record_ids: list[str] = list(dict.fromkeys(change.record_id for change in known))
         found: dict[str, RecordStateContract] = {
             state.record_id: state
             for state in await self._states.get_states(record_ids, space_id=space_id)
@@ -116,7 +130,7 @@ class ProjectionSynchroniser:
             indexed[record_id] = state is not None and await self.index_state(
                 writer, state, space_id=space_id
             )
-        applied: int = sum(1 for change in batch if indexed[change.record_id])
+        applied: int = sum(1 for change in known if indexed[change.record_id])
         return applied, len(batch) - applied
 
 

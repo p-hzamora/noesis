@@ -1,0 +1,1 @@
+"""Isolated briefing synthesis adapters."""

@@ -84,6 +84,7 @@ from .knowledge_errors import (
     StoreNotInitialisedError,
 )
 from .retrieval_errors import (
+    BriefingRunFailedError,
     IndexNotInitialisedError,
     IndexRebuildRequiredError,
     IndexSyncInProgressError,
@@ -91,6 +92,7 @@ from .retrieval_errors import (
 )
 
 __all__ = [
+    "BriefingRunFailedError",
     "BriefAlreadyIngestedError",
     "CurationInboxFailedError",
     "CurationParkedError",

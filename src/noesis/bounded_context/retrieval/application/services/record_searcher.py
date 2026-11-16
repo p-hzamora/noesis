@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from noesis.exceptions import IndexRebuildRequiredError, SemanticIndexUnavailableError
 from noesis.shared_kernel.contracts.knowledge import (
     GraphNeighbourContract,
+    GraphNeighboursContract,
     RecordHitContract,
     RecordStateContract,
 )
@@ -63,6 +64,8 @@ class _Fused:
     states: dict[str, RecordStateContract]
     sources: dict[str, set[CandidateKindEnum]]
     stale_hits: int
+    discovery: dict[str, tuple[GraphNeighbourContract, ...]] = field(default_factory=dict)
+    warnings: tuple[str, ...] = ()
 
 
 @dataclass(slots=True)
@@ -313,9 +316,17 @@ class RecordSearcher:
                 target.append(record_id)
         first: list[str] = self._fusion.fuse(_non_empty(lists.lexical, lists.semantic))
         seeds: list[str] = list(dict.fromkeys([*([anchor] if anchor else []), *first[:SEED_COUNT]]))
+        discovery: dict[str, tuple[GraphNeighbourContract, ...]] = {}
+        warnings: list[str] = []
         if seeds:
             lists.graph = await self._graph_candidates(
-                seeds, space_id=space_id, limit=graph_limit, states=states, exclude=anchor
+                seeds,
+                space_id=space_id,
+                limit=graph_limit,
+                states=states,
+                exclude=anchor,
+                discovery=discovery,
+                warnings=warnings,
             )
         order: list[str] = self._fusion.fuse(_non_empty(lists.lexical, lists.graph, lists.semantic))
         sources: dict[str, set[CandidateKindEnum]] = {}
@@ -326,7 +337,14 @@ class RecordSearcher:
         ):
             for record_id in ranked:
                 sources.setdefault(record_id, set()).add(kind)
-        return _Fused(order=order, states=states, sources=sources, stale_hits=stale)
+        return _Fused(
+            order=order,
+            states=states,
+            sources=sources,
+            stale_hits=stale,
+            discovery=discovery,
+            warnings=tuple(warnings),
+        )
 
     async def _graph_candidates(
         self,
@@ -336,11 +354,16 @@ class RecordSearcher:
         limit: int,
         states: dict[str, RecordStateContract],
         exclude: str | None,
+        discovery: dict[str, tuple[GraphNeighbourContract, ...]],
+        warnings: list[str],
     ) -> list[str]:
         """Q-013: neighbours by Sources shared (summed over seeds), best seed rank, record id."""
-        pairs: list[GraphNeighbourContract] = await self._neighbours.neighbours(
-            seeds, space_id=space_id, limit=limit
-        )
+        batch = await self._neighbours.neighbours(seeds, space_id=space_id, limit=limit)
+        if isinstance(batch, GraphNeighboursContract):
+            warnings.extend(batch.warnings)
+            pairs = list(batch.neighbours)
+        else:
+            pairs = batch
         pairs = [
             pair for pair in pairs if pair.record_id not in seeds and pair.record_id != exclude
         ]
@@ -354,16 +377,27 @@ class RecordSearcher:
                 space_id,
             )
         )
+        for record_id in dict.fromkeys(pair.record_id for pair in pairs):
+            discovery[record_id] = tuple(pair for pair in pairs if pair.record_id == record_id)
         shared: dict[str, int] = {}
+        link_seeds: dict[str, set[str]] = {}
         best_seed: dict[str, int] = {}
         for pair in pairs:
             if pair.record_id not in states or pair.seed_id not in seeds:
                 continue
             shared[pair.record_id] = shared.get(pair.record_id, 0) + pair.shared_sources
+            if pair.relation != "shared_source":
+                link_seeds.setdefault(pair.record_id, set()).add(pair.seed_id)
             seed_rank: int = seeds.index(pair.seed_id)
             best_seed[pair.record_id] = min(best_seed.get(pair.record_id, seed_rank), seed_rank)
         ordered: list[str] = sorted(
-            shared, key=lambda record_id: (-shared[record_id], best_seed[record_id], record_id)
+            shared,
+            key=lambda record_id: (
+                0 if shared[record_id] else 1,
+                -shared[record_id] if shared[record_id] else -len(link_seeds.get(record_id, set())),
+                best_seed[record_id],
+                record_id,
+            ),
         )
         return ordered[:limit]
 
@@ -425,10 +459,19 @@ class RecordSearcher:
                     sources=tuple(kind for kind in order if kind in kinds),
                     revised_at=state.revised_at,
                     rank=rank,
+                    discovery=fused.discovery.get(record_id, ()),
+                    warnings=tuple(
+                        dict.fromkeys(
+                            warning
+                            for path in fused.discovery.get(record_id, ())
+                            for warning in path.warnings
+                        )
+                    ),
                 )
             )
         return RecordSearchResultDto(
             hits=tuple(dtos),
+            warnings=fused.warnings,
             pending_changes=semantic.pending_changes,
             stale_hits=fused.stale_hits,
             semantic_state=semantic.state,
