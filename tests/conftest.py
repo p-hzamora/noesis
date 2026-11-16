@@ -34,8 +34,6 @@ def isolated_environment(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Pat
         "AI_AGENT",
     ):
         monkeypatch.delenv(name, raising=False)
-    # a test that forgets to fake the recall agent fails fast instead of calling a real model
-    monkeypatch.setenv("NOESIS_RECALL_CLAUDE_BIN", str(tmp_path / "no-claude-here"))
     return home
 
 

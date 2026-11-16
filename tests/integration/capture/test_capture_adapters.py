@@ -9,9 +9,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
-from tests.support.capture_support import START
+from tests.support.capture_support import START, FixedClock, a_brief
 from tests.support.git_support import add_worktree, commit, git, init_repo, isolate_git
-from tests.support.notes_support import FixedClock, a_brief
 
 from noesis.bounded_context.capture.application.dtos import CaptureRunDto, TranscriptSnapshotDto
 from noesis.bounded_context.capture.domain.value_objects import CommitRecord, DiffSize, SessionId
@@ -148,7 +147,13 @@ async def test_live_publisher_detaches_the_curator_and_captures_its_output(
     )
     publisher = DetachedProcessWorkBriefPublisherAdapter(
         files=BriefFiles(tmp_path / "briefs"),
-        command=[sys.executable, str(fake)],
+        argv_of=lambda brief_file: [
+            sys.executable,
+            str(fake),
+            "consume",
+            "--file",
+            str(brief_file),
+        ],
         environment={},
         clock=FixedClock(START),
     )
@@ -162,20 +167,14 @@ async def test_live_publisher_detaches_the_curator_and_captures_its_output(
             break
         await asyncio.sleep(0.02)
     result = json.loads(result_file.read_text())
-    assert result["argv"] == [
-        "notes",
-        "curate",
-        "--brief-file",
-        publication.reference,
-        "--json",
-    ]
+    assert result["argv"] == ["consume", "--file", publication.reference]
     assert result["guard"] == "1"
 
 
 async def test_live_publisher_reports_a_command_that_cannot_start(tmp_path: Path) -> None:
     publisher = DetachedProcessWorkBriefPublisherAdapter(
         files=BriefFiles(tmp_path),
-        command=[str(tmp_path / "missing")],
+        argv_of=lambda brief_file: [str(tmp_path / "missing"), str(brief_file)],
         environment={},
         clock=FixedClock(START),
     )

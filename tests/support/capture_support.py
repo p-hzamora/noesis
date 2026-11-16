@@ -34,10 +34,38 @@ from noesis.bounded_context.capture.domain.value_objects import (
     SessionId,
     WorktreeHead,
 )
-from noesis.shared_kernel.contracts import WorkBriefContract
+from noesis.shared_kernel.application.ports.clock import IClock
+from noesis.shared_kernel.contracts import CommitRefContract, WorkBriefContract
 
 START: datetime = datetime(2026, 10, 30, 12, 0, tzinfo=UTC)
 SESSION: str = "session-1"
+
+
+class FixedClock(IClock):
+    """A clock frozen at `START` unless told otherwise."""
+
+    def __init__(self, now: datetime = START) -> None:
+        self.current: datetime = now
+
+    def now(self) -> datetime:
+        return self.current
+
+
+def a_brief(repository: str = "demo", session_id: str = "abcd1234ef") -> WorkBriefContract:
+    """A small, valid work brief."""
+    return WorkBriefContract(
+        session_id=session_id,
+        repository=repository,
+        repository_path=f"/work/{repository}",
+        branch="main",
+        head="8e6d3b5fe598c6bf",
+        commits=(CommitRefContract(sha="8e6d3b5fe598c6bf", subject="feat: add TTL cache"),),
+        diff_stat=("app.py | 36 +++",),
+        goal="make login faster",
+        session_excerpt="A: chose a TTL cache over Redis: single instance.",
+    )
+
+
 REPO = Path("/work/demo")
 
 

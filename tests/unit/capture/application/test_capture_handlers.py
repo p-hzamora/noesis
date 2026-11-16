@@ -11,6 +11,7 @@ from tests.support.capture_support import (
     START,
     FakeTranscripts,
     FakeVcs,
+    FixedClock,
     InMemoryCaptureSessionRepository,
     InMemoryCaptureSessionTreeReader,
     InMemoryCaptureUnitOfWork,
@@ -19,7 +20,6 @@ from tests.support.capture_support import (
     RecordingRepoRegistry,
     a_commit,
 )
-from tests.support.notes_support import FixedClock
 
 from noesis.bounded_context.capture.application.dtos import (
     CaptureOutcomeEnum,

@@ -44,7 +44,6 @@ class _Store(IGraphStoreProbe):
 def _query(**changes: object) -> RunDiagnosticsQuery:
     values: dict[str, object] = {
         "env_file": Path("/cfg/.env"),
-        "vault_dir": Path("/vault"),
         "state_dir": Path("/state"),
         "curator_binary": "claude",
         "hooks_settings_file": Path("/s.json"),

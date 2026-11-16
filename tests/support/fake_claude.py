@@ -19,7 +19,8 @@ def write_fake_claude(
     """Create an executable that records its stdin and argv, then prints `envelope` (or `raw`).
 
     Args:
-        folder: Where to create the script (`claude`) and its records (`stdin.txt`, `argv.txt`, `env.json`).
+        folder: Where to create the script (`claude`) and its records (`stdin.txt`, `argv.txt`,
+            `env.json`, and `calls.log`, which gets one line per invocation).
         envelope: JSON to print, mimicking `claude -p --output-format json`.
         raw: Text to print instead of JSON.
         exit_code: Exit status of the fake.
@@ -33,6 +34,7 @@ def write_fake_claude(
     script.write_text(
         "#!/usr/bin/env python3\n"
         "import json, os, pathlib, sys, time\n"
+        f"open({str(folder / 'calls.log')!r}, 'a').write('call\\n')\n"
         f"pathlib.Path({str(folder / 'stdin.txt')!r}).write_text(sys.stdin.read())\n"
         f"pathlib.Path({str(folder / 'argv.txt')!r}).write_text('\\n'.join(sys.argv[1:]))\n"
         f"pathlib.Path({str(folder / 'env.json')!r}).write_text(json.dumps(dict(os.environ)))\n"
@@ -53,6 +55,18 @@ def success_envelope(decisions: list[JsonObject]) -> JsonObject:
         "is_error": False,
         "result": "",
         "structured_output": {"decisions": decisions},
+        "total_cost_usd": 0.001,
+    }
+
+
+def candidates_envelope(candidates: list[JsonObject]) -> JsonObject:
+    """What a successful curation run prints: `{"candidates": [...]}` as `structured_output`."""
+    return {
+        "type": "result",
+        "subtype": "success",
+        "is_error": False,
+        "result": "",
+        "structured_output": {"candidates": candidates},
         "total_cost_usd": 0.001,
     }
 

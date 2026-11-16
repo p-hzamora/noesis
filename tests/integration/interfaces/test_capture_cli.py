@@ -292,7 +292,7 @@ def test_an_odd_session_id_is_hashed_into_a_safe_one_not_rejected(
     assert stored.startswith("repo-") and "/" not in stored and " " not in stored
 
 
-def test_capture_on_reports_the_env_file_state_dir_and_vault_the_hooks_must_share(
+def test_capture_on_reports_the_env_file_state_dir_the_hooks_must_share(
     tmp_path: Path,
     repo: Path,
     transcript: Path,
@@ -303,19 +303,17 @@ def test_capture_on_reports_the_env_file_state_dir_and_vault_the_hooks_must_shar
     env_file: Path = tmp_path / "lab/noesis.env"
     env_file.parent.mkdir()
     env_file.write_text(
-        f"NOESIS_STATE_DIR={pinned_state}\nNOESIS_VAULT_DIR={tmp_path / 'lab/vault'}\n"
-        "NOESIS_CAPTURE_MIN_FILES=1\n",
+        f"NOESIS_STATE_DIR={pinned_state}\nNOESIS_CAPTURE_MIN_FILES=1\n",
         encoding="utf-8",
     )
     pinned: list[str] = ["--env-file", str(env_file)]
 
     assert run([*pinned, "capture", "on", "--session", SESSION, "--mode", "dry-run", "--json"]) == 0
     result = json.loads(capsys.readouterr().out)["result"]
-    assert (result["enabled"], result["env_file"], result["state_dir"], result["vault_dir"]) == (
+    assert (result["enabled"], result["env_file"], result["state_dir"]) == (
         True,
         str(env_file),
         str(pinned_state),
-        str(tmp_path / "lab/vault"),
     )
 
     # Without the pinned env file, the default state dir knows nothing about the session.

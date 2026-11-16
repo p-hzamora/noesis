@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 
 from noesis.core import (
+    CuratorRelatedLookupEnum,
     Environment,
     env_example_text,
     load_environment,
@@ -13,9 +14,7 @@ from noesis.core.configurations import (
     LogLevelEnum,
 )
 from noesis.exceptions import (
-    ExitCodeEnum,
     InvalidConfigurationError,
-    RemovedBackendError,
 )
 
 pytestmark = pytest.mark.unit
@@ -26,7 +25,7 @@ def test_defaults_apply_when_no_file_and_no_variables(isolated_environment: Path
 
     assert environment.env_file == isolated_environment / ".config/noesis/.env"
     assert environment.runtime.state_dir == isolated_environment / ".local/state/noesis"
-    assert environment.notes.vault_dir is None
+    assert environment.vault_import.vault_dir is None
     assert (environment.capture.min_files, environment.capture.min_lines) == (2, 20)
     assert environment.curator.claude_bin == "claude"
 
@@ -37,7 +36,7 @@ def test_values_come_from_the_env_file_and_expand_the_home_folder(tmp_path: Path
 
     environment: Environment = load_environment(env_file)
 
-    assert environment.notes.vault_dir == Path.home() / "brain"
+    assert environment.vault_import.vault_dir == Path.home() / "brain"
     assert environment.capture.min_lines == 5
 
 
@@ -74,7 +73,6 @@ def test_the_env_example_template_documents_every_setting() -> None:
 
     for variable in (
         "NOESIS_VAULT_DIR",
-        "NOESIS_WRITER_BACKEND",
         "NOESIS_STATE_DIR",
         "NOESIS_LOG_LEVEL",
         "NOESIS_CAPTURE_MIN_FILES",
@@ -82,88 +80,55 @@ def test_the_env_example_template_documents_every_setting() -> None:
         "NOESIS_CURATOR_MODEL",
         "NOESIS_CURATOR_RETRY_SECONDS",
         "NOESIS_CURATOR_SYSTEM_PROMPT_FILE",
-        "NOESIS_RECALL_RUNTIME",
-        "NOESIS_RECALL_MODEL=claude-haiku-5-5",
-        "NOESIS_RECALL_EFFORT=low",
-        "NOESIS_RECALL_MAX_INPUT_CHARS",
     ):
         assert variable in template
 
 
-def test_search_backend_defaults_to_the_filesystem(
-    tmp_path: Path, isolated_environment: Path
-) -> None:
-    default = load_environment(tmp_path / "missing.env").notes
-    assert default.search_backend.value == "filesystem"
+def test_the_related_lookup_defaults_to_required_and_can_be_turned_off(tmp_path: Path) -> None:
+    assert load_environment().curator.related_lookup is CuratorRelatedLookupEnum.REQUIRED
 
-
-@pytest.mark.parametrize(
-    ("variable", "removed"),
-    [("NOESIS_SEARCH_BACKEND", "obsidian-mcp"), ("NOESIS_WRITER_BACKEND", "mcp")],
-)
-def test_a_removed_backend_value_fails_validation_with_a_typed_error(
-    variable: str, removed: str, tmp_path: Path, isolated_environment: Path
-) -> None:
     env_file: Path = tmp_path / "noesis.env"
-    env_file.write_text(f"{variable}={removed}\n", encoding="utf-8")
+    env_file.write_text("NOESIS_CURATOR_RELATED_LOOKUP=off\n", encoding="utf-8")
 
-    with pytest.raises(RemovedBackendError) as raised:
-        load_environment(env_file)
-
-    error: RemovedBackendError = raised.value
-    assert error.error_code == "CORE_006_REMOVED_BACKEND"
-    assert error.exit_code is ExitCodeEnum.FAILURE
-    assert error.metadata == {"variable": variable, "value": removed}
-    assert any("filesystem" in step for step in error.next_steps)
+    assert load_environment(env_file).curator.related_lookup is CuratorRelatedLookupEnum.OFF
 
 
-@pytest.mark.parametrize(
-    ("variable", "removed"),
-    [("NOESIS_SEARCH_BACKEND", "OBSIDIAN-MCP"), ("NOESIS_WRITER_BACKEND", " mcp ")],
-)
-def test_a_removed_backend_value_is_caught_from_the_process_environment(
-    variable: str, removed: str, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
-    monkeypatch.setenv(variable, removed)
-
-    with pytest.raises(RemovedBackendError):
-        load_environment(tmp_path / "missing.env")
-
-
-def test_obsidian_mcp_variables_are_ignored(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, isolated_environment: Path
-) -> None:
-    monkeypatch.setenv("NOESIS_OBSIDIAN_MCP_URL", "http://127.0.0.1:1/mcp/")
-    monkeypatch.setenv("NOESIS_OBSIDIAN_MCP_TOKEN", "abc123")
-
-    notes = load_environment(tmp_path / "missing.env").notes
-
-    assert not hasattr(notes, "obsidian_mcp_url")
-    assert not hasattr(notes, "obsidian_mcp_token")
-
-
-def test_an_unknown_search_backend_is_rejected(tmp_path: Path) -> None:
+def test_a_bogus_related_lookup_is_a_settings_error_naming_the_variable(tmp_path: Path) -> None:
     env_file: Path = tmp_path / "noesis.env"
-    env_file.write_text("NOESIS_SEARCH_BACKEND=elasticsearch\n", encoding="utf-8")
+    env_file.write_text("NOESIS_CURATOR_RELATED_LOOKUP=sometimes\n", encoding="utf-8")
 
     with pytest.raises(InvalidConfigurationError) as raised:
         load_environment(env_file)
 
-    assert "NOESIS_SEARCH_BACKEND" in str(raised.value.metadata["problems"])
+    problems: object = raised.value.metadata["problems"]
+    assert isinstance(problems, list)
+    assert any(str(p).startswith("NOESIS_CURATOR_RELATED_LOOKUP:") for p in problems)
 
 
-def test_writer_backend_defaults_to_the_filesystem(tmp_path: Path) -> None:
-    assert load_environment(tmp_path / "missing.env").notes.writer_backend.value == "filesystem"
+def test_the_related_lookup_is_documented_in_the_env_example() -> None:
+    assert "NOESIS_CURATOR_RELATED_LOOKUP" in env_example_text()
 
 
-def test_an_unknown_writer_backend_is_rejected(tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    ("suffix", "value"),
+    [
+        ("SEARCH_BACKEND", "obsidian-mcp"),
+        ("WRITER_BACKEND", "mcp"),
+        ("RECALL_RUNTIME", "carrier-pigeon"),
+        ("VECTRA_COLLECTION", "stale"),
+    ],
+)
+def test_variables_of_the_retired_notes_context_are_ignored(
+    suffix: str, value: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     env_file: Path = tmp_path / "noesis.env"
-    env_file.write_text("NOESIS_WRITER_BACKEND=bogus\n", encoding="utf-8")
+    env_file.write_text(f"NOESIS_{suffix}={value}\n", encoding="utf-8")
+    monkeypatch.setenv(f"NOESIS_{suffix}", value)
 
-    with pytest.raises(InvalidConfigurationError) as raised:
-        load_environment(env_file)
+    environment: Environment = load_environment(env_file)
 
-    assert "NOESIS_WRITER_BACKEND" in str(raised.value.metadata["problems"])
+    assert not hasattr(environment, "notes")
+    assert not hasattr(environment, "recall")
 
 
 def test_ambient_session_ids_are_read_from_the_process_environment(
@@ -180,27 +145,3 @@ def test_ambient_session_ids_are_read_from_the_process_environment(
         "thread-1",
         None,
     )
-
-
-def test_recall_settings_default_to_the_runtime_defaults_and_read_the_model_and_effort(
-    tmp_path: Path,
-) -> None:
-    default = load_environment(tmp_path / "missing.env").recall
-    assert (default.runtime.value, default.model, default.effort) == ("claude-cli", "", "")
-
-    env_file: Path = tmp_path / "noesis.env"
-    env_file.write_text(
-        "NOESIS_RECALL_MODEL=claude-haiku-5-5\nNOESIS_RECALL_EFFORT=low\n", encoding="utf-8"
-    )
-    configured = load_environment(env_file).recall
-    assert (configured.model, configured.effort) == ("claude-haiku-5-5", "low")
-
-
-def test_an_unknown_recall_runtime_is_rejected(tmp_path: Path) -> None:
-    env_file: Path = tmp_path / "noesis.env"
-    env_file.write_text("NOESIS_RECALL_RUNTIME=carrier-pigeon\n", encoding="utf-8")
-
-    with pytest.raises(InvalidConfigurationError) as raised:
-        load_environment(env_file)
-
-    assert "NOESIS_RECALL_RUNTIME" in str(raised.value.metadata["problems"])

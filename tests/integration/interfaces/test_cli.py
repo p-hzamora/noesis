@@ -65,7 +65,7 @@ def test_config_show_reports_effective_settings(
     result: object = _json(capsys.readouterr().out)["result"]
     assert isinstance(result, dict)
     assert result["env_file_exists"] is True
-    assert result["settings"]["notes"]["vault_dir"] == str(tmp_path)  # type: ignore[index]
+    assert result["settings"]["vault_import"]["vault_dir"] == str(tmp_path)  # type: ignore[index]
 
 
 def test_invalid_configuration_prints_problems_on_stderr(
@@ -80,7 +80,7 @@ def test_invalid_configuration_prints_problems_on_stderr(
     assert "NOESIS_CAPTURE_MIN_LINES" in err
 
 
-def test_doctor_fails_without_a_vault_and_passes_with_one(
+def test_doctor_has_no_vault_writer_or_search_backend_check(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     fake_bin: Path = tmp_path / "bin"
@@ -90,11 +90,9 @@ def test_doctor_fails_without_a_vault_and_passes_with_one(
     curator.chmod(0o755)
     monkeypatch.setenv("PATH", f"{fake_bin}{os.pathsep}{os.environ['PATH']}")
 
-    assert run(["doctor", "--json"]) == 1
+    assert run(["doctor", "--json"]) == 0
     checks: object = _json(capsys.readouterr().out)["result"]["checks"]  # type: ignore[index]
     assert isinstance(checks, list)
-    assert {check["name"]: check["ok"] for check in checks}["vault"] is False
-
-    monkeypatch.setenv("NOESIS_VAULT_DIR", str(tmp_path))
-    assert run(["doctor"]) == 0
-    assert "ok  vault" in capsys.readouterr().out
+    names: set[str] = {check["name"] for check in checks}
+    assert {"state_dir", "git", "curator"} <= names
+    assert not names & {"vault", "writer", "search_backend"}
