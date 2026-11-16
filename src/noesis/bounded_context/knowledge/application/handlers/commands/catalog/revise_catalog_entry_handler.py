@@ -2,7 +2,10 @@
 
 from pydantic import Field
 
-from noesis.bounded_context.knowledge.application.dtos import CatalogWriteResultDto
+from noesis.bounded_context.knowledge.application.dtos import (
+    CatalogWriteResultDto,
+    PendingRecordChange,
+)
 from noesis.bounded_context.knowledge.application.handlers.types import (
     KnowledgeUnitOfWorkFactory,
 )
@@ -19,6 +22,9 @@ from noesis.bounded_context.knowledge.application.services.idempotency import (
     replay_of,
 )
 from noesis.bounded_context.knowledge.application.services.inputs import SourceInput
+from noesis.bounded_context.knowledge.application.services.record_changes import (
+    pending_changes_from,
+)
 from noesis.bounded_context.knowledge.application.services.record_reference_resolver import (
     RecordReferenceResolver,
 )
@@ -208,8 +214,16 @@ class ReviseCatalogEntryHandler(IHandler[ReviseCatalogEntryCommand, CatalogWrite
                     extra={"kind": entry.kind.value, "name": entry.name.value},
                     recorded_at=now,
                 )
+                changes: list[PendingRecordChange] = pending_changes_from(
+                    entry.collect_events(),
+                    record_type="catalog_entry",
+                    status=None,
+                    occurred_at=now,
+                )
                 await uow.catalog_entries.append_revision(entry, revision)
                 await uow.ledger.record(ledger_entry)
+                for change in changes:
+                    await uow.changes.append(change)
                 await uow.commit()
         except EntryAlreadyExistsError, RevisionConflictError:
             winner: LedgerEntry | None = replay_of(

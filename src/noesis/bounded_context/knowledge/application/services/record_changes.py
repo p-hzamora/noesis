@@ -13,6 +13,8 @@ from noesis.bounded_context.knowledge.domain.events import (
     AssertionAccepted,
     AssertionProposed,
     AssertionRetracted,
+    CatalogEntryRegistered,
+    CatalogEntryRevised,
     ExperienceRecorded,
     KnowledgeAccepted,
     KnowledgeProposed,
@@ -33,8 +35,8 @@ def pending_changes_from(
 ) -> list[PendingRecordChange]:
     """The feed entries of `events`, in order.
 
-    Only Knowledge, Experience and Assertion events produce a change; space, project and source events
-    produce none (the feed carries no change for them).
+    Only Knowledge, Experience, Assertion and CatalogEntry events produce a change; space, project
+    and source events produce none (the feed carries no change for them).
 
     Args:
         events: Events collected from one aggregate.
@@ -51,8 +53,10 @@ def pending_changes_from(
         match event:
             case KnowledgeProposed(revision=revision):
                 kind, number = "created", revision
-            case KnowledgeRevised(revision=revision):
+            case KnowledgeRevised(revision=revision) | CatalogEntryRevised(revision=revision):
                 kind, number = "revised", revision
+            case CatalogEntryRegistered():
+                kind, number = "created", 1
             case ExperienceRecorded() | AssertionProposed():
                 kind, number = "created", None
             case KnowledgeAccepted(pinned_revision=pinned):

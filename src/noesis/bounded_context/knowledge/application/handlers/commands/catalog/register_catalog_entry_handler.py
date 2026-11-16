@@ -2,7 +2,10 @@
 
 from pydantic import Field
 
-from noesis.bounded_context.knowledge.application.dtos import CatalogWriteResultDto
+from noesis.bounded_context.knowledge.application.dtos import (
+    CatalogWriteResultDto,
+    PendingRecordChange,
+)
 from noesis.bounded_context.knowledge.application.handlers.types import (
     KnowledgeUnitOfWorkFactory,
 )
@@ -15,6 +18,9 @@ from noesis.bounded_context.knowledge.application.services.idempotency import (
     replay_of,
 )
 from noesis.bounded_context.knowledge.application.services.inputs import SourceInput
+from noesis.bounded_context.knowledge.application.services.record_changes import (
+    pending_changes_from,
+)
 from noesis.bounded_context.knowledge.application.services.record_reference_resolver import (
     RecordReferenceResolver,
 )
@@ -160,6 +166,9 @@ class RegisterCatalogEntryHandler(IHandler[RegisterCatalogEntryCommand, CatalogW
             source_ids=source_ids,
             now=now,
         )
+        changes: list[PendingRecordChange] = pending_changes_from(
+            entry.collect_events(), record_type="catalog_entry", status=None, occurred_at=now
+        )
         ledger_entry: LedgerEntry = LedgerEntry(
             space_id=space_id,
             key=action.idempotency_key,
@@ -174,6 +183,8 @@ class RegisterCatalogEntryHandler(IHandler[RegisterCatalogEntryCommand, CatalogW
             async with self._uow_factory() as uow:
                 await uow.catalog_entries.add(entry)
                 await uow.ledger.record(ledger_entry)
+                for change in changes:
+                    await uow.changes.append(change)
                 await uow.commit()
         except (EntryAlreadyExistsError, CatalogEntryAlreadyExistsError) as error:
             winner: LedgerEntry | None = replay_of(
