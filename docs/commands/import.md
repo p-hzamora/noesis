@@ -20,8 +20,8 @@ noesis import run [--yes] [--update] [--strict] [--verbose] [--json]
   blocks are untouched. A note left with no text is `skipped_empty`.
 - A rerun is safe: unchanged notes are `unchanged`. A changed note is `changed_in_vault`; with
   `--update` a `proposed` record gets a new revision (`revised`) and an accepted one gets a new
-  `proposed` successor (`successor_proposed`, or `created` naming its target while the review
-  commands are absent).
+  `proposed` successor and a proposed `supersedes` assertion from it to the accepted record
+  (`successor_proposed`, with `target_record_id` and `assertion_id`).
 - `--strict` refuses the run with `IMPORT_201_BLOCKING_FINDINGS` when any note is blocked, before
   writing anything. `--verbose` lists every note in `result.notes`.
 - Result: `applied`, `update`, `vault_key`, `totals`, `blocked_reasons`, `warnings`,

@@ -453,8 +453,9 @@ record's note changed; a new `proposed` record was linked to it), `skipped_empty
 after normalisation, e.g. a links-only index), `blocked`. A note is blocked with `reason`
 `not_text`, `invalid_header`, `invalid_id`, `duplicate_id`, `invalid_scope` (interop), or
 `id_conflict`, `target_closed`, `revision_conflict`, `idempotency_key_reused`, `invalid_metadata`
-(Knowledge, `detail` holds its code). Until C4 is built, a changed note of an accepted record yields outcome `created` with
-`target_record_id` and reason `assertions unavailable: target not linked` (no `successor_proposed`). The run still exits 0 with `complete: false`; read the
+(Knowledge, `detail` holds its code). A `successor_proposed` row names the accepted record
+(`target_record_id`) and the `supersedes` assertion proposed between them (`assertion_id`); both wait
+in `noesis review queue`. With blocked notes the run still exits 0 with `complete: false`; read the
 `blocked_reasons` counts and the rows. Wiki links become their text, sections holding only links
 are removed, code is left alone.
 
