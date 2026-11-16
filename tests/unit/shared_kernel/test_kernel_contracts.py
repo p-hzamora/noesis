@@ -99,7 +99,9 @@ def test_record_changed_accepts_the_closed_change_kinds(change_kind: str) -> Non
     assert _change(change_kind).change_kind == change_kind
 
 
-def test_record_changed_rejects_links_changed() -> None:
-    """Wiki links are not data (D24): there is no link-set change kind."""
-    with pytest.raises(ValidationError):
-        _change("links_changed")
+def test_record_changed_preserves_unknown_kinds_and_rejects_blank() -> None:
+    """Readers tolerate future kinds without authorising any producer."""
+    assert _change("links_changed").change_kind == "links_changed"
+    for blank in ("", "   "):
+        with pytest.raises(ValidationError):
+            _change(blank)

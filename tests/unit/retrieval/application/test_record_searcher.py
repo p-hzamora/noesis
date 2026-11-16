@@ -63,6 +63,8 @@ async def test_hit_has_exactly_the_eleven_fields() -> None:
         "sources",
         "revised_at",
         "rank",
+        "discovery",
+        "warnings",
     }
 
 

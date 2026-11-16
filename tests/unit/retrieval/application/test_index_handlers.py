@@ -436,3 +436,39 @@ def test_duplicate_projection_kind_is_a_typed_configuration_error_at_start_up(
             client,
             load_environment(tmp_path / "missing.env"),  # type: ignore[operator]
         )
+
+
+async def test_unknown_feed_kinds_cross_batches_without_body_reads_and_restart_is_noop() -> None:
+    world = RetrievalWorld()
+    world.add_knowledge("K")
+    world.feed.add(SPACE, "K")
+    for _ in range(101):
+        world.feed.add(SPACE, "unread", change_kind="future_kind")
+    world.feed.add(SPACE, "K", change_kind="revised")
+    world.feed.add(SPACE, "unread", change_kind="trailing_future")
+    world.cursors.set("probe", SPACE, 0)
+    probe = InMemoryProbeProjection()
+    handler = sync_handler(world, probe)
+    result = await handler.handle(sync_command())
+    (projection,) = result.projections
+    assert (
+        projection.cursor,
+        projection.applied,
+        projection.skipped,
+        projection.unknown_changes,
+    ) == (104, 2, 102, 102)
+    assert all(record_id == "K" for record_id, _ in world.indexables.gets)
+    before = len(probe.upserts)
+    assert (await handler.handle(sync_command())).projections[0].applied == 0
+    assert len(probe.upserts) == before
+
+
+async def test_unknown_feed_kinds_do_not_hide_a_genuine_gap() -> None:
+    world = RetrievalWorld()
+    for _ in range(3):
+        world.feed.add(SPACE, "unread", change_kind="future")
+    world.feed.drop(SPACE, 2)
+    world.cursors.set("probe", SPACE, 0)
+    with pytest.raises(IndexRebuildRequiredError):
+        await sync_handler(world, InMemoryProbeProjection()).handle(sync_command())
+    assert await world.cursors.get("probe", SPACE) == 0

@@ -8,6 +8,7 @@ import pytest
 import noesis.exceptions as exceptions
 from noesis.exceptions import (
     ApplicationException,
+    BriefingRunFailedError,
     IndexNotInitialisedError,
     IndexRebuildRequiredError,
     IndexSyncInProgressError,
@@ -25,6 +26,7 @@ CASES: list[tuple[type[Exception], str, type[Exception]]] = [
         "RETRIEVAL_101_SEMANTIC_INDEX_UNAVAILABLE",
         InfrastructureException,
     ),
+    (BriefingRunFailedError, "RETRIEVAL_102_BRIEFING_RUN_FAILED", InfrastructureException),
     (IndexNotInitialisedError, "RETRIEVAL_201_INDEX_NOT_INITIALISED", ApplicationException),
     (IndexRebuildRequiredError, "RETRIEVAL_202_INDEX_REBUILD_REQUIRED", ApplicationException),
     (IndexSyncInProgressError, "RETRIEVAL_203_INDEX_SYNC_IN_PROGRESS", ApplicationException),
@@ -44,7 +46,7 @@ def test_error_has_stable_code_failure_exit_code_and_layer(
     assert error.next_steps == ("do this",)  # type: ignore[attr-defined]
 
 
-def test_module_defines_only_the_four_codes() -> None:
+def test_module_defines_only_the_five_codes() -> None:
     defined = {
         cls.__error_code__
         for _, cls in inspect.getmembers(retrieval_errors, inspect.isclass)
@@ -59,7 +61,7 @@ def test_errors_are_re_exported_from_the_package(name: str) -> None:
     assert getattr(exceptions, name) is getattr(retrieval_errors, name)
 
 
-@pytest.mark.parametrize(("first", "last"), [(102, 109), (204, 209)])
+@pytest.mark.parametrize(("first", "last"), [(103, 109), (204, 209)])
 def test_module_docstring_names_the_reserved_blocks(first: int, last: int) -> None:
     docstring: str = retrieval_errors.__doc__ or ""
 
