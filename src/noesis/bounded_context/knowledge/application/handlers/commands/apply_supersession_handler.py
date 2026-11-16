@@ -1,11 +1,19 @@
 """Apply the effect of an accepted `supersedes` assertion to its object (unit of work 2)."""
 
+from datetime import datetime
+
 from noesis.bounded_context.knowledge.application.dtos import EffectDto
+from noesis.bounded_context.knowledge.application.dtos.pending_record_change import (
+    PendingRecordChange,
+)
 from noesis.bounded_context.knowledge.application.handlers.types import (
     KnowledgeUnitOfWorkFactory,
 )
 from noesis.bounded_context.knowledge.application.ports.ids import IRecordIdGenerator
 from noesis.bounded_context.knowledge.application.ports.schema import IStoreSchema
+from noesis.bounded_context.knowledge.application.services.record_changes import (
+    pending_changes_from,
+)
 from noesis.bounded_context.knowledge.application.services.review_support import ReviewSupport
 from noesis.bounded_context.knowledge.domain.entities import Assertion, Knowledge
 from noesis.bounded_context.knowledge.domain.value_objects import (
@@ -109,16 +117,26 @@ class ApplySupersessionHandler(IHandler[ApplySupersessionCommand, EffectDto]):
                     return effect("applied")
                 if target.status is not RecordStatusEnum.ACCEPTED:
                     return effect("skipped", OBJECT_NOT_ACCEPTED)
+                now: datetime = support.clock.now()
                 target.supersede(
                     cause=cause.id,
                     successor=cause.subject_id,
                     actor=action.actor,
-                    now=support.clock.now(),
+                    now=now,
+                )
+                changes: list[PendingRecordChange] = pending_changes_from(
+                    target.collect_events(),
+                    record_type="knowledge" if isinstance(target, Knowledge) else "assertion",
+                    status=target.status.value,
+                    occurred_at=now,
+                    head_revision=target.head_number if isinstance(target, Knowledge) else None,
                 )
                 if isinstance(target, Knowledge):
                     await uow.knowledge.save(target)
                 else:
                     await uow.assertions.save(target)
+                for change in changes:
+                    await uow.changes.append(change)
                 await uow.commit()
         except StatusConflictError:
             return effect("skipped", CONCURRENT_DECISION)

@@ -3,6 +3,9 @@
 from collections.abc import Sequence
 
 from noesis.bounded_context.knowledge.application.dtos import ProposeAssertionResultDto
+from noesis.bounded_context.knowledge.application.dtos.pending_record_change import (
+    PendingRecordChange,
+)
 from noesis.bounded_context.knowledge.application.handlers.types import (
     KnowledgeUnitOfWorkFactory,
 )
@@ -10,6 +13,9 @@ from noesis.bounded_context.knowledge.application.ports.ids import IRecordIdGene
 from noesis.bounded_context.knowledge.application.ports.ledger import LedgerEntry
 from noesis.bounded_context.knowledge.application.ports.schema import IStoreSchema
 from noesis.bounded_context.knowledge.application.services.inputs import ProjectRef, SourceInput
+from noesis.bounded_context.knowledge.application.services.record_changes import (
+    pending_changes_from,
+)
 from noesis.bounded_context.knowledge.application.services.review_support import (
     Prelude,
     ReviewMutationCommand,
@@ -180,6 +186,12 @@ class ProposeAssertionHandler(IHandler[ProposeAssertionCommand, ProposeAssertion
                     )
                 if not action.apply:
                     return result
+                changes: list[PendingRecordChange] = pending_changes_from(
+                    assertion.collect_events(),
+                    record_type="assertion",
+                    status=assertion.status.value,
+                    occurred_at=assertion.created_at,
+                )
                 await repository.add(assertion)
                 await uow.ledger.record(
                     LedgerEntry(
@@ -192,6 +204,8 @@ class ProposeAssertionHandler(IHandler[ProposeAssertionCommand, ProposeAssertion
                         recorded_at=support.clock.now(),
                     )
                 )
+                for change in changes:
+                    await uow.changes.append(change)
                 await uow.commit()
         except EntryAlreadyExistsError as error:
             winner: LedgerEntry = await support.winner(

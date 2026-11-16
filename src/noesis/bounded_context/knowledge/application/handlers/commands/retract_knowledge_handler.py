@@ -5,12 +5,18 @@ from typing import Annotated
 from pydantic import AfterValidator
 
 from noesis.bounded_context.knowledge.application.dtos import RetractResultDto
+from noesis.bounded_context.knowledge.application.dtos.pending_record_change import (
+    PendingRecordChange,
+)
 from noesis.bounded_context.knowledge.application.handlers.types import (
     KnowledgeUnitOfWorkFactory,
 )
 from noesis.bounded_context.knowledge.application.ports.ids import IRecordIdGenerator
 from noesis.bounded_context.knowledge.application.ports.ledger import LedgerEntry
 from noesis.bounded_context.knowledge.application.ports.schema import IStoreSchema
+from noesis.bounded_context.knowledge.application.services.record_changes import (
+    pending_changes_from,
+)
 from noesis.bounded_context.knowledge.application.services.review_support import (
     Prelude,
     ReviewMutationCommand,
@@ -118,6 +124,13 @@ class RetractKnowledgeHandler(IHandler[RetractKnowledgeCommand, RetractResultDto
                 )
                 if not action.apply:
                     return result
+                changes: list[PendingRecordChange] = pending_changes_from(
+                    knowledge.collect_events(),
+                    record_type="knowledge",
+                    status=knowledge.status.value,
+                    occurred_at=now,
+                    head_revision=knowledge.head_number,
+                )
                 await uow.knowledge.save(knowledge)
                 await uow.ledger.record(
                     LedgerEntry(
@@ -130,6 +143,8 @@ class RetractKnowledgeHandler(IHandler[RetractKnowledgeCommand, RetractResultDto
                         recorded_at=now,
                     )
                 )
+                for change in changes:
+                    await uow.changes.append(change)
                 await uow.commit()
         except EntryAlreadyExistsError as error:
             winner: LedgerEntry = await support.winner(error, action, RETRACT_COMMAND, prelude)

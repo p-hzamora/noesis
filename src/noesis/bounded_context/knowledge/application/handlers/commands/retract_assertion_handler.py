@@ -1,6 +1,9 @@
 """Reject a proposed assertion or retract an accepted one."""
 
 from noesis.bounded_context.knowledge.application.dtos import RetractResultDto
+from noesis.bounded_context.knowledge.application.dtos.pending_record_change import (
+    PendingRecordChange,
+)
 from noesis.bounded_context.knowledge.application.handlers.commands.retract_knowledge_handler import (
     RETRACT_COMMAND,
     RequiredReason,
@@ -11,6 +14,9 @@ from noesis.bounded_context.knowledge.application.handlers.types import (
 from noesis.bounded_context.knowledge.application.ports.ids import IRecordIdGenerator
 from noesis.bounded_context.knowledge.application.ports.ledger import LedgerEntry
 from noesis.bounded_context.knowledge.application.ports.schema import IStoreSchema
+from noesis.bounded_context.knowledge.application.services.record_changes import (
+    pending_changes_from,
+)
 from noesis.bounded_context.knowledge.application.services.review_support import (
     Prelude,
     ReviewMutationCommand,
@@ -109,6 +115,12 @@ class RetractAssertionHandler(IHandler[RetractAssertionCommand, RetractResultDto
                 )
                 if not action.apply:
                     return result
+                changes: list[PendingRecordChange] = pending_changes_from(
+                    assertion.collect_events(),
+                    record_type="assertion",
+                    status=assertion.status.value,
+                    occurred_at=now,
+                )
                 await uow.assertions.save(assertion)
                 await uow.ledger.record(
                     LedgerEntry(
@@ -121,6 +133,8 @@ class RetractAssertionHandler(IHandler[RetractAssertionCommand, RetractResultDto
                         recorded_at=now,
                     )
                 )
+                for change in changes:
+                    await uow.changes.append(change)
                 await uow.commit()
         except EntryAlreadyExistsError as error:
             winner: LedgerEntry = await support.winner(error, action, RETRACT_COMMAND, prelude)

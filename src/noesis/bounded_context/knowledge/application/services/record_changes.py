@@ -10,9 +10,15 @@ from noesis.bounded_context.knowledge.application.dtos.pending_record_change imp
     PendingRecordChange,
 )
 from noesis.bounded_context.knowledge.domain.events import (
+    AssertionAccepted,
+    AssertionProposed,
+    AssertionRetracted,
     ExperienceRecorded,
+    KnowledgeAccepted,
     KnowledgeProposed,
+    KnowledgeRetracted,
     KnowledgeRevised,
+    RecordSuperseded,
 )
 from noesis.shared_kernel.domain.events import DomainEvent
 
@@ -23,10 +29,11 @@ def pending_changes_from(
     record_type: ChangeRecordType,
     status: str | None,
     occurred_at: datetime,
+    head_revision: int | None = None,
 ) -> list[PendingRecordChange]:
     """The feed entries of `events`, in order.
 
-    Only Knowledge and Experience events produce a change; space, project and source events
+    Only Knowledge, Experience and Assertion events produce a change; space, project and source events
     produce none (the feed carries no change for them).
 
     Args:
@@ -34,6 +41,8 @@ def pending_changes_from(
         record_type: Type of that aggregate.
         status: The aggregate's stored status; null for types without status.
         occurred_at: Knowledge's clock time of the write, stamped on every change.
+        head_revision: The aggregate's head revision, carried by retract and supersede changes;
+            null for types without revisions.
     """
     changes: list[PendingRecordChange] = []
     for event in events:
@@ -44,8 +53,14 @@ def pending_changes_from(
                 kind, number = "created", revision
             case KnowledgeRevised(revision=revision):
                 kind, number = "revised", revision
-            case ExperienceRecorded():
+            case ExperienceRecorded() | AssertionProposed():
                 kind, number = "created", None
+            case KnowledgeAccepted(pinned_revision=pinned):
+                kind, number = "status_changed", pinned
+            case KnowledgeRetracted() | RecordSuperseded():
+                kind, number = "status_changed", head_revision
+            case AssertionAccepted() | AssertionRetracted():
+                kind, number = "status_changed", None
             case _:
                 continue
         changes.append(

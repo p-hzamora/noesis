@@ -1,6 +1,9 @@
 """Accept a proposed assertion; a `supersedes` then runs its effect in a second unit of work."""
 
 from noesis.bounded_context.knowledge.application.dtos import AcceptResultDto, EffectDto
+from noesis.bounded_context.knowledge.application.dtos.pending_record_change import (
+    PendingRecordChange,
+)
 from noesis.bounded_context.knowledge.application.handlers.commands.accept_knowledge_handler import (
     ACCEPT_COMMAND,
 )
@@ -14,6 +17,9 @@ from noesis.bounded_context.knowledge.application.handlers.types import (
 from noesis.bounded_context.knowledge.application.ports.ids import IRecordIdGenerator
 from noesis.bounded_context.knowledge.application.ports.ledger import LedgerEntry
 from noesis.bounded_context.knowledge.application.ports.schema import IStoreSchema
+from noesis.bounded_context.knowledge.application.services.record_changes import (
+    pending_changes_from,
+)
 from noesis.bounded_context.knowledge.application.services.review_support import (
     Prelude,
     ReviewMutationCommand,
@@ -158,8 +164,16 @@ class AcceptAssertionHandler(IHandler[AcceptAssertionCommand, AcceptResultDto]):
                     extra=extra,
                     recorded_at=decision.decided_at,
                 )
+                changes: list[PendingRecordChange] = pending_changes_from(
+                    assertion.collect_events(),
+                    record_type="assertion",
+                    status=assertion.status.value,
+                    occurred_at=decision.decided_at,
+                )
                 await uow.assertions.save(assertion)
                 await uow.ledger.record(entry)
+                for change in changes:
+                    await uow.changes.append(change)
                 await uow.commit()
         except EntryAlreadyExistsError as error:
             winner: LedgerEntry = await support.winner(error, action, ACCEPT_COMMAND, prelude)

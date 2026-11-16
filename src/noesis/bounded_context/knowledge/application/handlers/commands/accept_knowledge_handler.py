@@ -3,12 +3,18 @@
 from pydantic import Field
 
 from noesis.bounded_context.knowledge.application.dtos import AcceptResultDto
+from noesis.bounded_context.knowledge.application.dtos.pending_record_change import (
+    PendingRecordChange,
+)
 from noesis.bounded_context.knowledge.application.handlers.types import (
     KnowledgeUnitOfWorkFactory,
 )
 from noesis.bounded_context.knowledge.application.ports.ids import IRecordIdGenerator
 from noesis.bounded_context.knowledge.application.ports.ledger import LedgerEntry
 from noesis.bounded_context.knowledge.application.ports.schema import IStoreSchema
+from noesis.bounded_context.knowledge.application.services.record_changes import (
+    pending_changes_from,
+)
 from noesis.bounded_context.knowledge.application.services.review_support import (
     Prelude,
     ReviewMutationCommand,
@@ -119,6 +125,13 @@ class AcceptKnowledgeHandler(IHandler[AcceptKnowledgeCommand, AcceptResultDto]):
                 )
                 if not action.apply:
                     return result
+                changes: list[PendingRecordChange] = pending_changes_from(
+                    knowledge.collect_events(),
+                    record_type="knowledge",
+                    status=knowledge.status.value,
+                    occurred_at=decision.decided_at,
+                    head_revision=knowledge.head_number,
+                )
                 await uow.knowledge.save(knowledge)
                 await uow.ledger.record(
                     LedgerEntry(
@@ -132,6 +145,8 @@ class AcceptKnowledgeHandler(IHandler[AcceptKnowledgeCommand, AcceptResultDto]):
                         recorded_at=decision.decided_at,
                     )
                 )
+                for change in changes:
+                    await uow.changes.append(change)
                 await uow.commit()
         except EntryAlreadyExistsError as error:
             winner: LedgerEntry = await support.winner(error, action, ACCEPT_COMMAND, prelude)

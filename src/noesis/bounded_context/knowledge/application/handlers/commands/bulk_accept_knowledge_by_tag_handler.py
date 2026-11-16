@@ -5,6 +5,9 @@ from noesis.bounded_context.knowledge.application.dtos import (
     TaggedProposalDto,
     TagMatchCountsDto,
 )
+from noesis.bounded_context.knowledge.application.dtos.pending_record_change import (
+    PendingRecordChange,
+)
 from noesis.bounded_context.knowledge.application.handlers.types import (
     KnowledgeUnitOfWorkFactory,
 )
@@ -13,8 +16,11 @@ from noesis.bounded_context.knowledge.application.ports.read_repositories import
     IReviewQueueReadRepository,
 )
 from noesis.bounded_context.knowledge.application.ports.schema import IStoreSchema
+from noesis.bounded_context.knowledge.application.services.record_changes import (
+    pending_changes_from,
+)
 from noesis.bounded_context.knowledge.application.services.review_support import ReviewSupport
-from noesis.bounded_context.knowledge.domain.entities import Knowledge
+from noesis.bounded_context.knowledge.domain.entities import Knowledge, ReviewDecision
 from noesis.bounded_context.knowledge.domain.services import ReviewAuthorityPolicy
 from noesis.bounded_context.knowledge.domain.value_objects import (
     Actor,
@@ -135,14 +141,23 @@ class BulkAcceptKnowledgeByTagHandler(
                     or action.tag not in knowledge.applicability.tags
                 ):
                     return False
-                knowledge.accept(
+                decision: ReviewDecision = knowledge.accept(
                     expected_revision=knowledge.head_number,
                     actor=action.actor,
                     reason=action.reason or f"bulk accept: tag {action.tag.value}",
                     basis=DecisionBasisEnum.MIGRATION,
                     now=support.clock.now(),
                 )
+                changes: list[PendingRecordChange] = pending_changes_from(
+                    knowledge.collect_events(),
+                    record_type="knowledge",
+                    status=knowledge.status.value,
+                    occurred_at=decision.decided_at,
+                    head_revision=knowledge.head_number,
+                )
                 await uow.knowledge.save(knowledge)
+                for change in changes:
+                    await uow.changes.append(change)
                 await uow.commit()
         except StatusConflictError:
             return False
