@@ -124,6 +124,7 @@ source_modules = [
     "noesis.bounded_context.notes.domain",
     "noesis.bounded_context.capture.domain",
     "noesis.bounded_context.knowledge.domain",
+    "noesis.bounded_context.retrieval.domain",
 ]
 forbidden_modules = ["typer", "subprocess", "pydantic_settings", "noesis.core"]
 allow_indirect_imports = true
@@ -161,6 +162,12 @@ containers = ["noesis.bounded_context.knowledge"]
 layers = ["infrastructure", "application", "domain"]
 
 [[tool.importlinter.contracts]]
+name = "Retrieval layers point inward"
+type = "layers"
+containers = ["noesis.bounded_context.retrieval"]
+layers = ["infrastructure", "application", "domain"]
+
+[[tool.importlinter.contracts]]
 name = "Capture layers point inward"
 type = "layers"
 layers = [
@@ -176,6 +183,7 @@ modules = [
     "noesis.bounded_context.capture",
     "noesis.bounded_context.knowledge",
     "noesis.bounded_context.notes",
+    "noesis.bounded_context.retrieval",
 ]
 
 [[tool.importlinter.contracts]]
@@ -188,6 +196,8 @@ source_modules = [
     "noesis.bounded_context.capture.application",
     "noesis.bounded_context.knowledge.domain",
     "noesis.bounded_context.knowledge.application",
+    "noesis.bounded_context.retrieval.domain",
+    "noesis.bounded_context.retrieval.application",
     "noesis.diagnostics.application",
 ]
 forbidden_modules = ["yaml", "subprocess", "shutil", "tempfile", "noesis.shared_kernel.infrastructure"]
@@ -202,6 +212,8 @@ source_modules = [
     "noesis.bounded_context.notes.application",
     "noesis.bounded_context.capture.domain",
     "noesis.bounded_context.capture.application",
+    "noesis.bounded_context.retrieval.domain",
+    "noesis.bounded_context.retrieval.application",
     "noesis.diagnostics.application",
 ]
 forbidden_modules = ["neo4j"]
