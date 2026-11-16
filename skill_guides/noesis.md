@@ -199,7 +199,7 @@ noesis record get <ID> [--revision <N>] --json
 
 ```text
 noesis search <query> [--project <key> | --all-projects] [--tag <t>]... [--type knowledge|experience]...
-                      [--status <s>]... [--limit 1..50] [--include-stale] [--require-semantic] [--json]
+                      [--status <s>]... [--limit 1..50] [--include-stale] [--require-semantic] [--semantic] [--json]
 ```
 
 - Scope: the active space. Default project: the git repository you run it in (the same name
@@ -213,7 +213,11 @@ noesis search <query> [--project <key> | --all-projects] [--tag <t>]... [--type 
   are left out unless `--status retracted`. Treat only `authoritative` as settled; `proposed` is a
   proposal.
 - `result.index`: `pending_changes`, `stale_hits`, `filter_shortfall` (fewer hits than `--limit`
-  matched the filters) and `semantic.state` (`absent` today: only text and shared-source search run).
+  matched the filters) and `semantic.state`: `absent` (not installed or mode `off`), `unavailable`
+  (no prepared model, embedder not running, or a rebuild in progress), `lagging` or `ready`.
+  Semantic search is optional and English only; when it is missing, text and shared-source search
+  still run. Identifier-like queries (backticks, `--flags`, paths, `a.b`, snake_case, camelCase,
+  UUIDs, `KEY-123`) keep the text order; semantic only appends records.
 - Errors: `RETRIEVAL_101_SEMANTIC_INDEX_UNAVAILABLE` (`--require-semantic` while the state is `absent` or
   `unavailable`), `RETRIEVAL_202_INDEX_REBUILD_REQUIRED` (run `noesis index rebuild --yes`),
   `INTEGRATION_103_GRAPH_STORE_UNAVAILABLE` (Neo4j is down). An empty query, `--limit` outside 1..50, or
@@ -222,10 +226,13 @@ noesis search <query> [--project <key> | --all-projects] [--tag <t>]... [--type 
 ## Index commands
 
 `noesis index sync [--wait-seconds <n>]`, `noesis index rebuild [--projection <name>] --yes` and
-`noesis index status [--verify]` keep search projections up to date. This release registers no
-projection, so each one reports `projections: []`, the feed's `head_sequence` and a warning, writes
-nothing and exits 0. `rebuild` without `--yes`, or naming an unregistered `--projection`, is a usage
-error (exit 2). Normal use needs none of them: text search reads the record store directly.
+`noesis index status [--verify]` keep search projections up to date. The only projection is the
+optional `semantic` one (installed with `noesis[semantic]`, set up by the user with `noesis index
+model prepare`, `noesis index embedder serve` and `noesis index rebuild --yes`); without it each
+command reports `projections: []`, the feed's `head_sequence` and a warning, writes nothing and
+exits 0. `index status` shows a `semantic` block with a `next_step`; never start the embedder or
+download the model on the user's behalf. `rebuild` without `--yes`, or naming an unregistered
+`--projection`, is a usage error (exit 2). Text search needs none of them.
 
 ## Assertions and review (Neo4j)
 

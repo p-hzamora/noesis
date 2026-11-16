@@ -18,6 +18,14 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Added
 
+- Optional semantic search (C5b, English only): `noesis[semantic]` extra (CPU ONNX, no torch),
+  pinned `BAAI/bge-small-en-v1.5` in Neo4j's native 384-dim cosine vector index over
+  Retrieval-owned `:Embedding` chunk nodes (448-token windows, 64 overlap; nothing truncated).
+  New `noesis index model prepare`, `noesis index embedder serve` and `search --semantic`;
+  `NOESIS_RETRIEVAL_SEMANTIC_MODE=resident|per-call|off`. Identifier-like queries keep the
+  lexical+graph order. Index sync/rebuild hold a renewed, fenced lease and persist the built
+  profile; a space being rebuilt is unavailable to semantic search.
+
 - Rebuild `noesis recall` over Knowledge and Retrieval with revision citations, authority
   labels, redacted model-free digests, isolated synthesis and observed catalog availability.
 - Discover live imported links and accepted supersession paths without transferring

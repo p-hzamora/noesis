@@ -98,7 +98,8 @@ below are reserved (a later chunk never changes the meaning of an existing membe
 | Kind | Reserved | For |
 |---|---|---|
 | Unit-of-work members | `changes`; `assertions`, `record_references`; `catalog_entries` (used by the catalog); `link_sets`; `consolidations`, `consolidation_guard` | change feed; review; catalog; import links; consolidation |
-| Labels | `:Change`, `:ChangeCounter`, `Index*` prefix | change feed and indexing |
+| Labels | `:Change`, `:ChangeCounter`, `Index*` prefix, `:Embedding` | change feed and indexing (`:Embedding`: C5b semantic chunks, Retrieval-owned) |
+| Schema steps | `retrieval_index`, `retrieval_semantic` (after it: `embedding_key` uniqueness, `embedding_record` index, `retrieval_semantic_vector` 384-dim cosine vector index) | Retrieval |
 | Labels | `:LinkSet` | file import |
 | Labels | `:Decision` | review |
 | Labels | `:Consolidation`, `:ConsolidationMembership` | consolidation |

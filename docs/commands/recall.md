@@ -1,9 +1,10 @@
 # Recall
 
 `noesis recall "task"` prepares a read-only briefing from Knowledge and Experience
-records in the active space. It uses lexical search and live graph neighbours; semantic
-search is optional and currently absent. It never synchronises an index or opens a source
-file for evidence.
+records in the active space. It uses lexical search and live graph neighbours, plus semantic
+candidates when the optional resident embedder is set up (see
+[index](index.md#semantic-search-setup-english-only)); it never loads a model per call. It never
+synchronises an index or opens a source file for evidence.
 
 ```sh
 noesis recall "build a Python DDD CLI" --project demo
