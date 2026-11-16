@@ -10,7 +10,7 @@ class RepositoryLocationDto(BaseDto):
 
     Attributes:
         common_dir: The resolved git directory every worktree of the repository shares.
-        root: The main worktree (the repository folder itself when bare): the path notes and
+        root: The main worktree (the repository folder itself when bare): the path records and
             briefs refer to.
         name: The folder name the repository is known by.
     """

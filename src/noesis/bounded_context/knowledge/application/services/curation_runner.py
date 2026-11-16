@@ -85,7 +85,7 @@ from noesis.shared_kernel.domain import JsonValue
 from noesis.utils import FrozenObject
 
 RELATED_RECORDS_LIMIT: int = 8
-"""How many related records the curator gets (today's `RELATED_NOTES_LIMIT`)."""
+"""How many related records the curator gets."""
 
 type Sleeper = Callable[[float], Awaitable[None]]
 

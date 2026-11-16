@@ -35,5 +35,5 @@ class SessionId(ValueObject):
 
     @property
     def short(self) -> str:
-        """First characters, for note frontmatter and logs."""
+        """First characters, for logs and display."""
         return self.value[:SHORT_LENGTH]
