@@ -11,6 +11,7 @@ from noesis.exceptions import AppException, ExitCodeEnum
 from noesis.interfaces.cli import commands
 
 from . import output
+from .commands.recall_commands import recall
 from .options import EnvFileOption
 from .state import CliState
 
@@ -40,6 +41,7 @@ app.add_typer(commands.assertion_app, name="assertion")
 app.add_typer(commands.review_app, name="review")
 app.add_typer(commands.index_app, name="index")
 app.command("search")(commands.search)
+app.command("recall")(recall)
 app.add_typer(commands.catalog_app, name="catalog")
 app.add_typer(commands.import_app, name="import")
 app.add_typer(commands.curate_app, name="curate")

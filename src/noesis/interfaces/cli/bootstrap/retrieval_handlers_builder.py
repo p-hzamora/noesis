@@ -33,6 +33,9 @@ from noesis.bounded_context.knowledge.infrastructure.inbound.retrieval.neo4j_rec
 from noesis.bounded_context.knowledge.infrastructure.inbound.retrieval.neo4j_record_text_search_adapter import (
     Neo4jRecordTextSearchAdapter,
 )
+from noesis.bounded_context.knowledge.infrastructure.inbound.retrieval.review_readers_adapter import (
+    ReviewReadersAdapter,
+)
 from noesis.bounded_context.knowledge.infrastructure.outbound.persistence import (
     CHANGE_FEED_SCHEMA_STEP,
     KNOWLEDGE_FULLTEXT_SCHEMA_STEP,
@@ -52,6 +55,9 @@ from noesis.bounded_context.retrieval.application.handlers.queries.find_similar_
 from noesis.bounded_context.retrieval.application.handlers.queries.get_index_status_handler import (
     GetIndexStatusHandler,
 )
+from noesis.bounded_context.retrieval.application.handlers.queries.recall_handler import (
+    RecallHandler,
+)
 from noesis.bounded_context.retrieval.application.handlers.queries.search_records_handler import (
     SearchRecordsHandler,
 )
@@ -62,7 +68,11 @@ from noesis.bounded_context.retrieval.application.ports.indexing.i_index_cursor_
     IIndexCursorStore,
 )
 from noesis.bounded_context.retrieval.application.ports.indexing.i_index_writer import IIndexWriter
+from noesis.bounded_context.retrieval.application.services.briefing_redactor import BriefingRedactor
 from noesis.bounded_context.retrieval.application.services.record_searcher import RecordSearcher
+from noesis.bounded_context.retrieval.infrastructure.outbound.briefing.claude_cli_briefing_adapter import (
+    ClaudeCliBriefingAdapter,
+)
 from noesis.bounded_context.retrieval.infrastructure.outbound.persistence import (
     RETRIEVAL_INDEX_STATEMENTS,
     RETRIEVAL_INDEX_STEP,
@@ -140,6 +150,7 @@ class RetrievalHandlers:
     index_status: GetIndexStatusHandler
     searcher: RecordSearcher
     projection_kinds: tuple[str, ...]
+    recall: RecallHandler | None = None
 
 
 def build_retrieval(client: Neo4jClient, environment: Environment) -> RetrievalHandlers:
@@ -172,8 +183,26 @@ def build_retrieval(client: Neo4jClient, environment: Environment) -> RetrievalH
         feed,
         projection_kinds=kinds,
     )
-    ttl: int = environment.retrieval.index_lock_ttl_seconds
+    from .knowledge_handlers_builder import build_catalog_availability_adapter
+
+    reviews = ReviewReadersAdapter(client)
+    settings = environment.retrieval
+    ttl: int = settings.index_lock_ttl_seconds
     return RetrievalHandlers(
+        recall=RecallHandler(
+            searcher,
+            indexables,
+            reviews=reviews,
+            recommendations=reviews,
+            catalog=build_catalog_availability_adapter(client, environment),
+            model=ClaudeCliBriefingAdapter(
+                claude_bin=settings.retrieval_briefing_claude_bin,
+                timeout_seconds=settings.retrieval_briefing_timeout_seconds,
+                max_budget_usd=settings.retrieval_briefing_max_budget_usd,
+            ),
+            redactor=BriefingRedactor(),
+            max_evidence_chars=settings.retrieval_briefing_max_evidence_chars,
+        ),
         search=SearchRecordsHandler(searcher),
         find_similar=FindSimilarRecordsHandler(searcher),
         sync_index=SyncIndexHandler(

@@ -108,7 +108,7 @@ def _response(
             semantic=SearchSemanticResponse(state=result.semantic_state.value),
             filter_shortfall=result.filter_shortfall,
         ),
-        warnings=_warnings(result, key, space),
+        warnings=(*_warnings(result, key, space), *result.warnings),
     )
 
 

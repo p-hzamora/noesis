@@ -23,6 +23,7 @@ class IndexSyncedProjectionResponse(FrozenObject):
     kind: str
     applied: int
     skipped: int
+    unknown_changes: int = 0
     cursor: int
 
 
@@ -41,7 +42,7 @@ class IndexSyncResponse(IRenderableResponse):
 
     def render(self) -> str:
         lines: list[str] = [
-            f"{item.kind}: applied {item.applied}, skipped {item.skipped}, cursor {item.cursor}"
+            f"{item.kind}: applied {item.applied}, skipped {item.skipped} (unknown {item.unknown_changes}), cursor {item.cursor}"
             for item in self.projections
         ]
         return "\n".join([*lines, *_footer(self.head_sequence, self.warnings)])
