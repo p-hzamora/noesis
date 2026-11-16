@@ -1,6 +1,7 @@
 """Masks secrets in text before Knowledge stores it (D-012).
 
-A Knowledge-local copy of the patterns Notes uses; the two stay separate until Notes retires.
+Every Knowledge write goes through it, and so does curation (briefs, candidates and apply
+payloads are masked before they reach the inbox, the curator or the store).
 """
 
 import re

@@ -9,6 +9,16 @@ from .capture_result_dto import CaptureResultDto
 from .catalog_entry_detail_dto import CatalogEntryDetailDto
 from .catalog_entry_dto import CatalogEntryDto
 from .catalog_write_result_dto import CatalogWriteResultDto
+from .curation_dtos import (
+    CurationItemDto,
+    CurationResultDto,
+    CurationSourceDto,
+    ParkedCurationDto,
+    PlanRegistrationDto,
+    RejectedEntryDto,
+    RelatedLookupDto,
+    RelatedRecordDto,
+)
 from .import_candidates_dto import ImportCandidateDto, ImportCandidatesDto
 from .import_knowledge_result_dto import ImportKnowledgeResultDto
 from .installed_artifact_dto import InstalledArtifactDto
@@ -79,6 +89,14 @@ __all__ = [
     "CatalogEntryDetailDto",
     "CatalogEntryDto",
     "CatalogWriteResultDto",
+    "CurationItemDto",
+    "CurationResultDto",
+    "CurationSourceDto",
+    "ParkedCurationDto",
+    "PlanRegistrationDto",
+    "RejectedEntryDto",
+    "RelatedLookupDto",
+    "RelatedRecordDto",
     "ImportCandidateDto",
     "ImportCandidatesDto",
     "ImportKnowledgeResultDto",

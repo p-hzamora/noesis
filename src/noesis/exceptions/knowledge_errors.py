@@ -1,6 +1,6 @@
 """Errors of the Knowledge context."""
 
-from .base import ApplicationException, DomainException
+from .base import ApplicationException, DomainException, InfrastructureException
 
 
 class InvalidRecordIdError(DomainException):
@@ -169,3 +169,51 @@ class CatalogEntryAlreadyExistsError(ApplicationException):
     """A catalog entry with the same kind and name already exists in the space."""
 
     __error_code__ = "KNOWLEDGE_262_CATALOG_ENTRY_ALREADY_EXISTS"
+
+
+class InvalidCurationTransitionError(DomainException):
+    """A curation ticket was moved to a stage its progress does not allow."""
+
+    __error_code__ = "KNOWLEDGE_040_INVALID_CURATION_TRANSITION"
+
+
+class CuratorRunFailedError(InfrastructureException):
+    """The curator is missing, timed out, failed, or answered something unusable."""
+
+    __error_code__ = "KNOWLEDGE_141_CURATOR_FAILED"
+
+
+class CurationInboxFailedError(InfrastructureException):
+    """The curation inbox cannot be read, written or locked."""
+
+    __error_code__ = "KNOWLEDGE_142_CURATION_INBOX_FAILED"
+
+
+class CurationParkedError(ApplicationException):
+    """A curation failed and its ticket is parked; the metadata names the ticket and the cause."""
+
+    __error_code__ = "KNOWLEDGE_241_CURATION_FAILED"
+
+
+class ParkedCurationTicketNotFoundError(ApplicationException):
+    """No curation ticket has the requested id."""
+
+    __error_code__ = "KNOWLEDGE_242_PARKED_CURATION_NOT_FOUND"
+
+
+class CurationRejectedError(ApplicationException):
+    """An apply payload has flawed entries; nothing was staged or written."""
+
+    __error_code__ = "KNOWLEDGE_243_CURATION_REJECTED"
+
+
+class BriefAlreadyIngestedError(ApplicationException):
+    """The submission's plan is registered in the store but its local plan is not available."""
+
+    __error_code__ = "KNOWLEDGE_244_BRIEF_ALREADY_INGESTED"
+
+
+class RelatedLookupUnavailableError(ApplicationException):
+    """The related-record lookup is required and cannot answer."""
+
+    __error_code__ = "KNOWLEDGE_245_RELATED_LOOKUP_UNAVAILABLE"
