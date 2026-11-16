@@ -8,8 +8,9 @@ from noesis.shared_kernel.infrastructure.outbound.neo4j import Neo4jConnectionSe
 
 pytestmark = [pytest.mark.integration, pytest.mark.neo4j]
 
-ALL_STEPS = ["core", "change_feed", "knowledge_fulltext", "retrieval_index"]
+ALL_STEPS = ["core", "review", "change_feed", "knowledge_fulltext", "retrieval_index"]
 NEW_STEPS = ["change_feed", "knowledge_fulltext", "retrieval_index"]
+INIT_STEPS = ["review", *NEW_STEPS]
 
 
 def _schema(settings: Neo4jConnectionSettings) -> tuple[list[object], list[object], list[object]]:
@@ -51,7 +52,7 @@ def test_ac028(
     after_second = _schema(neo4j_settings)
 
     assert code == code_again == 0
-    assert first["result"]["applied_steps"] == NEW_STEPS  # type: ignore[index]
+    assert first["result"]["applied_steps"] == INIT_STEPS  # type: ignore[index]
     assert first["result"]["already_applied_steps"] == ["core"]  # type: ignore[index]
     assert second["result"]["applied_steps"] == []  # type: ignore[index]
     assert after_first[0] == [{"steps": ALL_STEPS}]

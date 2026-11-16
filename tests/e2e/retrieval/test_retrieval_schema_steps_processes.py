@@ -9,6 +9,7 @@ from noesis.shared_kernel.infrastructure.outbound.neo4j import Neo4jConnectionSe
 pytestmark = [pytest.mark.integration, pytest.mark.neo4j]
 
 NEW_STEPS = ["change_feed", "knowledge_fulltext", "retrieval_index"]
+INIT_STEPS = ["review", *NEW_STEPS]
 
 
 def test_ac028_processes(
@@ -29,6 +30,6 @@ def test_ac028_processes(
     second = run_noesis(["store", "init"], child_env)
 
     assert first.code == second.code == 0
-    assert first.result["applied_steps"] == NEW_STEPS
+    assert first.result["applied_steps"] == INIT_STEPS
     assert second.result["applied_steps"] == []
     assert run_noesis(["search", "x"], child_env).code == 0

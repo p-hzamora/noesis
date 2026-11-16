@@ -39,7 +39,12 @@ FAKE_STEP: Neo4jSchemaStep = Neo4jSchemaStep(
     name="c9_fake",
     statements=("CREATE INDEX c9_fake_index IF NOT EXISTS FOR (n:FakeC9) ON (n.value)",),
 )
-ALL_STEPS: tuple[str, ...] = ("core", "review", "change_feed", "knowledge_fulltext", "retrieval_index")
+ALL_STEPS: tuple[str, ...] = (
+    "core",
+    "change_feed",
+    "knowledge_fulltext",
+    "retrieval_index",
+)
 CORE_CONSTRAINTS: set[tuple[str, str]] = {
     ("Record", "id"),
     ("Space", "id"),
@@ -73,7 +78,7 @@ async def test_record_get_on_an_empty_store_names_the_missing_step_and_writes_no
 async def test_store_init_twice_applies_every_registered_step_once_and_ensures_one_default_space(
     neo4j_settings: Neo4jConnectionSettings,
 ) -> None:
-    """With C5a's three steps registered after `core` (the production registry)."""
+    """With only C5a's three steps registered after `core` (this env registers no review step)."""
     env: Neo4jKnowledgeEnv = make_neo4j_env(neo4j_settings, extra_steps=RETRIEVAL_SCHEMA_STEPS)
     try:
         first: StoreInitialisedDto = await env.initialise_store.handle(_init())
