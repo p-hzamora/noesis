@@ -6,10 +6,10 @@ top to bottom once; afterwards use the checklist at the end when you design a co
 ## 1. What happens when you type a command
 
 ```text
-$ noesis notes search "ttl cache" --repo demo --json
-  └─┬──┘ └───┬───┘ └─┬──┘ └────┬────┘ └────┬────┘ └─┬─┘
- program  command  sub-  argument      option     flag
-          group   command (positional) (key value) (on/off)
+$ noesis search "ttl cache" --project demo --json
+  └─┬──┘ └──┬───┘ └────┬────┘ └────┬────┘ └─┬─┘
+ program command  argument      option     flag
+                (positional) (key value) (on/off)
 ```
 
 1. The **shell** splits the line into words (`argv`), honouring quotes: `"ttl cache"` is
@@ -50,7 +50,8 @@ Big tools group verbs under nouns, like `git remote add`. noesis does the same:
 
 ```text
 noesis capture   on | off | status | runs        (Capture context)
-noesis notes curate | apply | retry | parked | search | list  (Notes context)
+noesis curate    brief | apply | retry | parked  (Knowledge context)
+noesis search    TEXT                            (Retrieval context)
 noesis hook      claude-code                     (machine entry point for agent hooks)
 noesis config    show | init
 noesis doctor
@@ -84,7 +85,7 @@ read when `--session` is left out), then
 
 
 Keeping results on stdout and everything else on stderr is what makes piping work:
-`noesis notes list --json | jq '.result.notes[].path'` stays clean even when warnings
+`noesis search ttl --json | jq '.result.hits[].id'` stays clean even when warnings
 are printed.
 
 ## 6. Exit codes
@@ -96,7 +97,7 @@ reading its output.
 | Code | Meaning in noesis                                                 |
 | ---- | ----------------------------------------------------------------- |
 | 0    | Success.                                                          |
-| 1    | The operation failed (curator down, vault missing, …).            |
+| 1    | The operation failed (curator down, store unreachable, …).            |
 | 2    | You called it wrong (unknown command, bad option, invalid input). |
 
 
@@ -137,7 +138,7 @@ Do not start a process for every test. noesis exposes `run(argv) -> exit code`
 pytest's `capsys`:
 
 ```python
-assert run(["notes", "list", "--json"]) == 1
+assert run(["import", "run", "--json"]) == 1
 assert json.loads(capsys.readouterr().out)["error"]["code"] == "CORE_002_VAULT_NOT_CONFIGURED"
 ```
 

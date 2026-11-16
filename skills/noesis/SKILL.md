@@ -1,8 +1,8 @@
 ---
 name: noesis
-description: Capture finished work into the notes vault, write notes directly, search past decisions and gotchas, and manage failed curations with the `noesis` CLI.
-when_to_use: Use when the user asks to record work or a note in the vault, turn capture on or off, check what was captured, search past decisions and gotchas, or retry a parked curation.
-argument-hint: "[capture on|off|status|runs | apply | search <text> | list | parked]"
+description: Capture finished work into the knowledge store, record knowledge directly, search past decisions and gotchas, import a notes vault, and manage failed curations with the `noesis` CLI.
+when_to_use: Use when the user asks to record work or knowledge, turn capture on or off, check what was captured, search past decisions and gotchas, import a vault, or retry a parked curation.
+argument-hint: "[capture on|off|status|runs | curate apply|parked|retry | record | search <text> | import]"
 ---
 
 # noesis
@@ -19,7 +19,7 @@ executables and do not guess commands.
 
 ## 2. Check which config the repo selects
 
-noesis picks its config from the repo itself. The env file sets the state dir, the vault and
+noesis picks its config from the repo itself. The env file sets the state dir, the store connection and
 the capture thresholds. The hooks use the same lookup, so no flag is needed.
 
 1. Look for `<repo>/.noesis-config` (or the nearest one up to the git root). It holds
@@ -47,7 +47,7 @@ cover. If `skills get` is unknown, the installed noesis is too old: say so and u
 ## 4. After `capture on`, verify
 
 Run `capture status` from the same repo, with the same `--env-file` (or none). Check that
-`enabled` is `true`. Then tell the user which env file, state dir and vault were used.
+`enabled` is `true`. Then tell the user which env file and state dir were used.
 If `enabled` is not `true`, say that capture is not on. Do not report success. Also check
 `generated` in the `capture on` result: `true` means noesis invented the session id, no hook can
 match it, and capture will not happen (it prints a warning on stderr too); redo `capture on`

@@ -17,8 +17,8 @@ Decided in chunk C2 (`c2-core-model-neo4j-store`, D-003, confirmed as a project 
    (`interfaces/cli/bootstrap/`) wires the adapter into the consumer.
 4. No context imports another, and no import-linter exception is allowed.
 
-**Why.** Contexts can be built, tested and retired independently (strangler migration from
-Notes to Knowledge). The contract is the only shared language, so a change to it is visible,
+**Why.** Contexts can be built, tested and retired independently (the strangler migration from
+Notes to Knowledge is finished). The contract is the only shared language, so a change to it is visible,
 versioned and reviewable.
 
 **Recorded exception (A-10).** Naming a kernel package after its publisher
@@ -35,7 +35,7 @@ Interfaces -> infrastructure -> application -> domain, per context and in the sh
 Each layer may import only the layers to its right.
 
 **Enforced by.** The layers contracts "Shared kernel layers point inward", "Diagnostics layers
-point inward", "Notes layers point inward", "Knowledge layers point inward", "Retrieval layers
+point inward", "Knowledge layers point inward", "Retrieval layers
 point inward" and "Capture layers point inward".
 
 ## Nothing below the interface layer imports it

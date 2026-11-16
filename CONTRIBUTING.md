@@ -30,7 +30,7 @@ make check       # everything CI runs
 | `make test` | tests only |
 | `make format-fix` | apply ruff format and safe fixes |
 | `make run ARGS="doctor --json"` | run the CLI from the source tree |
-| `make sandbox` | create `.sandbox/` with its own vault, state and config |
+| `make sandbox` | create `.sandbox/` with its own state and config |
 
 The sandbox never touches your real config, vault, or Claude settings. Use it to try
 the hooks and curator by hand.
@@ -41,7 +41,7 @@ noesis uses DDD, CQRS and hexagonal architecture. The layer rules are enforced b
 import-linter (`make imports`) and `tests/architecture/test_layers.py`, so a violation
 fails CI.
 
-- Bounded contexts (`capture`, `notes`) never import each other; they share only
+- Bounded contexts (`capture`, `knowledge`, `retrieval`, `interop`) never import each other; they share only
   `shared_kernel/contracts/`.
 - Dependencies point inward: infrastructure -> application -> domain.
 - Application code does no I/O. Ports live in `application/ports/`, adapters in

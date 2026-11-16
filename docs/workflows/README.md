@@ -13,13 +13,10 @@ Legend used in every diagram:
 | Adapter | `bounded_context/<context>/infrastructure/` (files, git, `claude`, settings JSON) |
 
 1. [Every command: the common path](common-path.md)
-2. [The whole pipeline: from a commit to a note](capture-pipeline.md)
+2. [The whole pipeline: from a commit to a record](capture-pipeline.md)
 3. [`capture on | off | status | runs`](capture.md)
 4. [`hook claude-code` (run by Claude Code, never by hand)](hook-claude-code.md)
-5. [`notes curate --brief-file F`](notes-curate.md)
-6. [`notes apply --decisions-file F`](notes-apply.md)
-7. [`notes retry | parked | search | list`](notes.md)
-8. [`notes recall TASK`](notes-recall.md)
-9. [`integrate claude-code install | uninstall | status`](integrate-claude-code.md)
-10. [`doctor`, `config`, `skills`](setup.md)
-11. [Running the knowledge store (Neo4j): compose, password, `store init`, backups](store.md)
+5. [`curate brief | apply | retry | parked`](curate.md)
+6. [`integrate claude-code install | uninstall | status`](integrate-claude-code.md)
+7. [`doctor`, `config`, `skills`](setup.md)
+8. [Running the knowledge store (Neo4j): compose, password, `store init`, backups](store.md)

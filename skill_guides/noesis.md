@@ -1,7 +1,7 @@
 # noesis: guide for agents
 
 noesis captures finished work from agent sessions, lets a curator decide what is worth
-keeping, and stores it as Markdown notes in the user's vault. This guide matches the
+keeping, and stores it as proposed records in the user's Neo4j knowledge store. This guide matches the
 installed noesis version. Use `noesis <command> --help` for anything not covered here.
 
 ## Rules
@@ -13,16 +13,17 @@ installed noesis version. Use `noesis <command> --help` for anything not covered
   `--session` or `--parent`, a missing `--session`, `--parent` equal to the session, running
   outside a git repository).
 - Never guess commands or flags. If something is not in this guide, run `--help`.
-- Never edit a note whose frontmatter says `origin: auto` by hand. To record a note yourself, use
-  `notes apply` (below); noesis picks the path. Read the notes freely. A note is identified by the
-  `noesis:` block in its frontmatter (id, scope, kind, origin), never by its folder.
-- Costly or settings-changing commands (`notes curate`, `notes apply`, `integrate … --yes`)
+- To record something yourself, use `record capture` or `curate apply` (below); records start
+  `proposed` and a person decides later. Never edit the store by other means.
+- Costly or settings-changing commands (`curate brief`, `curate apply`, `integrate … --yes`)
   only when the user asked for them. `--dry-run` on both shows the result without writing.
+- Recalling notes before a task (a briefing) is not available in this version; it returns with a
+  later release. Use `noesis search` meanwhile.
 
 ## Which env file
 
-The env file decides the state dir (where capture flags and the journal live), the vault
-and the capture thresholds. noesis picks it from the repository, so no flag is needed:
+The env file decides the state dir (where capture flags and the journal live), the store
+connection and the capture thresholds. noesis picks it from the repository, so no flag is needed:
 
 1. Look for `<repo>/.noesis-config` (the nearest one, up to the git root). It holds one line,
    `profile = <name>`. The profile file is
@@ -43,10 +44,10 @@ from the repository, so no flag appears.
 
 ## Capture this session's work
 
-Capture is off by default. When the user asks to record this session's work in the vault:
+Capture is off by default. When the user asks to record this session's work in the knowledge store:
 
 ```bash
-noesis [--env-file <path>] capture on --session <SESSION_ID> --json            # live: curate into the vault
+noesis [--env-file <path>] capture on --session <SESSION_ID> --json            # live: curate into the store
 noesis [--env-file <path>] capture on --session <SESSION_ID> --mode dry-run --json   # only store briefs
 noesis [--env-file <path>] capture status --session <SESSION_ID> --json        # on/off, pending commits
 noesis [--env-file <path>] capture runs --session <SESSION_ID> --json          # journal + curation results
@@ -90,14 +91,14 @@ capture command is that stored id; passing it back as `--session` is stable.
   (`INTERFACE_004_SELF_PARENT_SESSION`, exit 2); the harness' own id is never used as the parent.
 - After upgrading from a noesis that derived ids differently, run `capture on` again in each
   session you want captured; sessions switched on by the older version are not found under the
-  new ids (their old state and notes stay where they are).
+  new ids (their old state stays where it is).
 
 ### Worktrees
 
 Every worktree of a repository is one repository: commits made in a linked worktree are
 captured (even when the hook reports the main checkout as the working directory), the brief
-records the branch the commit was made on, and the notes go to the main repository's scope,
-`repo:<main repo folder name>`. If two worktrees committed within two minutes and the command
+records the branch the commit was made on, and the records go to the main repository's project,
+`<main repo folder name>`. If two worktrees committed within two minutes and the command
 does not say which one, noesis records neither and `capture runs` shows `ambiguous_worktree`:
 tell the user, and have them commit again.
 
@@ -110,8 +111,8 @@ After `capture on`, always verify before you report success:
    field; `status` reports `false` because it never generates one). If it is `true`, the id was
    invented, no hook can match it, and capture will not happen: say so, then run `capture on`
    again with the agent's own `--session`. Do not tell the user that capture is on.
-4. Tell the user which env file, state dir and vault were used. `capture on` and
-   `capture status` include them as `env_file`, `state_dir` and `vault_dir`.
+4. Tell the user which env file and state dir were used. `capture on` and
+   `capture status` include them as `env_file` and `state_dir`.
 
 Once on, nothing else is needed. After each `git commit` and at the end of each turn, the
 Claude Code hooks hand finished work to the curator in the background. A change counts
@@ -119,94 +120,34 @@ when the pending commits together reach the size thresholds (`config show`, run 
 same env file). If `capture runs` shows `handed_over` without a result yet, the curator is
 still running.
 
-## Look up what the vault already knows
+## Curate work into records
 
 ```bash
-noesis [--env-file <path>] notes search "<words>" --repo <repo> --json   # best match first
-noesis [--env-file <path>] notes list --repo <repo> --origin auto --json  # auto | manual
+noesis curate brief --brief-file brief.json --dry-run --json    # the curator judges; nothing written
+noesis curate apply --decisions-file draft.json --dry-run --json  # your own candidates; no curator
+cat draft.json | noesis curate apply --decisions-file - --session <SESSION_ID> --commit <SHA> --json
 ```
 
-Search scans the vault's Markdown files by default. With `NOESIS_SEARCH_BACKEND=vectra` it
-searches a vectra collection and, when vectra fails, the same command still exits 0 with file
-results and the message `vectra could not search, searched files instead` (in `--json`, as
-`result.notice`): tell the user, do not retry. The values `obsidian-mcp` (search) and `mcp`
-(writer) were removed; a configuration naming one fails with `CORE_006_REMOVED_BACKEND` and its
-`next_steps` say to use `filesystem`.
-
-Results carry each note's `path`. For the full text, read that file under the vault
-folder (`noesis [--env-file <path>] config show --json` -> `settings.notes.vault_dir`).
-
-## Recall notes before a task
-
-Run it once, when you start a task that touches code the vault may already cover (a bug, a
-design choice, an unfamiliar area). Do not run it for trivial edits.
-
-```bash
-noesis notes recall "<one sentence on the task>" --repo <repo> --json
-```
-
-It searches the notes, reads the best ones in full and has an agent write a briefing for the
-task. It takes up to about a minute and calls a model, so run it once.
-
-- Pass one sentence about the task, not a pasted prompt. A sentence with no usable keyword fails
-  with `NOTES_204_NO_RECALL_TERMS` (exit 1), a blank task with `INTERFACE_005_EMPTY_RECALL_TASK`
-  (exit 2).
-- Without `--repo` or `--scope` (`repo:<name>` or `topic:<name>`) the repository you are in is used; outside a git repository it
-  fails with `INTERFACE_002_NOT_IN_GIT_REPOSITORY`.
-- Read `result.synthesis`:
-  - `briefing`: use `result.briefing`. `constraints`, `decisions`, `gotchas` and `context` each
-    carry `sources` (note paths) that were read and checked. `inferences` are the agent's own
-    reasoning, not facts from the notes; `unsupported` are statements dropped for lacking a valid
-    citation; `not_covered` is what the notes do not say. `briefing.markdown` is the whole thing
-    as a document you can show the user.
-  - `no_evidence`: nothing in the vault matched. Say so and go on. Do not retry with other wording.
-  - `digest`: only with `--no-synthesis`; `entries` are pointers and snippets, no model ran.
-- Tell the user which notes you relied on (their `sources`) and keep inferences labelled as such.
-  Check `result.warnings` (notes unreadable, text cut, secrets masked) and `notice` (the search backend
-  failed and files were searched); mention them, do not retry.
-- `--limit` (1..20, default 5) is how many notes are read; `--budget-tokens` (default 1000, `0`
-  none) is the length asked of the briefing. `--no-synthesis` lists the best notes only, with no
-  model and no cost.
-- `NOTES_103_RECALL_AGENT_FAILED` (exit 1): the briefing could not be written (agent missing,
-  model rejected, timeout, unusable answer). `error.metadata.candidates` lists the notes that
-  would have been read; rerun with `--no-synthesis` or read them yourself. Do not report the
-  recall as done.
-
-## Record a note yourself
-
-When the user asks you to record something in the vault, write the draft and let noesis store
-it. No curator runs. Run it from inside the repository: the note goes to
-the path the vault's `noesis.yaml` layout gives (by default
-`repos/<repo folder name>/<kind folder>/<slug>.md`, with a `-2`, `-3` suffix instead of overwriting
-anything), and a manual note on the same topic is never touched (it is reported as skipped, `covered by <path>`).
-
-```bash
-noesis notes apply --decisions-file draft.json --dry-run --json     # preview: paths, created/updated/skipped
-noesis notes apply --decisions-file draft.json --json               # write
-cat draft.json | noesis notes apply --decisions-file - --session <SESSION_ID> --commit <SHA> --json
-```
-
-`--session` and `--commit` (repeatable) are optional provenance; without them the note simply
-has no `session` / `commits`. The file is:
+`curate brief` calls a model, so run it only when the user asks (the capture hooks run it by
+themselves). `curate apply` stores candidates you wrote, without the curator. Run it from inside
+the repository: records go to the project of its name. Everything lands `proposed`; capture never
+accepts. `--session` and `--commit` (repeatable) are provenance sources. The file is:
 
 ```json
-{"decisions": [{
-  "action": "create", "candidate": "TTL cache for logins", "reason": "non-obvious choice",
-  "kind": "decision", "slug": "use-ttl-cache", "title": "Use a TTL cache",
-  "sections": [{"heading": "Decision", "body": "Keep tokens in memory."}]
+{"candidates": [{
+  "kind": "knowledge", "key": "ttl-cache", "title": "Use a TTL cache",
+  "body": "Keep tokens in memory.", "subtype": "decision", "reason": "non-obvious choice"
 }]}
 ```
 
-`kind` is `decision`, `gotcha`, `run` or `glossary`; missing required sections are filled with
-`Not recorded`. Check `result.skipped` after every call. Outside a git repository the command
-fails with `INTERFACE_002_NOT_IN_GIT_REPOSITORY` (exit 2).
+Check `result.items`: each has an `ordinal`, an `outcome` (`recorded`, `proposed`, `revised`,
+`successor_proposed`, `skipped`) and the `record_id`. Running the same work again writes nothing
+new (`result.replayed`). Outside a git repository `apply` fails with
+`INTERFACE_002_NOT_IN_GIT_REPOSITORY` (exit 2).
 
-`apply` is strict: one malformed entry fails the whole call with `NOTES_203_APPLY_FAILED`
-(exit 1) and writes nothing. A storage failure fails the same way. Either way the payload you
-sent is kept, so nothing is lost: `error.metadata` has `rejected` (entry `index` and `reason`),
-`written` / `not_written` (storage), `ticket`, `record_path` and `payload_path`. Fix the entries
-and run `apply` again with `--decisions-file <payload_path>`. If the record itself cannot be
-kept, the payload is in `error.metadata.raw_payload`.
+`apply` is strict: one flawed entry fails the whole call with `KNOWLEDGE_243_CURATION_REJECTED`
+(exit 1) and writes nothing; the payload is kept, `error.metadata` lists each rejected entry.
+Fix the entries and run `apply` again.
 
 ## The record store (Neo4j)
 
@@ -381,29 +322,25 @@ noesis catalog scan [--runtime claude-code|codex]... --json
 ## Failed curations
 
 ```bash
-noesis [--env-file <path>] notes parked --json           # tickets of briefs whose curation failed
-noesis [--env-file <path>] notes retry <TICKET> --json   # retry one, in the foreground
+noesis [--env-file <path>] curate parked --json            # tickets whose curation failed (works with the store down)
+noesis [--env-file <path>] curate retry <TICKET> --json    # retry one, in the foreground
+noesis [--env-file <path>] curate retry --all --json       # list what it would retry; add --yes to run
 ```
 
-`notes curate --dry-run` runs the curator and shows what it would store, without writing and
-without parking. A brief is parked when the curator keeps failing and also when storing the notes fails (vault
-folder not writable): both are `NOTES_201_CURATION_FAILED` with a
-`ticket` in `error.metadata`. Follow its `next_steps`: fix the cause, then `notes retry
-<TICKET>`. A storage failure may carry `written` and `not_written` paths (some notes were stored
-before it failed); retry overwrites them all, so do not write notes by hand.
-
-## Where notes are stored
-
-`NOESIS_WRITER_BACKEND` selects the writer: `filesystem` (default; files under
-`NOESIS_VAULT_DIR`, which can be an NFS mount) or `vectra` (files, then synced into a vectra
-collection). Search follows `NOESIS_SEARCH_BACKEND` independently. The vault folder is required.
+`curate brief --dry-run` runs the curator and shows what it would store, without writing and
+without parking. A brief is parked when the curator keeps failing or the store cannot be written
+(`KNOWLEDGE_241_CURATION_FAILED`, `ticket` in `error.metadata`). Follow its `next_steps`: fix
+the cause (the curator `KNOWLEDGE_141`, Neo4j `INTEGRATION_103`, the related lookup
+`KNOWLEDGE_245`: run `noesis index sync` or set `NOESIS_CURATOR_RELATED_LOOKUP=off`), then
+`curate retry <TICKET>`. A retry resumes at the stage that failed and never writes a record twice.
+Old Notes tickets (`<state>/notes/parked`) are not read: drain them with the previous version.
 
 ## Setup and diagnosis
 
 ```bash
-noesis [--env-file <path>] doctor --json                       # vault, state dir, git, curator CLI, hooks, writer, search backend, graph_store (Neo4j reachable + schema steps; warn only without a password), update (warn only)
+noesis [--env-file <path>] doctor --json                       # state dir, git, curator CLI, hooks, graph_store (Neo4j reachable + schema steps; warn only without a password), update (warn only)
 noesis [--env-file <path>] config show --json                  # effective settings and their file
-noesis [--env-file <path>] config init --vault-dir <folder>    # create the env file (default ~/.config/noesis/.env)
+noesis [--env-file <path>] config init [--vault-dir <folder>] # create the env file (default ~/.config/noesis/.env); the vault is read only by `import run`
 noesis update check --json                             # behind / ahead / diverged / up_to_date / unknown vs origin; exit 0 always
 noesis integrate claude-code status --json             # hooks in the user settings file only
 noesis integrate claude-code install                   # preview; add --yes to write
@@ -414,19 +351,16 @@ noesis integrate claude-code install                   # preview; add --yes to w
 are not included. To inspect a project file, pass
 `integrate claude-code status --settings <repo>/.claude/settings.json`.
 
-Common error codes: `CORE_002_VAULT_NOT_CONFIGURED` (run `config init`),
+Common error codes: `CORE_002_VAULT_NOT_CONFIGURED` (`import run` needs `NOESIS_VAULT_DIR`; run `config init --vault-dir`),
 `INTERFACE_003_BLANK_SESSION_ID` (a blank `--session` or `--parent`; exit 2),
 `INTERFACE_004_SELF_PARENT_SESSION` (`--parent` is the session itself; exit 2),
-`INTERFACE_005_EMPTY_RECALL_TASK` (`notes recall` got a blank task; exit 2),
 `CAPTURE_001_INVALID_SESSION_ID` (a blank id that reached the domain, in practice a hook payload),
 `CAPTURE_202_SESSION_ID_MISSING` (no `--session` and none in the environment, exit 2; run
 `capture on` and pass back `result.session_id`),
 `CAPTURE_201_SESSION_NOT_FOUND` (`--parent` names a session that was never switched on),
-`NOTES_201_CURATION_FAILED` (curation or storage failed; see `notes parked`),
-`NOTES_203_APPLY_FAILED` (`notes apply` rejected an entry or could not store; the payload was kept),
-`INTERFACE_002_NOT_IN_GIT_REPOSITORY` (run `capture`, `notes apply` and `notes recall` from inside the repository),
-`NOTES_204_NO_RECALL_TERMS` (`notes recall` task has no usable keyword),
-`NOTES_103_RECALL_AGENT_FAILED` (`notes recall` could not write the briefing; `--no-synthesis` still works),
+`KNOWLEDGE_241_CURATION_FAILED` (curation failed and the ticket is parked; see `curate parked`),
+`KNOWLEDGE_243_CURATION_REJECTED` (`curate apply` rejected an entry; the payload was kept),
+`INTERFACE_002_NOT_IN_GIT_REPOSITORY` (run `capture` and `curate apply` from inside the repository),
 `INTEGRATION_101_AGENT_SETTINGS_INVALID` (the settings file is not valid JSON).
 
 ## Import a vault or a file into the record store

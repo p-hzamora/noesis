@@ -6,15 +6,12 @@ The vocabulary of the project. Use these terms in code, docs, and conversation.
 
 **Capture** (bounded context):
 Detecting units of finished work inside an agent session and deciding when they are ready
-to hand over. Knows sessions, commits, and transcripts; knows nothing about notes.
-
-**Notes** (bounded context):
-Owns a note from its creation through validation to storing it or not. Knows notes,
-curation, and storage; knows nothing about agent sessions.
+to hand over. Knows sessions, commits, and transcripts; knows nothing about records.
 
 **Knowledge** (bounded context):
-Owns records and their history: spaces, projects, sources, immutable revisions, and the Neo4j
-store that holds them. Knows records and ids; knows nothing about files, notes or agent sessions.
+Owns records and their history: spaces, projects, sources, immutable revisions, curation of work
+into records, and the Neo4j store that holds them. Knows records and ids; knows nothing about
+agent sessions.
 Distinct from the **Knowledge** record type below.
 
 **Capture session**:
@@ -23,7 +20,7 @@ handed over and how far the transcript has been read.
 
 **Repository id**:
 `<main folder name>-<8 hex>`, derived from the repository's common git directory. Every
-worktree of a repository shares it, and so do its notes (`repos/<main folder name>/`).
+worktree of a repository shares it, and so do its records (the project key is the folder name).
 
 **Child session**:
 A capture session started with `capture on --parent`, for a sub-agent. It has its own pending
@@ -31,7 +28,7 @@ commits and cursor, inherits the parent's mode, and is merged into the parent's 
 `capture runs --children`.
 
 **Work brief**:
-The compact, versioned description of finished work that Capture hands to Notes:
+The compact, versioned description of finished work that Capture hands to Knowledge:
 repository, commits, diff stat, session goal, and an excerpt of the conversation. Never a diff.
 
 **Hand-over**:
@@ -42,62 +39,31 @@ curator as a detached process; in dry-run mode it only stores the brief.
 The append-only per-session record of what Capture did (`noesis capture runs`).
 
 **Curator**:
-The LLM that judges a work brief against the admission rule and drafts note decisions
-(`ICurator.judge`). It never writes storage itself.
+The LLM that judges a work brief against the admission rule and drafts candidates
+(`ICurator.judge`). It never writes the store itself.
 
 **Curate**:
-The whole flow behind `noesis notes curate`: the curator judges, then apply stores what it
-admitted.
+The flow behind `noesis curate brief`: stage the submission, the curator judges, the plan is saved
+once, then the candidates are written as records step by step. A failure parks the ticket.
 
 **Apply**:
-Storing decisions as auto notes through the auto-curation policy, with no curator. It is the
-second half of curate, and `noesis notes apply` runs it alone for drafts a person or an agent
-wrote. A failed apply keeps its payload in the failure log.
+Storing candidates a person or an agent wrote, with no curator (`noesis curate apply`). Any flawed
+entry rejects the whole call and keeps the payload.
+
+**Ticket**:
+The local inbox entry of one submission; it records the stage reached, so `curate retry` resumes
+there. A parked ticket is one whose curation failed.
+
+**Ordinal**:
+A candidate's position in its plan, from 1. It never shifts, so idempotency keys stay stable.
 
 **Admission rule**:
 Keep decisions with rationale, non-obvious gotchas, run outcomes, and glossary terms;
 reject anything the repository already records.
 
-**Note**:
-One Markdown document whose `noesis:` frontmatter block (id, scope, kind, origin, sources,
-updated) is its identity; the folder it sits in means nothing. Kinds come from the manifest
-(`noesis.yaml`; defaults: decision, gotcha, howto, concept, run, glossary, drift, dependency).
-
-**Auto note**:
-A note written by noesis without a person in the loop. Carries `origin: auto`, is updated in
-place (same id) when the topic recurs, and never edits a manual note.
-
-**Recall**:
-Preparing for a task from the notes: search by keyword, read the best notes in full, and have the
-recall agent write a briefing. Read-only.
-
-**Recall agent**:
-The LLM that writes the briefing from notes noesis hands it (`IRecallAgent.brief`). It has no
-tools and no access to the vault. Its runtime (`NOESIS_RECALL_RUNTIME`, the program that runs it)
-and its model (`NOESIS_RECALL_MODEL`) are separate.
-
-**Briefing**:
-What recall returns: a summary plus constraints, decisions, gotchas, context, open questions,
-inferences and gaps, each statement citing the notes it rests on. Not the same as the agent's
-instructions (`recall_system.md`) and not a work brief.
-
 **Vault**:
-The folder that stores notes (`NOESIS_VAULT_DIR`). An Obsidian vault is one kind of vault.
-
-_Avoid_: "brain" as a structural term; "writer" for the curator (it does not write).
-
-**Migration plan**:
-A JSON file of entries `{old, new, action, scope?, kind?}` that `noesis vault migrate` applies:
-`note` adds or refreshes the `noesis:` block and moves the file, `move` relocates it byte for
-byte, `keep` leaves it. noesis knows nothing about the old layout; a one-off generator writes
-the plan.
-
-**Group**:
-A manifest entry (`groups:` in the vault's `noesis.yaml`) giving some repositories their own root,
-e.g. a gitignored `company/<org>`; scope stays `repo:<name>`, only the folder changes. Membership
-is decided by a remote glob (recommended: glob only, the file is pushed with the vault) or a
-`repos` list. `vault doctor` has no remotes, so it infers membership from the group root a
-repository's notes sit under (`{root}/repos/<name>/`).
+The folder of Markdown notes that `noesis import` reads (`NOESIS_VAULT_DIR`). noesis never
+writes to it.
 
 **Record**:
 Anything the knowledge store keeps under a ULID that is unique across all record types: a

@@ -50,7 +50,7 @@ To upgrade, run the installer again; it replaces the existing install. To uninst
 curl -LsSf https://raw.githubusercontent.com/p-hzamora/noesis/main/install.sh | sh -s -- --uninstall
 ```
 
-Uninstalling removes the command only. Your config (`~/.config/noesis/`) and your notes are
+Uninstalling removes the command only. Your config (`~/.config/noesis/`) and your records are
 kept.
 
 ### Manual install
@@ -69,7 +69,7 @@ source edits apply at once.
 ### Configure and check
 
 ```bash
-noesis config init --vault-dir ~/notes   # writes ~/.config/noesis/.env
+noesis config init                       # writes ~/.config/noesis/.env
 noesis doctor                            # checks folders, git, the curator CLI, hooks
 ```
 

@@ -1,7 +1,7 @@
 # `doctor`, `config`, `skills`
 
 These have no bounded-context handler (except `doctor`'s host-level one) and never write
-notes.
+records.
 
 ```mermaid
 flowchart LR
@@ -9,7 +9,7 @@ flowchart LR
     rd -->|installed hook events as plain values| hs[GetAgentHooksStatusHandler]
     rd --> dh[RunDiagnosticsHandler]
     dh --> probe[SystemEnvironmentProbeAdapter]
-    probe --> checks["env file, vault dir, state dir,<br/>curator binary, Claude Code hooks,<br/>writer, search backend"]
+    probe --> checks["env file, state dir,<br/>git, curator binary, Claude Code hooks,<br/>graph store"]
     dh --> upd["CheckForUpdateHandler → ICheckoutInspector (git)"]
     upd --> checks
     checks --> dr["DoctorResponse, exit 1 if any check fails"]
@@ -21,11 +21,10 @@ flowchart LR
     sg["skills get NAME"] --> guides
 ```
 
-The `writer` check (between `claude_code_hooks` and `search_backend`) reports the filesystem
-writer and makes no write; the `vault` check says whether files can land. The `vault` check
-fails on an unset vault only when a vault is required. The `search_backend` check reports
-`filesystem`. No check mentions Obsidian: the Obsidian MCP backends were removed, and a
-configuration that still names one fails before `doctor` runs, with `CORE_006_REMOVED_BACKEND`.
+`doctor` makes no write. The checks are the env file, state dir, `git`, the curator binary,
+the Claude Code hooks, the graph store (a warning when `NOESIS_NEO4J_PASSWORD` is unset) and
+`update`. A leftover variable of the removed Notes backends (writer, search, vectra, recall) in an old
+`.env` is ignored.
 
 The last check, `update`, compares the noesis checkout's git HEAD with origin's default
 branch (the same query as `noesis update check`, with a 3 s budget). It never fails the

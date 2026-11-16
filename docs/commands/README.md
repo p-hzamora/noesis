@@ -7,12 +7,11 @@ layer, see [workflows](../workflows/README.md); for the ideas behind the CLI, se
 | Group | Page |
 |---|---|
 | `capture on \| off \| status \| runs` | [capture.md](capture.md) |
-| `notes curate \| apply \| retry \| parked \| search \| recall \| list` | [notes.md](notes.md) |
+| `curate brief \| apply \| retry \| parked` | [curate.md](curate.md) |
 | `record capture \| revise \| get`, `store init` | [record.md](record.md) |
 | `search` | [search.md](search.md) |
 | `index sync \| rebuild \| status` | [index.md](index.md) |
 | `catalog register \| revise \| list \| show \| check \| scan` | [catalog.md](catalog.md) |
-| `vault doctor \| migrate` | [vault.md](vault.md) |
 | `hook claude-code`, `integrate claude-code install \| uninstall \| status` | [agent-integration.md](agent-integration.md) |
 | `doctor`, `config show \| init`, `skills list \| get`, `update check` | [setup.md](setup.md) |
 
@@ -24,10 +23,3 @@ layer, see [workflows](../workflows/README.md); for the ideas behind the CLI, se
 - Top-level `noesis --env-file <file>` overrides the configuration file (default: the
   repository's `.noesis-config` profile, else `~/.config/noesis/.env`). `--version` prints the version.
 - Exit codes: `0` ok, `1` the operation failed, `2` invalid command line.
-
-## Scopes
-
-A note belongs to one scope: `repo:<name>` or `topic:<name>`. Commands that filter by scope take
-`--scope repo:noesis` or `--scope topic:rust`; `--repo <name>` is a shortcut for `--scope repo:<name>`.
-Notes are found by their `noesis:` frontmatter, not by their folder; the kinds and the layout for
-new notes come from the manifest (`noesis.yaml`, see [notes.md](../workflows/notes.md)).

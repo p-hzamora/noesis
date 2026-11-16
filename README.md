@@ -1,12 +1,11 @@
 # noesis
 
-Capture finished agent work, curate what is worth keeping, and store it as notes.
+Capture finished agent work, curate what is worth keeping, and store it as knowledge records.
 
 noesis watches coding-agent sessions (Claude Code today) for units of finished work such as
 git commits. It asks an LLM curator which decisions, gotchas, and outcomes are worth
-remembering, and writes them as Markdown notes into a folder you choose: an Obsidian
-vault, a plain directory, or an NFS mount. Storage is an adapter, so the same flow works
-with any of them.
+remembering, and stores them as proposed records in a Neo4j knowledge store, with the commits
+and the session as sources. Capture never accepts a record; a person reviews them.
 
 > Status: early development. See `docs/architecture.md` for the design and
 > `CONTEXT.md` for the vocabulary.
@@ -15,7 +14,7 @@ with any of them.
 
 ```bash
 curl -LsSf https://raw.githubusercontent.com/p-hzamora/noesis/main/install.sh | sh
-noesis config init --vault-dir ~/brain  # writes ~/.config/noesis/.env
+noesis config init                       # writes ~/.config/noesis/.env
 noesis doctor                           # checks folders, git, the curator CLI, and whether this checkout is behind origin
 ```
 
@@ -55,12 +54,12 @@ noesis --help | --version
 noesis config show|init [--json]
 noesis doctor [--json]
 noesis update check [--json]                # is this checkout behind its origin? (exit 0 always)
-noesis notes curate --brief-file FILE [--dry-run]   # the curator judges a work brief, then store auto notes
-noesis notes apply --decisions-file FILE|- [--dry-run] # store note drafts you wrote, no curator
-noesis notes parked | retry TICKET      # failed curations
-noesis notes search TEXT [--repo R]     # find notes
-noesis notes recall TASK [--repo R] [--no-synthesis]  # briefing for a task, grounded in notes ([details](docs/workflows/notes-recall.md))
-noesis notes list [--repo R] [--origin manual|auto]
+noesis curate brief --brief-file FILE [--dry-run]   # the curator judges a work brief, then stores proposed records ([details](docs/commands/curate.md))
+noesis curate apply --decisions-file FILE|- [--dry-run] # store candidates you wrote, no curator
+noesis curate parked | retry TICKET|--all [--yes]  # failed curations
+noesis search TEXT [--project P]            # find records
+noesis record capture|revise|get ...        # write and read records of the knowledge store
+noesis import run | file ...                # import a notes vault as proposed records (reads NOESIS_VAULT_DIR)
 noesis capture on|off|status|runs [--session ID] [--mode live|dry-run] [--parent ID] [--children]
 noesis hook claude-code                     # stdin: Claude Code hook JSON (always exits 0)
 noesis integrate claude-code install|uninstall|status [--settings F] [--yes]
