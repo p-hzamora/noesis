@@ -1,4 +1,4 @@
-"""Live publisher: starts `noesis notes curate` as a detached process and returns at once.
+"""Live publisher: starts the consumer of the brief as a detached process and returns at once.
 
 The hook must never wait for a model run. The child lives in its own process session,
 writes its JSON result next to the brief, and is not killed when the hook exits.
@@ -7,7 +7,7 @@ writes its JSON result next to the brief, and is not killed when the hook exits.
 import os
 import shutil
 import subprocess
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 
 from noesis.bounded_context.capture.application.dtos import PublicationDto
@@ -21,18 +21,22 @@ RECURSION_GUARD: Mapping[str, str] = {"NOESIS_HOOK": "1"}
 
 
 class DetachedProcessWorkBriefPublisherAdapter(IWorkBriefPublisher):
-    """Writes the brief file, then spawns `<command> notes curate --brief-file <file> --json`."""
+    """Writes the brief file, then spawns the argv the composition root builds for that file.
+
+    Capture does not name the consumer's command: `argv_of` receives the brief file's path and
+    returns the whole argument vector of the detached child (D-012).
+    """
 
     def __init__(
         self,
         *,
         files: BriefFiles,
-        command: Sequence[str],
+        argv_of: Callable[[Path], Sequence[str]],
         environment: Mapping[str, str],
         clock: IClock,
     ) -> None:
         self._files: BriefFiles = files
-        self._command: tuple[str, ...] = tuple(command)
+        self._argv_of: Callable[[Path], Sequence[str]] = argv_of
         self._environment: Mapping[str, str] = environment
         self._clock: IClock = clock
 
@@ -41,7 +45,7 @@ class DetachedProcessWorkBriefPublisherAdapter(IWorkBriefPublisher):
         try:
             brief_file: Path = self._files.write(brief, now=self._clock.now())
             _spawn_detached(
-                [*self._command, "notes", "curate", "--brief-file", str(brief_file), "--json"],
+                list(self._argv_of(brief_file)),
                 environment={**self._environment, **RECURSION_GUARD},
                 stdout=BriefFiles.result_of(brief_file),
                 stderr=BriefFiles.log_of(brief_file),

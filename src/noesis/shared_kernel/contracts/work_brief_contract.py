@@ -1,6 +1,6 @@
-"""Work brief: what Capture hands to Notes about one unit of finished work.
+"""Work brief: what Capture hands to Knowledge about one unit of finished work.
 
-It crosses a process boundary as JSON (`noesis notes curate --brief-file`), so it is
+It crosses a process boundary as JSON (`noesis curate brief --brief-file`), so it is
 versioned. It deliberately carries no diff: only commit subjects, a capped diff stat, the
 session goal, and an excerpt of the conversation.
 """
@@ -38,7 +38,7 @@ class WorkBriefContract(FrozenObject):
         diff_stat: Capped `git show --stat` lines (names and counts only).
         goal: The session's first real prompt.
         session_excerpt: User prompts and assistant prose since the last hand-over.
-        session_label: Short, human-facing label of the session for note provenance. Optional:
+        session_label: Short, human-facing label of the session for record provenance. Optional:
             a brief without it (older Capture) falls back to the start of `session_id`.
     """
 
