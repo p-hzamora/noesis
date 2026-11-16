@@ -191,3 +191,23 @@ noesis integrate claude-code install|uninstall|status
 | `noesis config init` | `commands/config_commands.py`, `core/env_template.py` | `write_env_file` renders the template and writes the file; the command decides whether overwriting is allowed. |
 | `noesis skills get` | `commands/skills_commands.py`, `skill_guides/*.md` (repository root) | Version-matched agent guide packaged with the CLI. |
 | Skill stub | `skills/noesis/SKILL.md` | Installed with `npx skills add`; only resolves the CLI and loads the guide, so it never goes stale. |
+
+## Imported link sets
+
+Interop parses and resolves vault links before text normalisation, then uses its
+`IKnowledgeImporter` port and versioned Knowledge contracts for a second pass after records.
+Only the port and `knowledge_import_translator.py` import those contracts in interop.
+Knowledge owns `LinkSet`, its digest and invariants, the assess/replace handlers, the
+`link_sets` unit-of-work member and the additive `links` schema step. Only
+`Neo4jLinkSetRepositoryAdapter` writes imported edges; architecture tests enforce this.
+
+A replacement locks the unique `LinkSet.source_record_id` node before reading the stored
+version. Its ledger key includes that version and the new digest, so A → B → A writes three
+versions. Unchanged sets leave the ledger and change feed untouched. Relationship writes lock
+endpoint Knowledge nodes as well as the LinkSet: this is an accepted deviation from the
+one-aggregate-per-transaction rule, changes no endpoint properties, and orders edge diffs by
+target id to reduce contention. Store busy errors propagate; a rerun converges.
+
+C9 consolidation must explicitly carry or drop LinkSet bookkeeping nodes and outgoing and
+incoming imported edges when merging records. C8 must make the change-feed reader tolerant
+before introducing a link-change event kind; C3b introduces none.

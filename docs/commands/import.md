@@ -53,3 +53,35 @@ same file is `unchanged`; after an edit it is `revised` (still `proposed`) or a 
 | `CORE_001_INVALID_CONFIGURATION` | invalid `NOESIS_IMPORT_VAULT_KEY`, or a derived key that is invalid | 1 |
 | `KNOWLEDGE_204_STORE_NOT_INITIALISED`, `KNOWLEDGE_208_SPACE_NOT_FOUND`, `INTEGRATION_103..107` | store problems | 1 |
 | usage error | missing `<path>`, `--update` or `--strict` on `import file`, `--dry-run` on `import run` | 2 |
+
+## Links
+
+`import run` reads wiki links (`[[note]]`), embeds (`![[note]]`) and relative Markdown
+note links before normalising the body. Links in removed links-only sections still count;
+fenced and inline code, header properties and external URLs do not. Resolution uses scanned
+note paths, case-insensitive Unicode NFC matching, partial paths and same-folder preference
+for duplicated base names. Header aliases are not lookup keys. Relative paths cannot escape
+the vault.
+
+After the record pass, `--yes` stores resolved links as `LINKS_TO` or `EMBEDS` relationships,
+with origin `migrated`, occurrence counts and sorted distinct anchors (including `^` block
+anchors). Dangling, ambiguous, non-note, self and not-imported targets are counted without
+creating stub records. JSON adds `links` occurrence totals and `link_sets` outcomes; previews
+report `planned`, applies report `created`/`replaced`, and both include `unchanged`, `deferred`,
+`no_record` and `blocked`. Verbose rows include link counts, the link-set outcome and ambiguous
+targets with sorted candidate paths. Notes with no outgoing links and no stored set contribute
+no set outcome. Links-only skipped notes with outgoing links contribute `no_record`; their
+occurrences are shown on the row, excluded from the totals for imported source notes.
+
+Unchanged reruns backfill missing link sets, then write nothing. Updating a note replaces its
+whole set, removing old edges. Without `--update`, changed notes defer their outgoing sets but
+remain valid targets. A successor receives new outgoing links; incoming links keep pointing to
+the accepted record. Retracted and superseded records retain their edges. Link classifications
+never affect `--strict`; a refused link set is counted as `blocked` without changing `complete`.
+`import file` does not import links.
+
+Run `noesis store init` after upgrading to apply the `links` schema step. An apply checks for
+this step before writing records; a preview needs no link schema. Each source's link set is
+atomic, but the whole vault is not. A store failure stops the run. On `GraphStoreBusyError`
+(lock timeout or deadlock), rerun `noesis import run --yes` with the same options: the run
+converges. Link changes do not add change-feed entries or trigger text re-indexing.

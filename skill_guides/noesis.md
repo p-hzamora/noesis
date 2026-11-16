@@ -409,3 +409,14 @@ Next steps: a preview ends with the exact apply command; an apply with `changed_
 `noesis import run --yes --update`; with blocked notes, `noesis import run --verbose`. Accepting the
 migrated records in bulk (`noesis review accept --tag origin:migrated --all --yes`) exists only once
 the review commands (C4) are built; until then the records stay `proposed`.
+
+### Imported vault links
+
+`import run` previews wiki links, embeds and relative Markdown note links as well as records.
+Run `store init` after upgrading to install the `links` schema step before `import run --yes`.
+JSON includes `links` occurrence counts and `link_sets` outcomes; `--verbose` lists ambiguous
+targets and their candidate paths. Only resolved links to imported records become graph edges;
+no unresolved stub is stored. An unchanged apply backfills links without re-importing records.
+Changed notes defer outgoing edges unless `--update` is given; proposed successors own their
+outgoing edges while incoming links stay on the accepted record. Link classes do not block
+`--strict`. After a busy-store error, rerun the same import. `import file` has no link pass.

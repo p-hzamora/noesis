@@ -18,6 +18,10 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Added
 
+- Import vault wiki links, embeds and relative Markdown note links as versioned graph edge
+  sets, with preview counts, ambiguous-target diagnostics and unchanged-record backfill.
+  Run `noesis store init` to install the additive `links` schema step.
+
 - `noesis vault doctor` and `noesis vault migrate --plan <file> [--apply]`: restructure a vault
   to the manifest layout from a plan, crash-safe and idempotent, with wikilinks kept pointing at
   moved files.
