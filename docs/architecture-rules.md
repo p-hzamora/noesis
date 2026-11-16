@@ -17,8 +17,7 @@ Decided in chunk C2 (`c2-core-model-neo4j-store`, D-003, confirmed as a project 
    (`interfaces/cli/bootstrap/`) wires the adapter into the consumer.
 4. No context imports another, and no import-linter exception is allowed.
 
-**Why.** Contexts can be built, tested and retired independently (the strangler migration from
-Notes to Knowledge is finished). The contract is the only shared language, so a change to it is visible,
+**Why.** Contexts can be built, tested and retired independently. The contract is the only shared language, so a change to it is visible,
 versioned and reviewable.
 
 **Recorded exception (A-10).** Naming a kernel package after its publisher

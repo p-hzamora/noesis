@@ -2,7 +2,8 @@
 
 The `knowledge` context keeps records in a local Neo4j Community database
 ([ADR-0003](../adr/0003-knowledge-context-and-neo4j-record-store.md)). `noesis store init`,
-`noesis record ...` and the Neo4j check of `noesis doctor` need it; Notes and Capture do not.
+`noesis record ...`, `noesis curate brief`, `noesis curate apply` and the Neo4j check of
+`noesis doctor` need it; the Capture hooks do not.
 
 ## Start it
 
