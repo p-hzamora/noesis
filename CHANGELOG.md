@@ -18,6 +18,11 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Added
 
+- Rebuild `noesis recall` over Knowledge and Retrieval with revision citations, authority
+  labels, redacted model-free digests, isolated synthesis and observed catalog availability.
+- Discover live imported links and accepted supersession paths without transferring
+  endorsement; tolerate unknown change-feed kinds while preserving contiguous cursors.
+
 - Import vault wiki links, embeds and relative Markdown note links as versioned graph edge
   sets, with preview counts, ambiguous-target diagnostics and unchanged-record backfill.
   Run `noesis store init` to install the additive `links` schema step.

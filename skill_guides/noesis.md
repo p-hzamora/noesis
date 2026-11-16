@@ -420,3 +420,20 @@ no unresolved stub is stored. An unchanged apply backfills links without re-impo
 Changed notes defer outgoing edges unless `--update` is given; proposed successors own their
 outgoing edges while incoming links stay on the accepted record. Link classes do not block
 `--strict`. After a busy-store error, rerun the same import. `import file` has no link pass.
+
+## Recall before a task
+
+Use `noesis recall "task" --project KEY --no-synthesis --json` for a deterministic,
+model-free digest, or omit `--no-synthesis` for a grounded briefing. Lexical and live graph
+retrieval work without a semantic index. Scope defaults to the git repository plus space-wide
+records; unknown projects return space-wide records with a warning.
+
+Only authoritative Knowledge supports constraints or decisions. PROPOSED and SUPERSEDED
+records are unconfirmed context. Use exact record/revision citations; omitted records cannot
+support claims. Source locators are provenance, never files to open for recall. Tools come
+from live scoped recommendations and only observed availability makes them usable; retain
+per-runtime reasons. Links discover records but never imply endorsement.
+
+Recall is read-only. Review suggestions for migrated proposals are suggestions for the user,
+not instructions to accept automatically. Store failures stop the command. A synthesis failure
+suggests rerunning with `--no-synthesis`. Run `noesis recall --help` for current options.
