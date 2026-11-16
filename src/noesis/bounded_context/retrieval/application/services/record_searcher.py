@@ -66,6 +66,7 @@ class _Fused:
     stale_hits: int
     discovery: dict[str, tuple[GraphNeighbourContract, ...]] = field(default_factory=dict)
     warnings: tuple[str, ...] = ()
+    baseline: frozenset[str] | None = None
 
 
 @dataclass(slots=True)
@@ -84,7 +85,10 @@ class RecordSearcher:
     scope, ranks by authority and retries once when the filters leave too few hits. Ordinary
     queries fuse lexical, graph and semantic lists with equal weight; an identifier-like query
     (Q-205) seeds the graph from lexical alone, keeps the lexical+graph order and appends
-    semantic-only records after it. `similar`
+    semantic-only records after it. Authority tiers then order the baseline, and separately the
+    appended records, so a semantic-only record never displaces an exact-identifier match
+    (measured F-5 tuning: tiering the union let accepted semantic neighbours push proposed exact
+    matches out of the top 10). `similar`
     runs the same collection and expansion for an anchor record. Neither writes.
     """
 
@@ -347,10 +351,9 @@ class RecordSearcher:
                 discovery=discovery,
                 warnings=warnings,
             )
+        baseline: list[str] = self._fusion.fuse(_non_empty(lists.lexical, lists.graph))
         order: list[str] = (
-            self._fusion.protect(
-                self._fusion.fuse(_non_empty(lists.lexical, lists.graph)), lists.semantic
-            )
+            self._fusion.protect(baseline, lists.semantic)
             if identifier
             else self._fusion.fuse(_non_empty(lists.lexical, lists.graph, lists.semantic))
         )
@@ -369,6 +372,7 @@ class RecordSearcher:
             stale_hits=stale,
             discovery=discovery,
             warnings=tuple(warnings),
+            baseline=frozenset(baseline) if identifier else None,
         )
 
     async def _graph_candidates(
@@ -452,7 +456,13 @@ class RecordSearcher:
             if tier is AuthorityTierEnum.RETRACTED and not asks_retracted:
                 continue
             tiered.append((record_id, tier))
-        return sorted(tiered, key=lambda item: self._authority.order_key(item[1]))  # stable
+        if fused.baseline is None:
+            return sorted(tiered, key=lambda item: self._authority.order_key(item[1]))  # stable
+        baseline: frozenset[str] = fused.baseline
+        return sorted(  # identifier query: the tiered baseline, then the tiered semantic-only
+            tiered,
+            key=lambda item: (item[0] not in baseline, self._authority.order_key(item[1])),
+        )
 
     def _result(
         self,
