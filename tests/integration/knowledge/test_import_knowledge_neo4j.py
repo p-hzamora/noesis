@@ -69,7 +69,10 @@ from noesis.bounded_context.knowledge.infrastructure.outbound.persistence import
     Neo4jImportCandidateReadRepositoryAdapter,
 )
 from noesis.exceptions import GraphStoreUnavailableError
-from noesis.interfaces.cli.bootstrap.knowledge_handlers_builder import registered_schema_step_names
+from noesis.interfaces.cli.bootstrap.knowledge_handlers_builder import (
+    EXTRA_SCHEMA_STEPS,
+    registered_schema_step_names,
+)
 from noesis.shared_kernel.contracts.knowledge import (
     ImportKnowledgeOutcomeContract,
     ImportKnowledgeRequestContract,
@@ -634,7 +637,8 @@ def _schema_listing(settings: Neo4jConnectionSettings) -> dict[str, list[dict[st
 
 
 async def _init_baseline_store(settings: Neo4jConnectionSettings) -> None:
-    baseline_env = make_neo4j_env(settings)
+    """`store init` with every step the other modules register (the composition without C3)."""
+    baseline_env = make_neo4j_env(settings, extra_steps=EXTRA_SCHEMA_STEPS)
     try:
         await baseline_env.initialise_store.handle(
             InitialiseStoreCommand(default_space_key=DEFAULT_SPACE_KEY)

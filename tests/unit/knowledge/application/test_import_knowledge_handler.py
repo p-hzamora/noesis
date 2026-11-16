@@ -436,6 +436,9 @@ class _FailingAppendRepository(IKnowledgeRepository):
     async def append_revision(self, knowledge: Knowledge, revision: Revision) -> None:
         raise self._error
 
+    async def save(self, knowledge: Knowledge) -> None:
+        await self._inner.save(knowledge)
+
 
 def _failing_append(env: KnowledgeEnv, error: Exception) -> Callable[[], FakeKnowledgeUnitOfWork]:
     class _Uow(FakeKnowledgeUnitOfWork):

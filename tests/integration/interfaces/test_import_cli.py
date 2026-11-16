@@ -1000,3 +1000,105 @@ def test_a_closed_note_without_a_ulid_is_found_by_locator_and_never_duplicated(
         "target_closed",
     )
     assert knowledge_count(neo4j_settings) == 7
+
+
+def supersedes_about(env: dict[str, str], record_id: str) -> list[dict[str, Any]]:
+    """`assertion list --about <id> --role object --predicate supersedes`: the items."""
+    listed = run_noesis(
+        [
+            "assertion",
+            "list",
+            "--about",
+            record_id,
+            "--role",
+            "object",
+            "--predicate",
+            "supersedes",
+        ],
+        env,
+    )
+    assert listed.code == 0, listed.stdout
+    return list(listed.result["assertions"])  # type: ignore[call-overload]
+
+
+def test_ac023b_accepted_note_gets_a_linked_successor(
+    ready: dict[str, str], vault: Folder, neo4j_settings: Neo4jConnectionSettings
+) -> None:
+    assert apply(ready).code == 0
+    with graph_session(neo4j_settings) as session:
+        seed_status(session, K5, "accepted")
+    vault.append(N5, "Also fast.\n")
+
+    linked = apply(ready, "--update")
+
+    assert linked.code == 0, linked.stdout
+    row = rows(linked)[N5]
+    assert row["outcome"] == "successor_proposed"
+    successor: str = row["record_id"]
+    assertion_id: str = row["assertion_id"]
+    assert successor not in (None, K5) and assertion_id is not None
+    assert row["target_record_id"] == K5
+    assert record(ready, successor)["status"] == "proposed"
+    assert (record(ready, K5)["status"], record(ready, K5)["head_revision"]) == ("accepted", 1)
+    [assertion] = supersedes_about(ready, K5)
+    assert (
+        assertion["id"],
+        assertion["status"],
+        assertion["subject"]["id"],
+        assertion["object"]["id"],
+    ) == (assertion_id, "proposed", successor, K5)
+
+    rerun = apply(ready, "--update")
+
+    assert (rows(rerun)[N5]["outcome"], rows(rerun)[N5]["record_id"]) == ("unchanged", successor)
+    assert len(supersedes_about(ready, K5)) == 1
+
+
+def test_ac026b_import_file_on_an_accepted_record_proposes_a_linked_successor(
+    tmp_path: Path, outside: Folder, neo4j_settings: Neo4jConnectionSettings
+) -> None:
+    env = child_env(tmp_path, neo4j_settings, None)
+    assert run_noesis(["store", "init"], env).code == 0
+    outside.write("design.md", DESIGN)
+    command = [
+        "import",
+        "file",
+        str(outside.root / "design.md"),
+        "--title",
+        "Design notes",
+        "--project",
+        "alpha",
+        "--tag",
+        "area:core",
+    ]
+    first = run_noesis(command, env)
+    assert first.code == 0, first.stdout
+    target_id = str(first.result["record_id"])
+    with graph_session(neo4j_settings) as session:
+        seed_status(session, target_id, "accepted")
+    outside.append("design.md", "More.\n")
+
+    second = run_noesis(command, env)
+
+    assert second.code == 0, second.stdout
+    assert second.result["outcome"] == "successor_proposed"
+    successor = str(second.result["record_id"])
+    assert successor != target_id and second.result["target_record_id"] == target_id
+    assertion_id = second.result["assertion_id"]
+    assert assertion_id is not None
+    [assertion] = supersedes_about(env, target_id)
+    assert (assertion["id"], assertion["subject"]["id"], assertion["status"]) == (
+        assertion_id,
+        successor,
+        "proposed",
+    )
+    assert assertion["applicability"]["project_key"] == "alpha"
+    assert record(env, target_id)["status"] == "accepted"
+    with graph_session(neo4j_settings) as session:
+        sources = session.run("MATCH (s:Source) RETURN count(s) AS c").single()
+    assert sources is not None and sources["c"] == 2  # one file_version per digest, none added
+
+    third = run_noesis(command, env)
+
+    assert (third.result["outcome"], third.result["record_id"]) == ("unchanged", successor)
+    assert len(supersedes_about(env, target_id)) == 1
