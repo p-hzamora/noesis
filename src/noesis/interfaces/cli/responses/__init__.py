@@ -38,6 +38,22 @@ from .catalog_response import (
 )
 from .config_init_response import ConfigInitResponse
 from .config_show_response import ConfigShowResponse
+from .consolidation_response import (
+    ConsolidationDecisionResponse,
+    ConsolidationDismissalResponse,
+    ConsolidationItemResponse,
+    ConsolidationListResponse,
+    ConsolidationMemberResponse,
+    ConsolidationProducedResponse,
+    ConsolidationProposeResponse,
+    ConsolidationScanResponse,
+    ConsolidationShowResponse,
+    ConsolidationStepResponse,
+    PlannedAssertionResponse,
+    ScanCandidateResponse,
+    ScanConflictResponse,
+    ScanGroupResponse,
+)
 from .curate_response import (
     CurateParkedItemResponse,
     CurateParkedResponse,
@@ -105,6 +121,20 @@ from .success_response import SuccessResponse
 from .update_check_response import UpdateCheckResponse
 
 __all__ = [
+    "ConsolidationDecisionResponse",
+    "ConsolidationDismissalResponse",
+    "ConsolidationItemResponse",
+    "ConsolidationListResponse",
+    "ConsolidationMemberResponse",
+    "ConsolidationProducedResponse",
+    "ConsolidationProposeResponse",
+    "ConsolidationScanResponse",
+    "ConsolidationShowResponse",
+    "ConsolidationStepResponse",
+    "PlannedAssertionResponse",
+    "ScanCandidateResponse",
+    "ScanConflictResponse",
+    "ScanGroupResponse",
     "CurateParkedItemResponse",
     "CurateParkedResponse",
     "CurateResponse",

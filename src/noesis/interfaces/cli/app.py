@@ -45,6 +45,7 @@ app.command("recall")(recall)
 app.add_typer(commands.catalog_app, name="catalog")
 app.add_typer(commands.import_app, name="import")
 app.add_typer(commands.curate_app, name="curate")
+app.add_typer(commands.consolidation_app, name="consolidation")
 app.command("doctor")(commands.doctor)
 
 

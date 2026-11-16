@@ -4,6 +4,7 @@ from .assertion_commands import assertion_app
 from .capture_commands import capture_app
 from .catalog_commands import catalog_app
 from .config_commands import config_app
+from .consolidation_commands import consolidation_app
 from .curate_commands import curate_app
 from .doctor_commands import doctor
 from .hook_commands import hook_app
@@ -22,6 +23,7 @@ __all__ = [
     "capture_app",
     "catalog_app",
     "config_app",
+    "consolidation_app",
     "curate_app",
     "doctor",
     "hook_app",

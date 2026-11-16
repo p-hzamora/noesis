@@ -14,6 +14,12 @@ from .capture_handlers_builder import (
     curate_brief_argv,
     curator_command,
 )
+from .consolidation_handlers_builder import (
+    ConsolidationHandlers,
+    build_consolidation,
+    open_consolidation,
+    with_consolidation,
+)
 from .curation_handlers_builder import (
     CURATION_FOLDER,
     CurationHandlers,
@@ -51,6 +57,7 @@ from .knowledge_handlers_builder import (
 __all__ = [
     "AgentHooksHandlers",
     "CaptureHandlers",
+    "ConsolidationHandlers",
     "CurationHandlers",
     "KnowledgeHandlers",
     "VaultImportHandlers",
@@ -62,6 +69,7 @@ __all__ = [
     "build_agent_hooks",
     "build_catalog_availability_adapter",
     "build_capture",
+    "build_consolidation",
     "build_claude_curator",
     "build_curation",
     "build_curation_inbox",
@@ -73,6 +81,7 @@ __all__ = [
     "curation_system_prompt",
     "curator_command",
     "installed_package_dir",
+    "open_consolidation",
     "open_curation",
     "open_file_import",
     "open_knowledge",
@@ -81,5 +90,6 @@ __all__ = [
     "related_lookup_mode",
     "run_diagnostics",
     "run_update_check",
+    "with_consolidation",
     "with_knowledge",
 ]

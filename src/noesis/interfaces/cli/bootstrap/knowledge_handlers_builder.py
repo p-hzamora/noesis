@@ -87,6 +87,7 @@ from noesis.bounded_context.knowledge.infrastructure.inbound.retrieval import (
 )
 from noesis.bounded_context.knowledge.infrastructure.outbound.persistence import (
     CATALOG_SCHEMA_STEP,
+    CONSOLIDATION_SCHEMA_STEP,
     CORE_SCHEMA_STEP,
     REVIEW_SCHEMA_STEP,
     KnowledgePersistence,
@@ -113,6 +114,7 @@ EXTRA_SCHEMA_STEPS: tuple[Neo4jSchemaStep, ...] = (
     *RETRIEVAL_SCHEMA_STEPS,
     CATALOG_SCHEMA_STEP,
     LINKS_SCHEMA_STEP,
+    CONSOLIDATION_SCHEMA_STEP,
 )
 """Schema steps other modules register after `core` (A-3); later chunks append here."""
 
