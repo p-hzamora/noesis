@@ -22,6 +22,22 @@ class GraphNeighbourContract(FrozenObject):
     contract_version: Literal[1] = 1
     record_id: str
     seed_id: str
-    relation: Literal["shared_source"] = "shared_source"
+    relation: Literal["shared_source", "links_to", "embeds"] = "shared_source"
     distance: int = 1
     shared_sources: int
+
+    direction: Literal["incoming", "outgoing"] | None = None
+    origin: str | None = None
+    anchors: tuple[str, ...] = ()
+    occurrence_count: int = 0
+    original_target_id: str | None = None
+    supersession_path: tuple[str, ...] = ()
+    warnings: tuple[str, ...] = ()
+
+
+class GraphNeighboursContract(FrozenObject):
+    """A bounded discovery batch with diagnostics independent of retained targets."""
+
+    contract_version: Literal[1] = 1
+    neighbours: tuple[GraphNeighbourContract, ...] = ()
+    warnings: tuple[str, ...] = ()

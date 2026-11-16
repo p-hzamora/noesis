@@ -7,7 +7,7 @@ from .catalog_availability_result_contract import (
     CatalogAvailabilityResultContract,
     CatalogAvailabilityRuntimeContract,
 )
-from .graph_neighbour_contract import GraphNeighbourContract
+from .graph_neighbour_contract import GraphNeighbourContract, GraphNeighboursContract
 from .import_knowledge_outcome_contract import ImportKnowledgeOutcomeContract
 from .import_knowledge_request_contract import (
     ImportActorContract,
@@ -32,6 +32,7 @@ __all__ = [
     "CatalogAvailabilityResultContract",
     "CatalogAvailabilityRuntimeContract",
     "GraphNeighbourContract",
+    "GraphNeighboursContract",
     "ImportActorContract",
     "ImportHeaderSourceContract",
     "ImportKnowledgeOutcomeContract",

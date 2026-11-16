@@ -3,6 +3,8 @@
 from datetime import datetime
 from typing import Literal
 
+from pydantic import Field
+
 from noesis.utils import FrozenObject
 
 
@@ -17,7 +19,7 @@ class RecordChangedContract(FrozenObject):
         space_id: Space the record lives in.
         record_id: The record that changed.
         record_type: Kind of the record.
-        change_kind: What happened; the closed set, with no link-set kind (wiki links are not data).
+        change_kind: What happened; an open, nonempty kind; unknown kinds retain their sequence.
         revision: Revision the change refers to; null for types without revisions.
         status: Status after the change; null for types without status.
     """
@@ -31,6 +33,6 @@ class RecordChangedContract(FrozenObject):
     record_type: Literal[
         "knowledge", "experience", "assertion", "source", "project", "catalog_entry"
     ]
-    change_kind: Literal["created", "revised", "status_changed"]
+    change_kind: str = Field(min_length=1, pattern=r"\S")
     revision: int | None = None
     status: str | None = None
