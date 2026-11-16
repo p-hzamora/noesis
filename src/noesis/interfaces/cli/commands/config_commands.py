@@ -29,11 +29,10 @@ def _view(environment: Environment) -> ConfigShowResponse:
         env_file_exists=environment.env_file.is_file(),
         settings={
             "runtime": environment.runtime.model_dump(mode="json"),
-            "notes": environment.notes.model_dump(mode="json"),
             "capture": environment.capture.model_dump(mode="json"),
             "curator": environment.curator.model_dump(mode="json"),
-            "recall": environment.recall.model_dump(mode="json"),
             "knowledge": environment.knowledge.model_dump(mode="json"),
+            "vault_import": environment.vault_import.model_dump(mode="json"),
         },
     )
 
@@ -49,7 +48,9 @@ def init(
     context: typer.Context,
     vault_dir: Annotated[
         Path | None,
-        typer.Option("--vault-dir", help="Folder that stores notes (writes NOESIS_VAULT_DIR)."),
+        typer.Option(
+            "--vault-dir", help="Vault folder read by `import run` (writes NOESIS_VAULT_DIR)."
+        ),
     ] = None,
     force: Annotated[bool, typer.Option("--force", help="Overwrite an existing file.")] = False,
     as_json: JsonOption = False,

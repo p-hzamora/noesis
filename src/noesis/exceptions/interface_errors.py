@@ -13,7 +13,7 @@ class InvalidWorkBriefError(InterfaceException):
 
 
 class NotInGitRepositoryError(InterfaceException):
-    """A command that stores notes for the current repository ran outside any git repository."""
+    """A command that stores records for the current repository ran outside any git repository."""
 
     __error_code__ = "INTERFACE_002_NOT_IN_GIT_REPOSITORY"
 
@@ -30,10 +30,8 @@ class SelfParentSessionError(InterfaceException):
     __error_code__ = "INTERFACE_004_SELF_PARENT_SESSION"
 
 
-class EmptyRecallTaskError(InterfaceException):
-    """`notes recall` got an empty or blank task."""
-
-    __error_code__ = "INTERFACE_005_EMPTY_RECALL_TASK"
+# INTERFACE_005 was the blank task of the retired recall command; the code stays reserved and
+# must never be reused.
 
 
 class UserPresenceRequiredError(InterfaceException):

@@ -7,12 +7,10 @@ from .base_settings import AppBaseSettings
 from .capture_settings import CaptureSettings
 from .claude_code_settings import ClaudeCodeSettings
 from .codex_settings import CodexSettings
-from .curator_settings import CuratorSettings
+from .curator_settings import CuratorRelatedLookupEnum, CuratorSettings
 from .import_settings import ImportSettings
 from .knowledge_settings import KnowledgeSettings
-from .notes_settings import NotesSettings
 from .paths import default_config_dir, default_env_file, default_state_dir
-from .recall_settings import RecallRuntimeEnum, RecallSettings
 from .retrieval_settings import RetrievalSettings
 from .runtime_settings import LogLevelEnum, RuntimeSettings
 from .session_identity_settings import SessionIdentitySettings
@@ -22,12 +20,10 @@ __all__ = [
     "CaptureSettings",
     "ClaudeCodeSettings",
     "CodexSettings",
+    "CuratorRelatedLookupEnum",
     "CuratorSettings",
     "ImportSettings",
     "KnowledgeSettings",
-    "NotesSettings",
-    "RecallRuntimeEnum",
-    "RecallSettings",
     "RetrievalSettings",
     "LogLevelEnum",
     "RuntimeSettings",

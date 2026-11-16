@@ -20,7 +20,6 @@ class CaptureStatusResponse(IRenderableResponse):
         parent_id: The session that started this one as a sub-agent, if any.
         env_file: The `.env` file this invocation read; hooks must read the same one.
         state_dir: Folder holding the capture flag and journal.
-        vault_dir: Vault the curator writes to, or None when unset.
         generated: Whether this call chose the session id itself because none was given or
             found (only `capture on` can); no hook can match such an id.
     """
@@ -38,7 +37,6 @@ class CaptureStatusResponse(IRenderableResponse):
     parent_id: str | None = None
     env_file: str | None = None
     state_dir: str | None = None
-    vault_dir: str | None = None
     generated: bool = False
 
     def render(self) -> str:
@@ -56,6 +54,5 @@ class CaptureStatusResponse(IRenderableResponse):
             f"pending: {pending}\n"
             f"last hand-over: {self.last_handover_at or 'never'}\n"
             f"env file: {self.env_file}\n"
-            f"state dir: {self.state_dir}\n"
-            f"vault: {self.vault_dir or 'not set'}"
+            f"state dir: {self.state_dir}"
         )

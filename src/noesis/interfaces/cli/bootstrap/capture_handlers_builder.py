@@ -94,6 +94,21 @@ def curator_command(environment: Environment) -> list[str]:
     return [sys.executable, "-m", "noesis", "--env-file", str(environment.env_file)]
 
 
+def curate_brief_argv(environment: Environment, brief_file: Path) -> list[str]:
+    """The whole argv of the detached child that curates `brief_file` (D-012).
+
+    Capture never names the consumer's command; this composition root does.
+    """
+    return [
+        *curator_command(environment),
+        "curate",
+        "brief",
+        "--brief-file",
+        str(brief_file),
+        "--json",
+    ]
+
+
 def build_capture(environment: Environment) -> CaptureHandlers:
     """Wire the Capture handlers for `environment`.
 
@@ -137,7 +152,7 @@ def build_capture(environment: Environment) -> CaptureHandlers:
         {
             CaptureModeEnum.LIVE: DetachedProcessWorkBriefPublisherAdapter(
                 files=files,
-                command=curator_command(environment),
+                argv_of=lambda brief_file: curate_brief_argv(environment, brief_file),
                 environment=dict(os.environ),
                 clock=clock,
             ),

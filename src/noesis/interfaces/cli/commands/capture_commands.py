@@ -80,12 +80,10 @@ def _status(
     environment: Environment, dto: CaptureStatusDto, *, generated: bool = False
 ) -> CaptureStatusResponse:
     """The status plus where it lives, so callers can match it against the hooks' config."""
-    vault: Path | None = environment.notes.vault_dir
     return CaptureStatusResponse.model_validate(dto).model_copy(
         update={
             "env_file": str(environment.env_file),
             "state_dir": str(environment.runtime.state_dir),
-            "vault_dir": str(vault) if vault is not None else None,
             "generated": generated,
         }
     )

@@ -1,4 +1,4 @@
-"""noesis: capture finished agent work, curate what is worth keeping, store it as notes."""
+"""noesis: capture finished agent work, curate what is worth keeping, store it as knowledge records."""
 
 from importlib.metadata import PackageNotFoundError, version
 

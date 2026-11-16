@@ -22,20 +22,18 @@ EPILOG: str = (
 
 app: typer.Typer = typer.Typer(
     name=PROGRAM,
-    help="Capture finished agent work, curate what is worth keeping, and store it as notes.",
+    help="Capture finished agent work, curate what is worth keeping, and store it as knowledge records.",
     epilog=EPILOG,
     no_args_is_help=True,
     add_completion=False,
     pretty_exceptions_enable=False,
 )
 app.add_typer(commands.capture_app, name="capture")
-app.add_typer(commands.notes_app, name="notes")
 app.add_typer(commands.hook_app, name="hook")
 app.add_typer(commands.integrate_app, name="integrate")
 app.add_typer(commands.skills_app, name="skills")
 app.add_typer(commands.config_app, name="config")
 app.add_typer(commands.update_app, name="update")
-app.add_typer(commands.vault_app, name="vault")
 app.add_typer(commands.record_app, name="record")
 app.add_typer(commands.store_app, name="store")
 app.add_typer(commands.assertion_app, name="assertion")
@@ -44,6 +42,7 @@ app.add_typer(commands.index_app, name="index")
 app.command("search")(commands.search)
 app.add_typer(commands.catalog_app, name="catalog")
 app.add_typer(commands.import_app, name="import")
+app.add_typer(commands.curate_app, name="curate")
 app.command("doctor")(commands.doctor)
 
 
@@ -65,7 +64,7 @@ def root(
         ),
     ] = False,
 ) -> None:
-    """Capture finished agent work, curate what is worth keeping, and store it as notes."""
+    """Capture finished agent work, curate what is worth keeping, and store it as knowledge records."""
     context.obj = CliState(env_file=env_file)
 
 

@@ -23,12 +23,10 @@ from .configurations import (
     CaptureSettings,
     ClaudeCodeSettings,
     CodexSettings,
+    CuratorRelatedLookupEnum,
     CuratorSettings,
     ImportSettings,
     KnowledgeSettings,
-    NotesSettings,
-    RecallRuntimeEnum,
-    RecallSettings,
     RetrievalSettings,
     RuntimeSettings,
     SessionIdentitySettings,
@@ -44,10 +42,8 @@ class Environment:
     Attributes:
         env_file: The `.env` file that was read (it may not exist).
         runtime: State folder and logging.
-        notes: Where notes are stored.
         capture: Capture thresholds.
         curator: Curator run settings.
-        recall: Recall agent settings (`notes recall` briefings).
         knowledge: Neo4j connection and active knowledge space (`record`, `store`).
         retrieval: Search and index settings (`search`, `index`).
         codex: Codex's home folder, from the process environment only (`catalog check`).
@@ -57,10 +53,8 @@ class Environment:
 
     env_file: Path
     runtime: RuntimeSettings
-    notes: NotesSettings
     capture: CaptureSettings
     curator: CuratorSettings
-    recall: RecallSettings
     knowledge: KnowledgeSettings
     retrieval: RetrievalSettings
     codex: CodexSettings
@@ -85,19 +79,15 @@ def load_environment(env_file: Path | None = None) -> Environment:
     path: Path = (env_file or default_env_file()).expanduser()
     problems: list[JsonValue] = []
     runtime: RuntimeSettings | None = _load(RuntimeSettings, path, problems)
-    notes: NotesSettings | None = _load(NotesSettings, path, problems)
     capture: CaptureSettings | None = _load(CaptureSettings, path, problems)
     curator: CuratorSettings | None = _load(CuratorSettings, path, problems)
-    recall: RecallSettings | None = _load(RecallSettings, path, problems)
     knowledge: KnowledgeSettings | None = _load(KnowledgeSettings, path, problems)
     retrieval: RetrievalSettings | None = _load(RetrievalSettings, path, problems)
     vault_import: ImportSettings | None = _load(ImportSettings, path, problems)
     if (
         runtime is None
-        or notes is None
         or capture is None
         or curator is None
-        or recall is None
         or knowledge is None
         or retrieval is None
         or vault_import is None
@@ -110,10 +100,8 @@ def load_environment(env_file: Path | None = None) -> Environment:
     return Environment(
         env_file=path,
         runtime=runtime,
-        notes=notes,
         capture=capture,
         curator=curator,
-        recall=recall,
         knowledge=knowledge,
         retrieval=retrieval,
         codex=CodexSettings(),
@@ -149,9 +137,9 @@ def _load[S: AppBaseSettings](
 __all__ = [
     "ClaudeCodeSettings",
     "CodexSettings",
+    "CuratorRelatedLookupEnum",
     "Environment",
     "KnowledgeSettings",
-    "RecallRuntimeEnum",
     "SessionIdentitySettings",
     "default_env_file",
     "default_state_dir",

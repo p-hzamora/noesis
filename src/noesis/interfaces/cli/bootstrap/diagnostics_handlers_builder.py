@@ -21,7 +21,6 @@ from noesis.exceptions import AgentSettingsInvalidError
 
 from .agent_hooks_handlers_builder import build_agent_hooks
 from .knowledge_handlers_builder import registered_schema_step_names
-from .notes_handlers_builder import needs_vault
 
 UPDATE_CHECK_TIMEOUT_SECONDS: float = (
     15.0  # `noesis update check`: the user asked, so wait for the network
@@ -93,15 +92,12 @@ async def run_diagnostics(
         installed_events = None
     query = RunDiagnosticsQuery(
         env_file=environment.env_file,
-        vault_dir=environment.notes.vault_dir,
         state_dir=environment.runtime.state_dir,
         curator_binary=environment.curator.claude_bin,
         hooks_settings_file=settings_file,
         installed_hook_events=installed_events,
-        vault_required=needs_vault(environment),
         update_package_dir=installed_package_dir(),
         graph_store_steps=registered_schema_step_names(),
         graph_store_configured=environment.knowledge.neo4j_password is not None,
-        search_backend=environment.notes.search_backend.value,
     )
     return await build_diagnostics(environment).handle(query)

@@ -21,33 +21,26 @@ class RunDiagnosticsQuery(FrozenObject):
 
     Attributes:
         env_file: The `.env` file in use (it may not exist).
-        vault_dir: Configured vault folder, or None when unset.
         state_dir: Folder for noesis state (it may not exist yet).
         curator_binary: Executable that runs the curator.
         hooks_settings_file: Agent settings file whose hooks were inspected.
         installed_hook_events: Events with a noesis hook, or None when the settings file
             could not be read.
-        vault_required: Whether something still uses local files; when False an unset vault
-            is not a failure.
         update_package_dir: Folder of the installed package, to check for an update; None
             skips the `update` check.
         graph_store_steps: Names of the schema steps the store should have applied, in order.
         graph_store_configured: Whether the store connection is configured (the password is
             set); when False the `graph_store` check is a warning, not a failure.
-        search_backend: Name of the configured search backend, echoed by the `search_backend` check.
     """
 
     env_file: Path
-    vault_dir: Path | None
     state_dir: Path
     curator_binary: str
     hooks_settings_file: Path
     installed_hook_events: tuple[str, ...] | None
-    vault_required: bool = True
     update_package_dir: Path | None = None
     graph_store_steps: tuple[str, ...] = ()
     graph_store_configured: bool = True
-    search_backend: str = "filesystem"
 
 
 class RunDiagnosticsHandler(IHandler[RunDiagnosticsQuery, DiagnosticReportDto]):
@@ -68,15 +61,12 @@ class RunDiagnosticsHandler(IHandler[RunDiagnosticsQuery, DiagnosticReportDto]):
         """The report; `ok` is False when any check failed."""
         checks: tuple[DiagnosticCheckDto, ...] = (
             self._check_config_file(action.env_file),
-            self._check_vault(action.vault_dir, required=action.vault_required),
             self._check_state_dir(action.state_dir),
             self._check_executable("git", "git", "needed to read commits"),
             self._check_executable(
                 "curator", action.curator_binary, "the Claude Code CLI runs the curator"
             ),
             self._check_agent_hooks(action.hooks_settings_file, action.installed_hook_events),
-            self._check_writer(action),
-            self._check_search_backend(action.search_backend),
             *await self._check_graph_store(action),
             *await self._check_update(action),
         )
@@ -87,8 +77,8 @@ class RunDiagnosticsHandler(IHandler[RunDiagnosticsQuery, DiagnosticReportDto]):
     ) -> tuple[DiagnosticCheckDto, ...]:
         """Reachable and initialised passes; unreachable, rejected or missing steps fail.
 
-        An unset password is a warning, not a failure: a person who only uses notes has no
-        store to check, and `record`/`store` name the missing variable when they run.
+        An unset password is a warning, not a failure: a person who has not set up the
+        store has nothing to check, and `record`/`store` name the missing variable when they run.
         """
         if not action.graph_store_configured:
             return (
@@ -173,27 +163,6 @@ class RunDiagnosticsHandler(IHandler[RunDiagnosticsQuery, DiagnosticReportDto]):
         state: str = "found" if self._probe.is_file(env_file) else "not created, defaults in use"
         return DiagnosticCheckDto(name="config_file", ok=True, detail=f"{env_file} ({state})")
 
-    def _check_vault(self, vault: Path | None, *, required: bool) -> DiagnosticCheckDto:
-        if vault is None and not required:
-            return DiagnosticCheckDto(
-                name="vault", ok=True, detail="not set (no local files are used)"
-            )
-        if vault is None:
-            return DiagnosticCheckDto(
-                name="vault",
-                ok=False,
-                detail="NOESIS_VAULT_DIR is not set",
-                next_step="Run `noesis config init --vault-dir <folder>`.",
-            )
-        if not self._probe.is_writable_folder(vault):
-            return DiagnosticCheckDto(
-                name="vault",
-                ok=False,
-                detail=f"{vault} is missing or not writable",
-                next_step=f"Create {vault} or point NOESIS_VAULT_DIR at a writable folder.",
-            )
-        return DiagnosticCheckDto(name="vault", ok=True, detail=str(vault))
-
     def _check_state_dir(self, state: Path) -> DiagnosticCheckDto:
         existing: Path = next(
             (folder for folder in (state, *state.parents) if self._probe.exists(folder)),
@@ -245,20 +214,3 @@ class RunDiagnosticsHandler(IHandler[RunDiagnosticsQuery, DiagnosticReportDto]):
             detail="not installed (capture from Claude Code is off)",
             next_step="Run `noesis integrate claude-code install` to enable capture.",
         )
-
-    @staticmethod
-    def _check_writer(action: RunDiagnosticsQuery) -> DiagnosticCheckDto:
-        """The writer stores files under the vault; the vault check says whether they can land."""
-        return DiagnosticCheckDto(
-            name="writer",
-            ok=True,
-            detail=(
-                f"filesystem (files under {action.vault_dir}; see the vault check)"
-                if action.vault_dir
-                else "filesystem (NOESIS_VAULT_DIR is not set; see the vault check)"
-            ),
-        )
-
-    @staticmethod
-    def _check_search_backend(backend: str) -> DiagnosticCheckDto:
-        return DiagnosticCheckDto(name="search_backend", ok=True, detail=backend)

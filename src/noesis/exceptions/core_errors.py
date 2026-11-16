@@ -10,7 +10,7 @@ class InvalidConfigurationError(CoreException):
 
 
 class VaultNotConfiguredError(CoreException):
-    """No vault folder is configured, so notes have nowhere to go."""
+    """No vault folder is configured, so the vault import has nothing to read."""
 
     __error_code__ = "CORE_002_VAULT_NOT_CONFIGURED"
 
@@ -31,9 +31,3 @@ class CuratorPromptUnreadableError(CoreException):
     """The configured curator system prompt file cannot be read."""
 
     __error_code__ = "CORE_005_CURATOR_PROMPT_UNREADABLE"
-
-
-class RemovedBackendError(CoreException):
-    """A setting names a storage or search backend that noesis no longer ships."""
-
-    __error_code__ = "CORE_006_REMOVED_BACKEND"
