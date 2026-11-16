@@ -26,6 +26,7 @@ ALL_STEPS = [
     "change_feed",
     "knowledge_fulltext",
     "retrieval_index",
+    "retrieval_semantic",
     "catalog",
     "links",
     "consolidation",

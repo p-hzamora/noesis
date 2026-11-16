@@ -44,6 +44,7 @@ ALL_STEPS: tuple[str, ...] = (
     "change_feed",
     "knowledge_fulltext",
     "retrieval_index",
+    "retrieval_semantic",
 )
 CORE_CONSTRAINTS: set[tuple[str, str]] = {
     ("Record", "id"),

@@ -17,6 +17,7 @@ from noesis.bounded_context.retrieval.application.dtos.record_search_dtos import
 )
 from noesis.bounded_context.retrieval.application.ports.indexing.i_index_cursor_store import (
     IIndexCursorStore,
+    ProjectionManifestDto,
 )
 from noesis.bounded_context.retrieval.application.ports.record_source.i_indexable_record_reader import (
     IIndexableRecordReader,
@@ -33,7 +34,9 @@ from noesis.bounded_context.retrieval.application.ports.record_source.i_record_s
 from noesis.bounded_context.retrieval.application.ports.record_source.i_record_text_search import (
     IRecordTextSearch,
 )
+from noesis.bounded_context.retrieval.application.services.projection_lock import lease_lost
 from noesis.bounded_context.retrieval.application.services.record_searcher import RecordSearcher
+from noesis.bounded_context.retrieval.domain.enums import BuildStateEnum
 from noesis.exceptions import RecordNotFoundError
 from noesis.shared_kernel.contracts.knowledge import (
     GraphNeighbourContract,
@@ -339,19 +342,43 @@ class FakeRecordChangeFeed(IRecordChangeFeed):
 
 
 class InMemoryIndexCursorStore(IIndexCursorStore):
-    """Cursors and compare-and-set locks with expiry by the injected clock."""
+    """Cursors, manifests and fenced leases with expiry by the injected clock.
+
+    A cursor set without a manifest reads as `complete` with no profile (a pre-manifest
+    cursor), as the Neo4j adapter does.
+    """
 
     def __init__(self, clock: MutableClock | None = None) -> None:
         self._clock: MutableClock = clock or MutableClock()
         self._cursors: dict[tuple[str, str], int] = {}
         self._locks: dict[tuple[str, str], tuple[str, datetime]] = {}
+        self._manifests: dict[tuple[str, str], ProjectionManifestDto] = {}
         self.acquire_calls: list[tuple[str, str, str]] = []
         self.advance_calls: list[tuple[str, str, int]] = []
         self.release_calls: list[tuple[str, str, str]] = []
+        self.renew_calls: list[tuple[str, str, str]] = []
+        self.fail_renewals: bool = False
 
     def set(self, projection: str, space_id: str, sequence: int) -> None:
         """Test setup: initialise or move a cursor without recording a call."""
         self._cursors[(projection, space_id)] = sequence
+
+    def set_manifest(
+        self,
+        projection: str,
+        space_id: str,
+        state: BuildStateEnum,
+        profile: dict[str, JsonValue] | None = None,
+    ) -> None:
+        """Test setup: the build manifest of a projection."""
+        self._manifests[(projection, space_id)] = ProjectionManifestDto(
+            state=state, profile=profile
+        )
+
+    def check_fence(self, projection: str, space_id: str, owner: str) -> None:
+        """Raise the fenced-write error unless `owner` holds the live lease."""
+        if self.lock_holder(projection, space_id) != owner:
+            raise lease_lost(projection, space_id)
 
     def lock_holder(self, projection: str, space_id: str) -> str | None:
         """Owner of a live lock, else None."""
@@ -369,10 +396,48 @@ class InMemoryIndexCursorStore(IIndexCursorStore):
         """The cursor, None when never initialised."""
         return self._cursors.get((projection, space_id))
 
-    async def advance(self, projection: str, space_id: str, sequence: int) -> None:
-        """Set the cursor."""
+    async def advance(
+        self, projection: str, space_id: str, sequence: int, *, owner: str | None = None
+    ) -> None:
+        """Set the cursor; fenced when `owner` is given."""
+        if owner is not None:
+            self.check_fence(projection, space_id, owner)
         self.advance_calls.append((projection, space_id, sequence))
         self._cursors[(projection, space_id)] = sequence
+
+    async def renew(self, projection: str, space_id: str, owner: str, ttl_seconds: int) -> bool:
+        """Extend only a live lease of `owner`."""
+        self.renew_calls.append((projection, space_id, owner))
+        if self.fail_renewals or self.lock_holder(projection, space_id) != owner:
+            return False
+        self.hold(projection, space_id, owner, ttl_seconds)
+        return True
+
+    async def manifest(self, projection: str, space_id: str) -> ProjectionManifestDto | None:
+        """The manifest; a bare cursor reads as complete."""
+        found: ProjectionManifestDto | None = self._manifests.get((projection, space_id))
+        if found is not None:
+            return found
+        if (projection, space_id) in self._cursors:
+            return ProjectionManifestDto(state=BuildStateEnum.COMPLETE)
+        return None
+
+    async def begin_rebuild(self, projection: str, space_id: str, *, owner: str) -> None:
+        """Mark rebuilding, fenced."""
+        self.check_fence(projection, space_id, owner)
+        self.set_manifest(projection, space_id, BuildStateEnum.REBUILDING)
+
+    async def complete_rebuild(
+        self,
+        projection: str,
+        space_id: str,
+        *,
+        owner: str,
+        profile: dict[str, JsonValue],
+    ) -> None:
+        """Publish the profile, fenced."""
+        self.check_fence(projection, space_id, owner)
+        self.set_manifest(projection, space_id, BuildStateEnum.COMPLETE, profile)
 
     async def acquire(self, projection: str, space_id: str, owner: str, ttl_seconds: int) -> bool:
         """Take the lock when free, expired, or already this owner's."""

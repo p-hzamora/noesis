@@ -494,6 +494,7 @@ async def test_ac014_core_only_store_rejects_register_until_store_init_adds_cata
                 "change_feed",
                 "knowledge_fulltext",
                 "retrieval_index",
+                "retrieval_semantic",
                 "catalog",
                 "links",
                 "consolidation",

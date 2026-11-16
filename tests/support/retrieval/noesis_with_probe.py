@@ -38,7 +38,7 @@ def main() -> None:
     delay_ms: int = int(os.environ.get(DELAY_VARIABLE, "0"))
 
     def probe_registry(
-        client: Neo4jClient, environment: Environment
+        client: Neo4jClient, environment: Environment, *, semantic_opt_in: bool = False
     ) -> retrieval_handlers_builder.RegisteredProjections:
         return retrieval_handlers_builder.RegisteredProjections(
             writers=(Neo4jProbeProjection(client, delay_ms=delay_ms),),

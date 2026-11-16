@@ -12,7 +12,7 @@ from noesis.shared_kernel.infrastructure.outbound.neo4j import Neo4jConnectionSe
 
 @pytest.fixture(autouse=True)
 def isolated_environment(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    """Point XDG and Claude Code folders at `tmp_path` and drop every NOESIS_* variable, for every test.
+    """Point XDG (config, state, cache) and Claude Code folders at `tmp_path` and drop every NOESIS_* variable, for every test.
 
     The user's `~/.config/noesis` profiles become unreachable and no `NOESIS_NEO4J_*` value
     survives, so no test can reach the user's own Neo4j (NFR-004, AC-015).
@@ -23,6 +23,8 @@ def isolated_environment(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Pat
     home: Path = tmp_path / "home"
     monkeypatch.setenv("XDG_CONFIG_HOME", str(home / ".config"))
     monkeypatch.setenv("XDG_STATE_HOME", str(home / ".local/state"))
+    monkeypatch.setenv("XDG_CACHE_HOME", str(home / ".cache"))  # model cache (C5b)
+    monkeypatch.delenv("XDG_RUNTIME_DIR", raising=False)  # embedder sockets fall back to the cache
     monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(home / ".claude"))
     drop_noesis_variables(monkeypatch)
     for name in (

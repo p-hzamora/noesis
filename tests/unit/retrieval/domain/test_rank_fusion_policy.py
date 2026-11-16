@@ -40,3 +40,13 @@ def test_every_record_appears_once() -> None:
 def test_no_rankings_fuse_to_nothing() -> None:
     assert fuse() == []
     assert fuse([], []) == []
+
+
+def test_protect_keeps_the_baseline_and_appends_only_new_records() -> None:
+    protected = RankFusionPolicy().protect(["a", "b", "c"], ["c", "x", "a", "y", "x"])
+
+    assert protected == ["a", "b", "c", "x", "y"]
+
+
+def test_protect_with_an_empty_baseline_is_the_extra_order() -> None:
+    assert RankFusionPolicy().protect([], ["x", "y"]) == ["x", "y"]

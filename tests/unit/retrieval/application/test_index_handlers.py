@@ -423,7 +423,9 @@ def test_duplicate_projection_kind_is_a_typed_configuration_error_at_start_up(
         writers=(InMemoryProbeProjection(), InMemoryProbeProjection()), candidate_sources=()
     )
     monkeypatch.setattr(
-        retrieval_handlers_builder, "registered_projections", lambda client, environment: registered
+        retrieval_handlers_builder,
+        "registered_projections",
+        lambda client, environment, **_: registered,
     )
     client = Neo4jClient(
         Neo4jConnectionSettings(

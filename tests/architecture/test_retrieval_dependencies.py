@@ -23,6 +23,10 @@ pytestmark = pytest.mark.architecture
 SRC: Path = Path(__file__).resolve().parents[2] / "src" / "noesis"
 RETRIEVAL: Path = SRC / "bounded_context" / "retrieval"
 FILE_READING_ATTRIBUTES: frozenset[str] = frozenset({"read_bytes", "read_text"})
+MODEL_CACHE_MODULES: frozenset[str] = frozenset(
+    {"bounded_context/retrieval/infrastructure/outbound/embedding/model_artifacts.py"}
+)
+"""C5b: the pinned model's cache manifest is the only file Retrieval reads; never record text."""
 
 
 def python_files(root: Path) -> list[Path]:
@@ -49,6 +53,8 @@ def test_no_file_reading() -> None:
     """AC-030: Retrieval reads no file; every body arrives through `IIndexableRecordReader`."""
     offenders: list[str] = []
     for path in python_files(RETRIEVAL):
+        if path.relative_to(SRC).as_posix() in MODEL_CACHE_MODULES:
+            continue
         for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
             if not isinstance(node, ast.Call):
                 continue
