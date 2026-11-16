@@ -5,7 +5,7 @@ commit first and the record on `:StoreMeta` second. Every statement is idempoten
 (`IF NOT EXISTS`), so a crash between the two is repaired by the next `store init`.
 """
 
-from collections.abc import Sequence
+from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass
 from typing import Any, Final, LiteralString
 
@@ -28,10 +28,14 @@ class Neo4jSchemaStep:
     Attributes:
         name: Stable name recorded once applied (`core`, ...).
         statements: Cypher schema statements, each idempotent (`IF NOT EXISTS`).
+        check: Runs after the statements commit and before the step is recorded; raises when
+            what exists does not match what the statements ask (an index created earlier with
+            other options), so the step stays unrecorded until repaired.
     """
 
     name: str
     statements: tuple[LiteralString, ...]
+    check: Callable[[Neo4jClient], Awaitable[None]] | None = None
 
 
 CORE_SCHEMA_STEP: Final[Neo4jSchemaStep] = Neo4jSchemaStep(
@@ -130,6 +134,8 @@ class Neo4jStoreSchemaAdapter(IStoreSchema):
             for statement in step.statements:
                 await schema.run(statement)
             await schema.commit()
+        if step.check is not None:
+            await step.check(self._client)
         async with await self._client.begin() as meta:
             recorded: list[dict[str, Any]] = await meta.run(
                 _RECORD, {"name": STORE_META_NAME, "step": name}
