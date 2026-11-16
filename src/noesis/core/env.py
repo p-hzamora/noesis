@@ -27,6 +27,7 @@ from .configurations import (
     NotesSettings,
     RecallRuntimeEnum,
     RecallSettings,
+    RetrievalSettings,
     RuntimeSettings,
     SessionIdentitySettings,
     default_env_file,
@@ -46,6 +47,7 @@ class Environment:
         curator: Curator run settings.
         recall: Recall agent settings (`notes recall` briefings).
         knowledge: Neo4j connection and active knowledge space (`record`, `store`).
+        retrieval: Search and index settings (`search`, `index`).
         identity: Session ids found in the process environment (never in the `.env` file).
     """
 
@@ -56,6 +58,7 @@ class Environment:
     curator: CuratorSettings
     recall: RecallSettings
     knowledge: KnowledgeSettings
+    retrieval: RetrievalSettings
     identity: SessionIdentitySettings
 
 
@@ -81,6 +84,7 @@ def load_environment(env_file: Path | None = None) -> Environment:
     curator: CuratorSettings | None = _load(CuratorSettings, path, problems)
     recall: RecallSettings | None = _load(RecallSettings, path, problems)
     knowledge: KnowledgeSettings | None = _load(KnowledgeSettings, path, problems)
+    retrieval: RetrievalSettings | None = _load(RetrievalSettings, path, problems)
     if (
         runtime is None
         or notes is None
@@ -88,6 +92,7 @@ def load_environment(env_file: Path | None = None) -> Environment:
         or curator is None
         or recall is None
         or knowledge is None
+        or retrieval is None
     ):
         raise InvalidConfigurationError(
             f"Invalid configuration in {path} or the environment.",
@@ -102,6 +107,7 @@ def load_environment(env_file: Path | None = None) -> Environment:
         curator=curator,
         recall=recall,
         knowledge=knowledge,
+        retrieval=retrieval,
         identity=SessionIdentitySettings(),
     )
 

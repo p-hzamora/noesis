@@ -78,8 +78,18 @@ from .notes_errors import (
     RecallAgentFailedError,
     UnknownNoteKindError,
 )
+from .retrieval_errors import (
+    IndexNotInitialisedError,
+    IndexRebuildRequiredError,
+    IndexSyncInProgressError,
+    SemanticIndexUnavailableError,
+)
 
 __all__ = [
+    "IndexNotInitialisedError",
+    "IndexRebuildRequiredError",
+    "IndexSyncInProgressError",
+    "SemanticIndexUnavailableError",
     "EntryAlreadyExistsError",
     "ExperienceWithoutSourceError",
     "IdempotencyKeyReusedError",

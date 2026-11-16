@@ -11,6 +11,7 @@ from .knowledge_settings import KnowledgeSettings
 from .notes_settings import NotesSettings
 from .paths import default_config_dir, default_env_file, default_state_dir
 from .recall_settings import RecallRuntimeEnum, RecallSettings
+from .retrieval_settings import RetrievalSettings
 from .runtime_settings import LogLevelEnum, RuntimeSettings
 from .session_identity_settings import SessionIdentitySettings
 
@@ -23,6 +24,7 @@ __all__ = [
     "NotesSettings",
     "RecallRuntimeEnum",
     "RecallSettings",
+    "RetrievalSettings",
     "LogLevelEnum",
     "RuntimeSettings",
     "SessionIdentitySettings",
