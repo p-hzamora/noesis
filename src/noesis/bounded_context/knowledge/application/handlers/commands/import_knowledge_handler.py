@@ -1,6 +1,9 @@
 """Import one note or file as graph-owned Knowledge: create, revise or propose a successor."""
 
-from noesis.bounded_context.knowledge.application.dtos import ImportKnowledgeResultDto
+from noesis.bounded_context.knowledge.application.dtos import (
+    ImportKnowledgeResultDto,
+    PendingRecordChange,
+)
 from noesis.bounded_context.knowledge.application.handlers.types import (
     KnowledgeUnitOfWorkFactory,
 )
@@ -43,6 +46,9 @@ from noesis.bounded_context.knowledge.application.services.inputs import (
     NewSourceInput,
     ProjectRef,
     SourceInput,
+)
+from noesis.bounded_context.knowledge.application.services.record_changes import (
+    pending_changes_from,
 )
 from noesis.bounded_context.knowledge.application.services.record_reference_resolver import (
     RecordReferenceResolver,
@@ -173,6 +179,12 @@ class ImportKnowledgeHandler(IHandler[ImportKnowledgeCommand, ImportKnowledgeRes
             content=prepared.content,
             now=now,
         )
+        changes: list[PendingRecordChange] = pending_changes_from(
+            knowledge.collect_events(),
+            record_type="knowledge",
+            status=knowledge.status.value,
+            occurred_at=now,
+        )
         linked: bool = decision.kind is ImportDecisionKindEnum.SUCCESSOR_LINKED
         extra: dict[str, JsonValue] = (
             {"target_record_id": target.id.value, "linked": linked} if target is not None else {}
@@ -191,6 +203,8 @@ class ImportKnowledgeHandler(IHandler[ImportKnowledgeCommand, ImportKnowledgeRes
             async with self._uow_factory() as uow:
                 await uow.knowledge.add(knowledge)
                 await uow.ledger.record(entry)
+                for change in changes:
+                    await uow.changes.append(change)
                 await uow.commit()
         except EntryAlreadyExistsError:
             winner: LedgerEntry | None = replay_of(
@@ -282,8 +296,16 @@ class ImportKnowledgeHandler(IHandler[ImportKnowledgeCommand, ImportKnowledgeRes
                     revision=revision.number,
                     recorded_at=now,
                 )
+                revised: list[PendingRecordChange] = pending_changes_from(
+                    knowledge.collect_events(),
+                    record_type="knowledge",
+                    status=knowledge.status.value,
+                    occurred_at=now,
+                )
                 await uow.knowledge.append_revision(knowledge, revision)
                 await uow.ledger.record(entry)
+                for change in revised:
+                    await uow.changes.append(change)
                 await uow.commit()
         except EntryAlreadyExistsError:
             winner: LedgerEntry | None = replay_of(
