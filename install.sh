@@ -75,7 +75,7 @@ uninstall() {
         [ -L "$NOESIS_BIN_DIR/noesis" ] && rm -f "$NOESIS_BIN_DIR/noesis"
         removed=1
     fi
-    [ "$removed" = 1 ] && say "noesis removed (config in ~/.config/noesis and your notes are kept)" \
+    [ "$removed" = 1 ] && say "noesis removed (config in ~/.config/noesis and your records are kept)" \
         || say "noesis is not installed"
 }
 
@@ -111,7 +111,7 @@ install() {
         say "installed, but 'noesis' is not on your PATH. Add this to your shell profile:"
         say "  export PATH=\"\$HOME/.local/bin:\$PATH\"   (or the bin dir your installer printed)"
     fi
-    say "next: noesis config init --vault-dir ~/notes && noesis doctor"
+    say "next: noesis config init && noesis doctor"
 }
 
 case "${1:-}" in

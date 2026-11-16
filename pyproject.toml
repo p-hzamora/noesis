@@ -1,7 +1,7 @@
 [project]
 name = "noesis"
 version = "0.1.1"
-description = "Capture finished agent work, curate what is worth keeping, and store it as notes."
+description = "Capture finished agent work, curate what is worth keeping, and store it as knowledge records."
 readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE"]
@@ -122,7 +122,6 @@ name = "Domain stays free of delivery and process frameworks"
 type = "forbidden"
 source_modules = [
     "noesis.shared_kernel.domain",
-    "noesis.bounded_context.notes.domain",
     "noesis.bounded_context.capture.domain",
     "noesis.bounded_context.knowledge.domain",
     "noesis.bounded_context.retrieval.domain",
@@ -141,15 +140,6 @@ name = "Diagnostics knows no bounded context and no settings"
 type = "forbidden"
 source_modules = ["noesis.diagnostics"]
 forbidden_modules = ["noesis.bounded_context", "noesis.core", "noesis.interfaces", "typer"]
-
-[[tool.importlinter.contracts]]
-name = "Notes layers point inward"
-type = "layers"
-layers = [
-    "noesis.bounded_context.notes.infrastructure",
-    "noesis.bounded_context.notes.application",
-    "noesis.bounded_context.notes.domain",
-]
 
 [[tool.importlinter.contracts]]
 name = "Bounded contexts never import the interfaces"
@@ -190,7 +180,6 @@ type = "independence"
 modules = [
     "noesis.bounded_context.capture",
     "noesis.bounded_context.knowledge",
-    "noesis.bounded_context.notes",
     "noesis.bounded_context.retrieval",
     "noesis.bounded_context.interop",
 ]
@@ -199,8 +188,6 @@ modules = [
 name = "Domain and application layers stay free of I/O libraries"
 type = "forbidden"
 source_modules = [
-    "noesis.bounded_context.notes.domain",
-    "noesis.bounded_context.notes.application",
     "noesis.bounded_context.capture.domain",
     "noesis.bounded_context.capture.application",
     "noesis.bounded_context.knowledge.domain",
@@ -219,8 +206,6 @@ type = "forbidden"
 source_modules = [
     "noesis.bounded_context.knowledge.domain",
     "noesis.bounded_context.knowledge.application",
-    "noesis.bounded_context.notes.domain",
-    "noesis.bounded_context.notes.application",
     "noesis.bounded_context.capture.domain",
     "noesis.bounded_context.capture.application",
     "noesis.bounded_context.retrieval.domain",

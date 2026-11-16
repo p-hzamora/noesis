@@ -56,7 +56,7 @@ sandbox: ## Create the sandbox git repo (.sandbox/, or FILE=/new/path): make san
 sandbox-hook: ## Simulate a Claude Code commit + Stop hook: make sandbox-hook MODE=live|dry-run
 	scripts/sandbox.sh hook $(MODE) $(if $(FILE),--file "$(FILE)")
 
-sandbox-curate: ## Run the real curator (haiku) on docs/examples/work-brief.json
+sandbox-curate: ## Dry-run `noesis curate brief` on docs/examples/work-brief.json
 	scripts/sandbox.sh curate $(if $(FILE),--file "$(FILE)")
 
 sandbox-env: ## Print the export line to point noesis at the sandbox (FILE=… as above)
