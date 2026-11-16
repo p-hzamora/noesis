@@ -9,6 +9,25 @@ from .capture_result_dto import CaptureResultDto
 from .catalog_entry_detail_dto import CatalogEntryDetailDto
 from .catalog_entry_dto import CatalogEntryDto
 from .catalog_write_result_dto import CatalogWriteResultDto
+from .consolidation_dtos import (
+    LINK_POLICY,
+    CandidateSnapshotDto,
+    CandidateSnapshotPageDto,
+    ConsolidationDecisionDto,
+    ConsolidationDetailDto,
+    ConsolidationDismissalDto,
+    ConsolidationDto,
+    ConsolidationMemberDto,
+    ConsolidationPageDto,
+    ConsolidationProposalDto,
+    ConsolidationScanDto,
+    ConsolidationStepDto,
+    OpenMembershipDto,
+    PlannedAssertionDto,
+    ProducedRecordDto,
+    ScanCandidateDto,
+    ScanGroupDto,
+)
 from .curation_dtos import (
     CurationItemDto,
     CurationResultDto,
@@ -62,6 +81,23 @@ from .unreadable_kind_dto import UnreadableKindDto
 from .version_drift_dto import VersionDriftDto
 
 __all__ = [
+    "LINK_POLICY",
+    "CandidateSnapshotDto",
+    "CandidateSnapshotPageDto",
+    "ConsolidationDecisionDto",
+    "ConsolidationDetailDto",
+    "ConsolidationDismissalDto",
+    "ConsolidationDto",
+    "ConsolidationMemberDto",
+    "ConsolidationPageDto",
+    "ConsolidationProposalDto",
+    "ConsolidationScanDto",
+    "ConsolidationStepDto",
+    "OpenMembershipDto",
+    "PlannedAssertionDto",
+    "ProducedRecordDto",
+    "ScanCandidateDto",
+    "ScanGroupDto",
     "AcceptResultDto",
     "AssertionDto",
     "AssertionEndpointDto",

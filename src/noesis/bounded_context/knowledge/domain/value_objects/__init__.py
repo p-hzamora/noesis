@@ -5,6 +5,13 @@ from .applicability import Applicability
 from .catalog_name import CatalogEntryName
 from .catalog_ref import CatalogRef
 from .catalog_revision import CatalogRevision
+from .consolidation_id import ConsolidationId
+from .consolidation_member import (
+    ConsolidationDismissal,
+    ConsolidationMember,
+    DismissedPair,
+    MemberCandidate,
+)
 from .content_hash import ContentHash
 from .curation_candidate import (
     DEFAULT_CURATION_SUBTYPES,
@@ -22,7 +29,11 @@ from .enums import (
     AssertionRoleEnum,
     AuthorityLabelEnum,
     CatalogEntryKindEnum,
+    ConsolidationKindEnum,
+    ConsolidationProgressEnum,
+    ConsolidationStateEnum,
     DecisionBasisEnum,
+    DismissalReasonKindEnum,
     ExperienceSubtypeEnum,
     OwnershipEnum,
     RecordStatusEnum,
@@ -87,6 +98,15 @@ __all__ = [
     "CatalogEntryName",
     "CatalogRef",
     "CatalogRevision",
+    "ConsolidationDismissal",
+    "ConsolidationId",
+    "ConsolidationKindEnum",
+    "ConsolidationMember",
+    "ConsolidationProgressEnum",
+    "ConsolidationStateEnum",
+    "DismissalReasonKindEnum",
+    "DismissedPair",
+    "MemberCandidate",
     "ContentHash",
     "DecisionBasisEnum",
     "ExperienceSubtypeEnum",

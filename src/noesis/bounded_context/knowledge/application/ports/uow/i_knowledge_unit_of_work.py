@@ -3,11 +3,15 @@
 import abc
 
 from noesis.bounded_context.knowledge.application.ports.changes import IRecordChangeLog
+from noesis.bounded_context.knowledge.application.ports.consolidation import (
+    IConsolidationGuardLookup,
+)
 from noesis.bounded_context.knowledge.application.ports.ledger import IIdempotencyLedger
 from noesis.bounded_context.knowledge.application.ports.references import IRecordReferenceLookup
 from noesis.bounded_context.knowledge.domain.repositories import (
     IAssertionRepository,
     ICatalogEntryRepository,
+    IConsolidationRepository,
     IExperienceRepository,
     IKnowledgeRepository,
     IKnowledgeSpaceRepository,
@@ -92,4 +96,16 @@ class IKnowledgeUnitOfWork(IUnitOfWork["IKnowledgeUnitOfWork"]):
     @abc.abstractmethod
     def link_sets(self) -> ILinkSetRepository:
         """Imported outgoing links; endpoint locks change no record properties."""
+        ...
+
+    @property
+    @abc.abstractmethod
+    def consolidations(self) -> IConsolidationRepository:
+        """Consolidations, the bookkeeping of overlapping Knowledge."""
+        ...
+
+    @property
+    @abc.abstractmethod
+    def consolidation_guard(self) -> IConsolidationGuardLookup:
+        """Open memberships, `distinct` dismissals and independent evidence."""
         ...

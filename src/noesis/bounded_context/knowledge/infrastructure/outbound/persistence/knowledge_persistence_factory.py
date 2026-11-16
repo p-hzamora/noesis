@@ -6,6 +6,9 @@ from dataclasses import dataclass
 from noesis.bounded_context.knowledge.application.handlers.types import (
     KnowledgeUnitOfWorkFactory,
 )
+from noesis.bounded_context.knowledge.application.ports.consolidation import (
+    IConsolidationReadRepository,
+)
 from noesis.bounded_context.knowledge.application.ports.ids import IRecordIdGenerator
 from noesis.bounded_context.knowledge.application.ports.read_repositories import (
     IAssertionReadRepository,
@@ -27,6 +30,7 @@ from .neo4j_assertion_read_adapter import Neo4jAssertionReadAdapter
 from .neo4j_catalog_entry_read_repository_adapter import (
     Neo4jCatalogEntryReadRepositoryAdapter,
 )
+from .neo4j_consolidation_read_adapter import Neo4jConsolidationReadAdapter
 from .neo4j_knowledge_unit_of_work_adapter import Neo4jKnowledgeUnitOfWorkAdapter
 from .neo4j_record_read_repository_adapter import Neo4jRecordReadRepositoryAdapter
 from .neo4j_review_decision_read_adapter import Neo4jReviewDecisionReadAdapter
@@ -49,6 +53,7 @@ class KnowledgePersistence:
         assertion_read_repository: Assertions as DTOs.
         review_state_read_repository: Derived review states and pending effects.
         review_decision_read_repository: The decision history of a record.
+        consolidation_read_repository: Consolidations and candidate snapshots.
     """
 
     uow_factory: KnowledgeUnitOfWorkFactory
@@ -60,6 +65,7 @@ class KnowledgePersistence:
     assertion_read_repository: IAssertionReadRepository
     review_state_read_repository: IReviewStateReadRepository
     review_decision_read_repository: IReviewDecisionReadRepository
+    consolidation_read_repository: IConsolidationReadRepository
 
 
 def build_knowledge_persistence(
@@ -89,4 +95,5 @@ def build_knowledge_persistence(
         assertion_read_repository=Neo4jAssertionReadAdapter(client),
         review_state_read_repository=Neo4jReviewStateReadAdapter(client),
         review_decision_read_repository=Neo4jReviewDecisionReadAdapter(client),
+        consolidation_read_repository=Neo4jConsolidationReadAdapter(client),
     )

@@ -217,3 +217,57 @@ class RelatedLookupUnavailableError(ApplicationException):
     """The related-record lookup is required and cannot answer."""
 
     __error_code__ = "KNOWLEDGE_245_RELATED_LOOKUP_UNAVAILABLE"
+
+
+class InvalidConsolidationError(DomainException):
+    """A consolidation request breaks an invariant (member count, duplicates, a malformed plan)."""
+
+    __error_code__ = "KNOWLEDGE_090_INVALID_CONSOLIDATION"
+
+
+class IneligibleConsolidationMemberError(DomainException):
+    """A record cannot be a consolidation member; the metadata names the member and the cause."""
+
+    __error_code__ = "KNOWLEDGE_091_INELIGIBLE_CONSOLIDATION_MEMBER"
+
+
+class ConsolidationClosedError(DomainException):
+    """The consolidation is dismissed, or acceptance already began, so the transition is closed."""
+
+    __error_code__ = "KNOWLEDGE_093_CONSOLIDATION_CLOSED"
+
+
+class SimilarityUnavailableError(InfrastructureException):
+    """The similarity lookup that feeds a consolidation scan cannot answer."""
+
+    __error_code__ = "KNOWLEDGE_190_SIMILARITY_UNAVAILABLE"
+
+
+class ConsolidationNotFoundError(ApplicationException):
+    """No consolidation has the requested id in the active space."""
+
+    __error_code__ = "KNOWLEDGE_290_CONSOLIDATION_NOT_FOUND"
+
+
+class ConsolidationMembershipConflictError(ApplicationException):
+    """A member already belongs to another open consolidation."""
+
+    __error_code__ = "KNOWLEDGE_291_CONSOLIDATION_MEMBERSHIP_CONFLICT"
+
+
+class DismissedConsolidationPairError(ApplicationException):
+    """Two members were judged distinct at these revisions and the dismissal still holds."""
+
+    __error_code__ = "KNOWLEDGE_292_DISMISSED_CONSOLIDATION_PAIR"
+
+
+class ConsolidationNotMaterialisedError(ApplicationException):
+    """The consolidation was opened but its proposals were never completed."""
+
+    __error_code__ = "KNOWLEDGE_294_CONSOLIDATION_NOT_MATERIALISED"
+
+
+class ConsolidationPartiallyAppliedError(ApplicationException):
+    """A consolidation step failed after earlier ones committed; the metadata lists every step."""
+
+    __error_code__ = "KNOWLEDGE_295_CONSOLIDATION_PARTIALLY_APPLIED"

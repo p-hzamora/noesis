@@ -4,12 +4,16 @@ from types import TracebackType
 from typing import Self
 
 from noesis.bounded_context.knowledge.application.ports.changes import IRecordChangeLog
+from noesis.bounded_context.knowledge.application.ports.consolidation import (
+    IConsolidationGuardLookup,
+)
 from noesis.bounded_context.knowledge.application.ports.ledger import IIdempotencyLedger
 from noesis.bounded_context.knowledge.application.ports.references import IRecordReferenceLookup
 from noesis.bounded_context.knowledge.application.ports.uow import IKnowledgeUnitOfWork
 from noesis.bounded_context.knowledge.domain.repositories import (
     IAssertionRepository,
     ICatalogEntryRepository,
+    IConsolidationRepository,
     IExperienceRepository,
     IKnowledgeRepository,
     IKnowledgeSpaceRepository,
@@ -24,6 +28,8 @@ from noesis.shared_kernel.infrastructure.outbound.neo4j import Neo4jClient, Neo4
 
 from .neo4j_assertion_repository_adapter import Neo4jAssertionRepositoryAdapter
 from .neo4j_catalog_entry_repository_adapter import Neo4jCatalogEntryRepositoryAdapter
+from .neo4j_consolidation_guard_lookup_adapter import Neo4jConsolidationGuardLookupAdapter
+from .neo4j_consolidation_repository_adapter import Neo4jConsolidationRepositoryAdapter
 from .neo4j_experience_repository_adapter import Neo4jExperienceRepositoryAdapter
 from .neo4j_idempotency_ledger_adapter import Neo4jIdempotencyLedgerAdapter
 from .neo4j_knowledge_repository_adapter import Neo4jKnowledgeRepositoryAdapter
@@ -68,6 +74,12 @@ class Neo4jKnowledgeUnitOfWorkAdapter(IKnowledgeUnitOfWork):
         )
         self._catalog_entries: Neo4jCatalogEntryRepositoryAdapter = (
             Neo4jCatalogEntryRepositoryAdapter(self._current, client)
+        )
+        self._consolidations: Neo4jConsolidationRepositoryAdapter = (
+            Neo4jConsolidationRepositoryAdapter(self._current, client)
+        )
+        self._consolidation_guard: Neo4jConsolidationGuardLookupAdapter = (
+            Neo4jConsolidationGuardLookupAdapter(self._current)
         )
 
     def _current(self) -> Neo4jTransaction:
@@ -134,6 +146,16 @@ class Neo4jKnowledgeUnitOfWorkAdapter(IKnowledgeUnitOfWork):
     def link_sets(self) -> ILinkSetRepository:
         """Imported outgoing links."""
         return self._link_sets
+
+    @property
+    def consolidations(self) -> IConsolidationRepository:
+        """Consolidations."""
+        return self._consolidations
+
+    @property
+    def consolidation_guard(self) -> IConsolidationGuardLookup:
+        """Open memberships, dismissed pairs and independent evidence."""
+        return self._consolidation_guard
 
     async def __aenter__(self) -> Self:
         """Begin the transaction; an unreachable store fails here (INTEGRATION_103)."""

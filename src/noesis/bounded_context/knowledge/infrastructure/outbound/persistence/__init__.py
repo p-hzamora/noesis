@@ -1,5 +1,6 @@
 """Neo4j persistence of the Knowledge context (labels, edges and keys per 30-record-store.md)."""
 
+from .consolidation_schema_step import CONSOLIDATION_SCHEMA_STEP
 from .knowledge_persistence_factory import KnowledgePersistence, build_knowledge_persistence
 from .neo4j_assertion_read_adapter import Neo4jAssertionReadAdapter
 from .neo4j_assertion_repository_adapter import Neo4jAssertionRepositoryAdapter
@@ -7,6 +8,9 @@ from .neo4j_catalog_entry_read_repository_adapter import (
     Neo4jCatalogEntryReadRepositoryAdapter,
 )
 from .neo4j_catalog_entry_repository_adapter import Neo4jCatalogEntryRepositoryAdapter
+from .neo4j_consolidation_guard_lookup_adapter import Neo4jConsolidationGuardLookupAdapter
+from .neo4j_consolidation_read_adapter import Neo4jConsolidationReadAdapter
+from .neo4j_consolidation_repository_adapter import Neo4jConsolidationRepositoryAdapter
 from .neo4j_experience_repository_adapter import Neo4jExperienceRepositoryAdapter
 from .neo4j_idempotency_ledger_adapter import Neo4jIdempotencyLedgerAdapter
 from .neo4j_import_candidate_read_repository_adapter import (
@@ -38,6 +42,7 @@ from .retrieval_schema_steps import (
 __all__ = [
     "CATALOG_SCHEMA_STEP",
     "CHANGE_FEED_SCHEMA_STEP",
+    "CONSOLIDATION_SCHEMA_STEP",
     "KNOWLEDGE_FULLTEXT_SCHEMA_STEP",
     "CORE_SCHEMA_STEP",
     "REVIEW_SCHEMA_STEP",
@@ -46,6 +51,9 @@ __all__ = [
     "Neo4jAssertionRepositoryAdapter",
     "Neo4jCatalogEntryReadRepositoryAdapter",
     "Neo4jCatalogEntryRepositoryAdapter",
+    "Neo4jConsolidationGuardLookupAdapter",
+    "Neo4jConsolidationReadAdapter",
+    "Neo4jConsolidationRepositoryAdapter",
     "Neo4jExperienceRepositoryAdapter",
     "Neo4jIdempotencyLedgerAdapter",
     "Neo4jImportCandidateReadRepositoryAdapter",

@@ -22,6 +22,10 @@ CATALOG_STEP: str = "catalog"
 """The step C6 registers: the uniqueness constraint on `CatalogEntry.catalog_key`."""
 
 
+CONSOLIDATION_STEP: str = "consolidation"
+"""C9: uniqueness of the consolidation id and of the membership keys."""
+
+
 async def require_steps(schema: IStoreSchema, *names: str) -> None:
     """Fail unless every named step is applied.
 

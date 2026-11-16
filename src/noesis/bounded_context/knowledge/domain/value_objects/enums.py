@@ -119,3 +119,35 @@ class AssertionRoleEnum(StrEnum):
     OBJECT = "object"
     EVIDENCE = "evidence"
     ANY = "any"
+
+
+class ConsolidationKindEnum(StrEnum):
+    """What a consolidation does; `graph_merge` is the only kind (a successor, never a file merge)."""
+
+    GRAPH_MERGE = "graph_merge"
+
+
+class ConsolidationStateEnum(StrEnum):
+    """Where a consolidation is: `acceptance_started` and `dismissed` are terminal."""
+
+    OPENED = "opened"
+    MATERIALISED = "materialised"
+    ACCEPTANCE_STARTED = "acceptance_started"
+    DISMISSED = "dismissed"
+
+
+class DismissalReasonKindEnum(StrEnum):
+    """Why a consolidation was dismissed; only `distinct` remembers the judged pairs."""
+
+    DISTINCT = "distinct"
+    POOR_DRAFT = "poor_draft"
+    OTHER = "other"
+
+
+class ConsolidationProgressEnum(StrEnum):
+    """How far the review of a consolidation's proposals got, derived from review state."""
+
+    PENDING = "pending"
+    PARTIALLY_APPLIED = "partially_applied"
+    APPLIED = "applied"
+    SUCCESSOR_RETRACTED = "successor_retracted"

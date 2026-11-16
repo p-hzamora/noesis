@@ -2,6 +2,7 @@
 
 from .i_assertion_repository import IAssertionRepository
 from .i_catalog_entry_repository import ICatalogEntryRepository
+from .i_consolidation_repository import IConsolidationRepository
 from .i_experience_repository import IExperienceRepository
 from .i_knowledge_repository import IKnowledgeRepository
 from .i_knowledge_space_repository import IKnowledgeSpaceRepository
@@ -11,6 +12,7 @@ from .i_source_repository import ISourceRepository
 __all__ = [
     "IAssertionRepository",
     "ICatalogEntryRepository",
+    "IConsolidationRepository",
     "IExperienceRepository",
     "IKnowledgeRepository",
     "IKnowledgeSpaceRepository",
