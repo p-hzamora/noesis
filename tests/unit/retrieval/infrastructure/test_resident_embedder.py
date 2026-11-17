@@ -15,6 +15,7 @@ from noesis.bounded_context.retrieval.infrastructure.inbound.embedder_runtime.un
     InferenceGate,
     SocketInUseError,
     UnixSocketEmbedderServer,
+    claim_socket_path,
 )
 from noesis.bounded_context.retrieval.infrastructure.outbound.embedding import (
     socket_text_embedder,
@@ -22,8 +23,11 @@ from noesis.bounded_context.retrieval.infrastructure.outbound.embedding import (
 from noesis.bounded_context.retrieval.infrastructure.outbound.embedding.embedder_protocol import (
     PROTOCOL_VERSION,
     ProtocolError,
+    fits_unix_socket,
     read_frame,
+    resolve_socket_path,
     runtime_directory,
+    short_runtime_directory,
     socket_path,
     write_frame,
 )
@@ -414,3 +418,43 @@ def test_the_socket_directory_of_another_user_is_refused(
 
     with pytest.raises(PermissionError):
         embedder_protocol.ensure_private_directory(tmp_path / "d")
+
+
+def test_a_symlinked_socket_directory_is_refused(short_dir: Path) -> None:
+    target = short_dir / "elsewhere"
+    target.mkdir(mode=0o700)
+    link = short_dir / "run"
+    link.symlink_to(target)
+
+    with pytest.raises(PermissionError, match="symbolic link"):
+        claim_socket_path(link / "e.sock")
+
+
+def test_claiming_removes_a_stale_socket_of_ours(short_dir: Path) -> None:
+    import socket as sockets
+
+    path = short_dir / "run" / "e.sock"
+    path.parent.mkdir(mode=0o700)
+    stale = sockets.socket(sockets.AF_UNIX, sockets.SOCK_STREAM)
+    stale.bind(str(path))
+    stale.close()  # bound, never listening: nobody answers
+
+    claim_socket_path(path)
+
+    assert not path.exists()
+
+
+def test_the_short_fallback_is_private_per_user() -> None:
+    assert short_runtime_directory(uid=4242).name == "noesis-4242"
+    assert fits_unix_socket(Path("/run/x.sock"))
+    assert not fits_unix_socket(Path("/" + "a" * 200))
+
+
+def test_a_deep_runtime_root_resolves_under_the_short_fallback(tmp_path: Path) -> None:
+    deep = tmp_path / ("d" * 120)
+
+    found = resolve_socket_path(deep, cache_root=tmp_path, profile_hash="p1")
+    preferred = resolve_socket_path(tmp_path, cache_root=tmp_path, profile_hash="p1")
+
+    assert found.parent == short_runtime_directory()
+    assert found.name == preferred.name  # same namespace, only the directory changes

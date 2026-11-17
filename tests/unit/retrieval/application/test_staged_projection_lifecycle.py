@@ -5,6 +5,7 @@ AC-204 (head change during embedding), AC-205 (cursor never passes a failed batc
 """
 
 import asyncio
+import logging
 
 import pytest
 from tests.support.retrieval.retrieval_fakes import SPACE, RetrievalWorld
@@ -34,7 +35,11 @@ from noesis.bounded_context.retrieval.application.services.projection_synchronis
     ProjectionSynchroniser,
 )
 from noesis.bounded_context.retrieval.domain.enums import BuildStateEnum
-from noesis.exceptions import IndexRebuildRequiredError, IndexSyncInProgressError
+from noesis.exceptions import (
+    GraphStoreUnavailableError,
+    IndexRebuildRequiredError,
+    IndexSyncInProgressError,
+)
 from noesis.shared_kernel.domain import JsonValue
 
 pytestmark = pytest.mark.unit
@@ -230,19 +235,62 @@ async def test_the_heartbeat_renews_and_reports_a_lost_lease() -> None:
     assert heartbeat.lost
 
 
-async def test_a_store_failure_during_renewal_counts_as_a_lost_lease() -> None:
+async def test_a_store_failure_during_renewal_counts_as_a_lost_lease(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
     world = RetrievalWorld()
 
     async def broken(*_: object) -> bool:
-        raise ConnectionError("store down")
+        raise GraphStoreUnavailableError("store down", {})
 
     world.cursors.renew = broken  # type: ignore[method-assign]
     heartbeat = LeaseHeartbeat(
         world.cursors, projection=STAGED_KIND, space_id=SPACE, owner=OWNER, ttl_seconds=3
     )
 
-    assert not await heartbeat.beat()
+    with caplog.at_level(logging.WARNING):
+        assert not await heartbeat.beat()
     assert heartbeat.lost
+    assert "GraphStoreUnavailableError" in caplog.text
+    assert "store down" not in caplog.text  # the error type only, never its message
+
+
+async def test_an_unexpected_renewal_error_marks_the_lease_lost_and_propagates() -> None:
+    world = RetrievalWorld()
+
+    async def buggy(*_: object) -> bool:
+        raise TypeError("a bug, not an outage")
+
+    world.cursors.renew = buggy  # type: ignore[method-assign]
+    heartbeat = LeaseHeartbeat(
+        world.cursors, projection=STAGED_KIND, space_id=SPACE, owner=OWNER, ttl_seconds=3
+    )
+
+    with pytest.raises(TypeError, match="a bug"):
+        await heartbeat.beat()
+    assert heartbeat.lost
+
+
+async def test_the_lock_surfaces_an_unexpected_renewal_error_after_releasing() -> None:
+    world = RetrievalWorld()
+
+    async def buggy(*_: object) -> bool:
+        raise TypeError("a bug, not an outage")
+
+    world.cursors.renew = buggy  # type: ignore[method-assign]
+
+    with pytest.raises(TypeError, match="a bug"):
+        async with projection_lock(
+            world.cursors,
+            projection=STAGED_KIND,
+            space_id=SPACE,
+            owner=OWNER,
+            wait_seconds=0,
+            ttl_seconds=1,
+        ) as heartbeat:
+            await asyncio.sleep(heartbeat.interval * 1.5)
+
+    assert world.cursors.lock_holder(STAGED_KIND, SPACE) is None
 
 
 async def test_the_lock_renews_in_the_background_without_blocking_the_block() -> None:
