@@ -71,6 +71,9 @@ Every command accepts `--json` (a `{"ok": ..., "result" | "error": ...}` envelop
 
 New to command-line tools? Read [`docs/cli-primer.md`](docs/cli-primer.md).
 
+For the Neo4j architecture, configuration reference and an end-to-end checklist, read the
+[refactor walkthrough](docs/guides/refactor-walkthrough.md).
+
 ## Playground
 
 ```bash
