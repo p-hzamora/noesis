@@ -25,7 +25,8 @@ class RetrievalSettings(AppBaseSettings):
             (`NOESIS_RETRIEVAL_MODEL_CACHE_DIR`; default `$XDG_CACHE_HOME/noesis/models`).
         retrieval_runtime_dir: Root of the embedder's socket directory
             (`NOESIS_RETRIEVAL_RUNTIME_DIR`; default `$XDG_RUNTIME_DIR`, else a private
-            directory under the model cache).
+            directory under the model cache; `/tmp/noesis-<uid>` when either would make the
+            socket path longer than the Unix limit).
         retrieval_embedder_threads: ONNX intra-op threads; null lets the runtime choose.
     """
 
