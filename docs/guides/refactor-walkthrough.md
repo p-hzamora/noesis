@@ -203,7 +203,7 @@ explicitly sets `NOESIS_VAULT_DIR=~/brain`, whereas the code default is unset.
 | `NOESIS_RETRIEVAL_BRIEFING_MAX_EVIDENCE_CHARS` | `24000` | Positive combined redacted title/body evidence budget. |
 | `NOESIS_RETRIEVAL_SEMANTIC_MODE` | `resident` | `resident`, `per-call`, or `off`. |
 | `NOESIS_RETRIEVAL_MODEL_CACHE_DIR` | `$XDG_CACHE_HOME/noesis/models`, else `~/.cache/noesis/models` | Verified model artifacts. |
-| `NOESIS_RETRIEVAL_RUNTIME_DIR` | absolute `$XDG_RUNTIME_DIR`, else unset | Socket root; when unset, a private directory under the model cache is used. |
+| `NOESIS_RETRIEVAL_RUNTIME_DIR` | absolute `$XDG_RUNTIME_DIR`, else unset | Socket root; when unset, a private directory under the model cache is used. A socket path over the Unix limit falls back to `/tmp/noesis-<uid>/`. |
 | `NOESIS_RETRIEVAL_EMBEDDER_THREADS` | unset | Positive ONNX intra-op thread count; unset lets runtime choose. |
 
 The following are **process-environment inputs**, not noesis `.env` settings:

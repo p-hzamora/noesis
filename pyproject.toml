@@ -16,7 +16,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# FastEmbed's CPU ONNX runtime stack for semantic search (D30); torch is never installed.
+# CPU ONNX runtime + tokenizers for semantic search (D30, D31: no FastEmbed package); never torch.
 semantic = [
     "numpy>=2.3,<3",
     "onnxruntime>=1.23,<2",

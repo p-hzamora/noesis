@@ -47,7 +47,8 @@ noesis index rebuild --yes                   # embeds every Knowledge head and E
   unavailable with a `prepare` next step, never a download or another model.
 - **Runtime.** `resident` mode uses the process started by `index embedder serve`: it loads the
   model once and answers on a private Unix socket under `$XDG_RUNTIME_DIR/noesis/` (mode 0700/0600;
-  no network listener, no store access, no text logging). Nothing ever starts it automatically.
+  when that path would exceed the Unix socket length limit, `/tmp/noesis-<uid>/` instead; `serve`
+  checks the socket before loading the model; no network listener, no store access, no text logging). Nothing ever starts it automatically.
   When it is not running, search silently continues lexical+graph (`semantic.state: unavailable`)
   and `--require-semantic` fails with `RETRIEVAL_101`. `per-call` mode loads the model inside the
   invoking process only for `search --semantic` (or `--require-semantic`) and for `index
