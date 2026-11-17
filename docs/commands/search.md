@@ -21,8 +21,9 @@ noesis search <query> [--project <key> | --all-projects] [--tag <tag>]...
   automatically; `--semantic` opts into loading the model in this process in `per-call` mode (a
   usage error, exit 2, in `off` mode). Queries that look like identifiers (backticks, `--flags`,
   paths, dotted names, snake_case, camelCase, UUIDs, `KEY-123`) keep the lexical+graph order and
-  only append semantic-only records; other queries fuse lexical, graph and semantic with equal
-  RRF weight. Authority tiers always come first. Semantic-only failures never fail a search;
+  only append semantic-only records (authority tiers order the lexical+graph hits, then the
+  appended ones, so an exact match is never pushed out by a semantic neighbour); other queries
+  fuse lexical, graph and semantic with equal RRF weight, then order by authority tier. Semantic-only failures never fail a search;
   store failures do.
 - Errors: `RETRIEVAL_101_SEMANTIC_INDEX_UNAVAILABLE`, `RETRIEVAL_202_INDEX_REBUILD_REQUIRED`,
   `INTEGRATION_103_GRAPH_STORE_UNAVAILABLE`. An empty query, `--limit` outside 1..50 and `--project`

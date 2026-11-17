@@ -217,7 +217,7 @@ noesis search <query> [--project <key> | --all-projects] [--tag <t>]... [--type 
   (no prepared model, embedder not running, or a rebuild in progress), `lagging` or `ready`.
   Semantic search is optional and English only; when it is missing, text and shared-source search
   still run. Identifier-like queries (backticks, `--flags`, paths, `a.b`, snake_case, camelCase,
-  UUIDs, `KEY-123`) keep the text order; semantic only appends records.
+  UUIDs, `KEY-123`) keep the text order; semantic only appends records after them.
 - Errors: `RETRIEVAL_101_SEMANTIC_INDEX_UNAVAILABLE` (`--require-semantic` while the state is `absent` or
   `unavailable`), `RETRIEVAL_202_INDEX_REBUILD_REQUIRED` (run `noesis index rebuild --yes`),
   `INTEGRATION_103_GRAPH_STORE_UNAVAILABLE` (Neo4j is down). An empty query, `--limit` outside 1..50, or
