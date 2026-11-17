@@ -2,10 +2,18 @@
 
 import asyncio
 import contextlib
+import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from typing import Final
 
-from noesis.exceptions import IndexSyncInProgressError
+from noesis.exceptions import (
+    GraphStoreAuthenticationFailedError,
+    GraphStoreBusyError,
+    GraphStoreQueryFailedError,
+    GraphStoreUnavailableError,
+    IndexSyncInProgressError,
+)
 
 from ..ports.indexing.i_index_cursor_store import IIndexCursorStore
 
@@ -13,12 +21,24 @@ DEFAULT_LOCK_TTL_SECONDS: int = 300
 MAX_HEARTBEAT_SECONDS: float = 30.0
 POLL_INTERVAL_SECONDS: float = 0.25
 
+STORE_FAILURES: Final[tuple[type[Exception], ...]] = (
+    GraphStoreUnavailableError,
+    GraphStoreBusyError,
+    GraphStoreAuthenticationFailedError,
+    GraphStoreQueryFailedError,
+)
+"""The typed store failures that end a lease's guarantees without ending the process."""
+
+_LOGGER: Final[logging.Logger] = logging.getLogger(__name__)
+
 
 class LeaseHeartbeat:
     """Renews a held lease every `interval` seconds until stopped or the lease is lost.
 
     Renewal never re-takes an expired lease: once a renewal fails, `lost` stays true and the
-    fenced writes of the holder fail in their own transactions.
+    fenced writes of the holder fail in their own transactions. A typed store failure counts
+    as a lost lease; any other error also marks the lease lost, then propagates (a bug, not an
+    outage).
     """
 
     def __init__(
@@ -39,13 +59,25 @@ class LeaseHeartbeat:
         self.lost: bool = False
 
     async def beat(self) -> bool:
-        """Renew once; False (and `lost`) when the lease is gone or the store failed."""
+        """Renew once; False (and `lost`) when the lease is gone or the store failed.
+
+        Raises:
+            Exception: Anything but a typed store failure, after marking the lease lost.
+        """
         try:
             renewed: bool = await self._cursors.renew(
                 self._projection, self._space_id, self._owner, self._ttl_seconds
             )
-        except Exception:  # a store failure ends the guarantees of the lease
+        except STORE_FAILURES as error:
+            _LOGGER.warning(
+                "%s lease renewal failed (%s); treating the lease as lost",
+                self._projection,
+                type(error).__name__,
+            )
             renewed = False
+        except Exception:
+            self.lost = True
+            raise
         if not renewed:
             self.lost = True
         return renewed
@@ -71,6 +103,8 @@ async def projection_lock(
 
     Raises:
         IndexSyncInProgressError: Another owner held the lock for the whole wait.
+        Exception: A renewal failed with something other than a typed store failure (the
+            lease is released first).
     """
     waited: float = 0.0
     while not await cursors.acquire(projection, space_id, owner, ttl_seconds):
@@ -90,9 +124,11 @@ async def projection_lock(
         yield heartbeat
     finally:
         task.cancel()
-        with contextlib.suppress(asyncio.CancelledError):
-            await task
-        await cursors.release(projection, space_id, owner)
+        try:
+            with contextlib.suppress(asyncio.CancelledError):
+                await task  # an unexpected renewal error surfaces here
+        finally:
+            await cursors.release(projection, space_id, owner)
 
 
 def lease_lost(projection: str, space_id: str) -> IndexSyncInProgressError:
