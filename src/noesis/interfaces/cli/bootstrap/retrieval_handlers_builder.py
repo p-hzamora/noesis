@@ -8,6 +8,7 @@ source only for explicit opt-ins; `off`, or the optional `semantic` extra not in
 registers nothing and search stays lexical+graph.
 """
 
+import asyncio
 import os
 import shutil
 import subprocess
@@ -68,7 +69,10 @@ from noesis.bounded_context.retrieval.application.handlers.queries.search_record
 from noesis.bounded_context.retrieval.application.ports.candidates.i_candidate_source import (
     ICandidateSource,
 )
-from noesis.bounded_context.retrieval.application.ports.embedding import ITextEmbedder
+from noesis.bounded_context.retrieval.application.ports.embedding import (
+    EmbedderUnavailableError,
+    ITextEmbedder,
+)
 from noesis.bounded_context.retrieval.application.ports.indexing.i_index_cursor_store import (
     IIndexCursorStore,
 )
@@ -77,17 +81,28 @@ from noesis.bounded_context.retrieval.application.services.briefing_redactor imp
 from noesis.bounded_context.retrieval.application.services.record_searcher import RecordSearcher
 from noesis.bounded_context.retrieval.domain.enums import SemanticModeEnum
 from noesis.bounded_context.retrieval.domain.value_objects import EmbeddingProfile
+from noesis.bounded_context.retrieval.infrastructure.inbound.embedder_runtime.unix_socket_embedder_server import (
+    SocketInUseError,
+    UnixSocketEmbedderServer,
+    claim_socket_path,
+)
 from noesis.bounded_context.retrieval.infrastructure.outbound.briefing.claude_cli_briefing_adapter import (
     ClaudeCliBriefingAdapter,
 )
 from noesis.bounded_context.retrieval.infrastructure.outbound.embedding.embedder_protocol import (
-    runtime_directory,
-    socket_path,
+    SocketPathTooLongError,
+    resolve_socket_path,
+)
+from noesis.bounded_context.retrieval.infrastructure.outbound.embedding.http_fetch import (
+    https_fetch,
 )
 from noesis.bounded_context.retrieval.infrastructure.outbound.embedding.model_artifacts import (
     ModelCache,
+    ModelCacheError,
+    PreparedModelDto,
 )
 from noesis.bounded_context.retrieval.infrastructure.outbound.embedding.semantic_runtime_probe import (
+    SETUP_NEXT_STEP,
     SemanticRuntimeProbe,
     semantic_dependency_installed,
 )
@@ -111,7 +126,11 @@ from noesis.bounded_context.retrieval.infrastructure.outbound.semantic.neo4j_vec
     check_semantic_vector_index,
 )
 from noesis.core import Environment
-from noesis.exceptions import InvalidConfigurationError, SpaceNotFoundError
+from noesis.exceptions import (
+    InvalidConfigurationError,
+    SemanticIndexUnavailableError,
+    SpaceNotFoundError,
+)
 from noesis.shared_kernel.application.ports.clock import IClock
 from noesis.shared_kernel.infrastructure.outbound.clock import SystemClockAdapter
 from noesis.shared_kernel.infrastructure.outbound.neo4j import Neo4jClient
@@ -165,14 +184,124 @@ def model_cache(environment: Environment) -> ModelCache:
 
 
 def embedder_socket(environment: Environment) -> Path:
-    """The resident embedder's socket for this cache and profile."""
+    """The resident embedder's socket for this cache and profile.
+
+    Under the runtime directory, or `/tmp/noesis-<uid>` when that path would exceed the Unix
+    socket length limit.
+
+    Raises:
+        InvalidConfigurationError: No candidate path fits the limit.
+    """
     cache: ModelCache = model_cache(environment)
     root: Path = environment.retrieval.retrieval_model_cache_dir
-    return socket_path(
-        runtime_directory(environment.retrieval.retrieval_runtime_dir, root),
-        cache_root=root,
-        profile_hash=cache.artifact.profile().fingerprint(),
+    try:
+        return resolve_socket_path(
+            environment.retrieval.retrieval_runtime_dir,
+            cache_root=root,
+            profile_hash=cache.artifact.profile().fingerprint(),
+        )
+    except SocketPathTooLongError as error:
+        raise InvalidConfigurationError(
+            f"The embedder socket path is too long: {error}.",
+            {"runtime_dir": str(environment.retrieval.retrieval_runtime_dir)},
+            next_steps=["Set NOESIS_RETRIEVAL_RUNTIME_DIR to a short directory you own."],
+        ) from error
+
+
+def prepare_semantic_model(environment: Environment) -> PreparedModelDto:
+    """Download (when missing), verify and cache the pinned model; the only download path.
+
+    Raises:
+        SemanticIndexUnavailableError: The download or verification failed.
+    """
+    cache: ModelCache = model_cache(environment)
+    try:
+        return cache.prepare(https_fetch)
+    except (ModelCacheError, OSError, ValueError) as error:
+        raise SemanticIndexUnavailableError(
+            f"The semantic model could not be prepared: {error}",
+            {"model": cache.artifact.model, "directory": str(cache.directory)},
+            next_steps=["Check the network and retry `noesis index model prepare`."],
+        ) from error
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class ResidentEmbedder:
+    """A loaded model ready to serve on its private socket.
+
+    Attributes:
+        server: The socket server (not listening yet).
+        socket: Where it will listen.
+        profile_hash: The profile it serves.
+    """
+
+    server: UnixSocketEmbedderServer
+    socket: Path
+    profile_hash: str
+
+
+def _cannot_listen(socket: Path, error: Exception) -> SemanticIndexUnavailableError:
+    return SemanticIndexUnavailableError(
+        f"The embedder cannot listen: {error}",
+        {"socket": str(socket)},
+        next_steps=["Stop the other embedder, or check the socket directory's owner."],
     )
+
+
+def build_resident_embedder(environment: Environment) -> ResidentEmbedder:
+    """Check the dependency and the socket path first (cheap), then load the model once.
+
+    Raises:
+        SemanticIndexUnavailableError: The optional extra is missing, another embedder listens
+            or the socket path belongs to another user, or the model is not prepared.
+        InvalidConfigurationError: No socket path fits the Unix socket length limit.
+    """
+    if not semantic_dependency_installed():
+        raise SemanticIndexUnavailableError(
+            "The optional semantic dependencies are not installed.",
+            {"extra": "semantic"},
+            next_steps=[SETUP_NEXT_STEP],
+        )
+    socket: Path = embedder_socket(environment)
+    try:
+        claim_socket_path(socket)
+    except (SocketInUseError, PermissionError) as error:
+        raise _cannot_listen(socket, error) from error
+    from noesis.bounded_context.retrieval.infrastructure.outbound.embedding.onnx_bge_engine import (
+        load_engine,
+    )
+
+    cache: ModelCache = model_cache(environment)
+    try:
+        engine = load_engine(cache, threads=environment.retrieval.retrieval_embedder_threads)
+    except EmbedderUnavailableError as error:
+        raise SemanticIndexUnavailableError(
+            f"The embedder cannot start: {error}",
+            {"directory": str(cache.directory)},
+            next_steps=["Run `noesis index model prepare`."],
+        ) from error
+    return ResidentEmbedder(
+        server=UnixSocketEmbedderServer(engine, socket),
+        socket=socket,
+        profile_hash=engine.profile.fingerprint(),
+    )
+
+
+async def serve_resident_embedder(
+    embedder: ResidentEmbedder, stop: asyncio.Event, on_listening: Callable[[Path], None]
+) -> None:
+    """Listen, call `on_listening`, serve until `stop` is set, then remove the socket.
+
+    Raises:
+        SemanticIndexUnavailableError: Another embedder took the socket meanwhile, or its
+            directory belongs to another user.
+    """
+    try:
+        await embedder.server.start()
+    except (SocketInUseError, PermissionError) as error:
+        raise _cannot_listen(embedder.socket, error) from error
+    on_listening(embedder.socket)
+    await embedder.server.serve_until(stop)
 
 
 def _embedder(environment: Environment, mode: SemanticModeEnum) -> ITextEmbedder:
@@ -461,13 +590,17 @@ __all__ = [
     "RETRIEVAL_SCHEMA_STEPS",
     "IndexSyncTrigger",
     "RegisteredProjections",
+    "ResidentEmbedder",
     "RetrievalHandlers",
+    "build_resident_embedder",
     "build_retrieval",
     "embedder_socket",
     "model_cache",
+    "prepare_semantic_model",
     "registered_projection_kinds",
     "registered_projections",
     "semantic_mode",
+    "serve_resident_embedder",
     "start_detached",
     "trigger_index_sync",
     "with_retrieval",

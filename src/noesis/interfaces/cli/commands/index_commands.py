@@ -27,27 +27,15 @@ from noesis.bounded_context.retrieval.application.handlers.commands.sync_index_h
 from noesis.bounded_context.retrieval.application.handlers.queries.get_index_status_handler import (
     GetIndexStatusQuery,
 )
-from noesis.bounded_context.retrieval.application.ports.embedding import EmbedderUnavailableError
-from noesis.bounded_context.retrieval.infrastructure.outbound.embedding.http_fetch import (
-    https_fetch,
-)
-from noesis.bounded_context.retrieval.infrastructure.outbound.embedding.model_artifacts import (
-    ModelCache,
-    ModelCacheError,
-    PreparedModelDto,
-)
-from noesis.bounded_context.retrieval.infrastructure.outbound.embedding.semantic_runtime_probe import (
-    SETUP_NEXT_STEP,
-    semantic_dependency_installed,
-)
 from noesis.core import Environment
-from noesis.exceptions import SemanticIndexUnavailableError
 from noesis.interfaces.cli import output
 from noesis.interfaces.cli.bootstrap.retrieval_handlers_builder import (
+    ResidentEmbedder,
     RetrievalHandlers,
-    embedder_socket,
-    model_cache,
+    build_resident_embedder,
+    prepare_semantic_model,
     registered_projection_kinds,
+    serve_resident_embedder,
     with_retrieval,
 )
 from noesis.interfaces.cli.options import JsonOption
@@ -161,47 +149,18 @@ def status(
 def prepare_model(context: typer.Context, as_json: JsonOption = False) -> None:
     """Download, verify and cache the pinned bge-small-en-v1.5 artifact (English only)."""
     env: Environment = cli_state(context).environment()
-    cache: ModelCache = model_cache(env)
-    try:
-        prepared: PreparedModelDto = cache.prepare(https_fetch)
-    except (ModelCacheError, OSError, ValueError) as error:
-        raise SemanticIndexUnavailableError(
-            f"The semantic model could not be prepared: {error}",
-            {"model": cache.artifact.model, "directory": str(cache.directory)},
-            next_steps=["Check the network and retry `noesis index model prepare`."],
-        ) from error
+    prepared = prepare_semantic_model(env)
     output.emit(ModelPrepareResponse.model_validate(prepared, from_attributes=True))
 
 
 @embedder_app.command("serve")
 def serve_embedder(context: typer.Context, as_json: JsonOption = False) -> None:
-    """Load the model once and serve embeddings on a private socket until interrupted."""
-    env: Environment = cli_state(context).environment()
-    if not semantic_dependency_installed():
-        raise SemanticIndexUnavailableError(
-            "The optional semantic dependencies are not installed.",
-            {"extra": "semantic"},
-            next_steps=[SETUP_NEXT_STEP],
-        )
-    from noesis.bounded_context.retrieval.infrastructure.inbound.embedder_runtime.unix_socket_embedder_server import (
-        SocketInUseError,
-        UnixSocketEmbedderServer,
-    )
-    from noesis.bounded_context.retrieval.infrastructure.outbound.embedding.onnx_bge_engine import (
-        load_engine,
-    )
+    """Load the model once and serve embeddings on a private socket until interrupted.
 
-    cache: ModelCache = model_cache(env)
-    socket = embedder_socket(env)
-    try:
-        engine = load_engine(cache, threads=env.retrieval.retrieval_embedder_threads)
-    except EmbedderUnavailableError as error:
-        raise SemanticIndexUnavailableError(
-            f"The embedder cannot start: {error}",
-            {"directory": str(cache.directory)},
-            next_steps=["Run `noesis index model prepare`."],
-        ) from error
-    server = UnixSocketEmbedderServer(engine, socket)
+    The socket path and its permissions are checked before the model is loaded.
+    """
+    env: Environment = cli_state(context).environment()
+    embedder: ResidentEmbedder = build_resident_embedder(env)
 
     async def run() -> None:
         stop = asyncio.Event()
@@ -209,18 +168,13 @@ def serve_embedder(context: typer.Context, as_json: JsonOption = False) -> None:
         for signum in (signal.SIGINT, signal.SIGTERM):
             with contextlib.suppress(NotImplementedError):
                 loop.add_signal_handler(signum, stop.set)
-        await server.start()
-        output.warn(f"embedder listening on {socket} (Ctrl-C to stop)")
-        await server.serve_until(stop)
+        await serve_resident_embedder(
+            embedder,
+            stop,
+            lambda socket: output.warn(f"embedder listening on {socket} (Ctrl-C to stop)"),
+        )
 
-    try:
-        asyncio.run(run())
-    except (SocketInUseError, PermissionError) as error:
-        raise SemanticIndexUnavailableError(
-            f"The embedder cannot listen: {error}",
-            {"socket": str(socket)},
-            next_steps=["Stop the other embedder, or check the socket directory's owner."],
-        ) from error
+    asyncio.run(run())
     output.emit(
-        EmbedderServeResponse(socket=str(socket), profile_hash=engine.profile.fingerprint())
+        EmbedderServeResponse(socket=str(embedder.socket), profile_hash=embedder.profile_hash)
     )

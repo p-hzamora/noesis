@@ -56,6 +56,36 @@ class SocketInUseError(Exception):
     """A live embedder already listens on the socket path."""
 
 
+def claim_socket_path(socket_path: Path) -> None:
+    """Make the socket's directory private, remove a stale socket we own, refuse a live one.
+
+    Cheap and model-free, so `serve` runs it before loading the model and `start` again
+    before listening.
+
+    Raises:
+        SocketInUseError: Another embedder answers on the path.
+        PermissionError: The path or its directory belongs to another user, or the path is
+            not a socket.
+    """
+    ensure_private_directory(socket_path.parent)
+    try:
+        info: os.stat_result = socket_path.lstat()
+    except FileNotFoundError:
+        return
+    if not stat.S_ISSOCK(info.st_mode) or info.st_uid != os.getuid():
+        raise PermissionError(f"{socket_path} is not a socket this user owns")
+    probe = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    try:
+        probe.settimeout(0.25)
+        probe.connect(str(socket_path))
+    except OSError:
+        socket_path.unlink()  # nobody answers: a stale socket of ours
+        return
+    finally:
+        probe.close()
+    raise SocketInUseError(f"an embedder already listens on {socket_path}")
+
+
 class InferenceGate:
     """One inference at a time; queries first; at most `max_waiting` callers waiting."""
 
@@ -133,8 +163,7 @@ class UnixSocketEmbedderServer:
             SocketInUseError: Another embedder answers on the path.
             PermissionError: The path or its directory belongs to another user.
         """
-        ensure_private_directory(self._socket_path.parent)
-        await self._remove_stale_socket()
+        claim_socket_path(self._socket_path)
         previous: int = os.umask(0o177)
         try:
             self._server = await asyncio.start_unix_server(self._serve, path=str(self._socket_path))
@@ -159,24 +188,6 @@ class UnixSocketEmbedderServer:
             self._server = None
         with contextlib.suppress(FileNotFoundError):
             self._socket_path.unlink()
-
-    async def _remove_stale_socket(self) -> None:
-        try:
-            info: os.stat_result = self._socket_path.lstat()
-        except FileNotFoundError:
-            return
-        if not stat.S_ISSOCK(info.st_mode) or info.st_uid != os.getuid():
-            raise PermissionError(f"{self._socket_path} is not a socket this user owns")
-        probe = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        try:
-            probe.settimeout(0.25)
-            probe.connect(str(self._socket_path))
-        except OSError:
-            self._socket_path.unlink()  # nobody answers: a stale socket of ours
-            return
-        finally:
-            probe.close()
-        raise SocketInUseError(f"an embedder already listens on {self._socket_path}")
 
     async def _serve(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
         try:
