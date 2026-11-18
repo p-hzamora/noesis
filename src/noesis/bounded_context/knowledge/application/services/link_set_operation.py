@@ -29,7 +29,8 @@ class LinkSetOperation:
         source = request.source_record_id
         origin: str = request.origin_tag.value.removeprefix("origin:")
         links = frozenset(request.links)
-        digest: LinkSetDigest = LinkSetDigest.of(links, origin)
+        relations = frozenset(request.relations)
+        digest: LinkSetDigest = LinkSetDigest.of(links, origin, relations)
         async with self._uow_factory() as uow:
             space = await uow.spaces.get_by_key(request.space_key)
             if space is None:
@@ -38,7 +39,12 @@ class LinkSetOperation:
                 await uow.link_sets.lock(source)
             stored: LinkSet | None = await uow.link_sets.get(source)
             references = await uow.record_references.describe(
-                [source, *(link.target_record_id for link in links)], space.id
+                [
+                    source,
+                    *(link.target_record_id for link in links),
+                    *(relation.target_record_id for relation in relations),
+                ],
+                space.id,
             )
             found = {
                 ref.record_id for ref in references if ref.record_type is RecordTypeEnum.KNOWLEDGE
@@ -50,7 +56,9 @@ class LinkSetOperation:
                     edges=0,
                     block_reason="record_not_found",
                 )
-            if any(link.target_record_id not in found for link in links):
+            if any(link.target_record_id not in found for link in links) or any(
+                relation.target_record_id not in found for relation in relations
+            ):
                 return LinkSetResultDto(
                     outcome="blocked",
                     source_record_id=source.value,
@@ -63,16 +71,18 @@ class LinkSetOperation:
                 origin=origin,
                 version=stored.version + 1 if stored else 1,
                 links=links,
+                relations=relations,
                 now=self._clock.now(),
             )
-            if (stored is not None and stored.digest == digest) or (stored is None and not links):
+            edges: int = len(links) + len(relations)
+            if (stored is not None and stored.digest == digest) or (stored is None and not edges):
                 return LinkSetResultDto(
-                    outcome="unchanged", source_record_id=source.value, edges=len(links)
+                    outcome="unchanged", source_record_id=source.value, edges=edges
                 )
             result = LinkSetResultDto(
                 outcome="replaced" if stored else "created",
                 source_record_id=source.value,
-                edges=len(links),
+                edges=edges,
             )
             if not apply:
                 return result
@@ -85,7 +95,16 @@ class LinkSetOperation:
                         sorted(
                             links, key=lambda link: (link.target_record_id.value, link.link_type)
                         )
-                    )
+                    ),
+                    "relations": tuple(
+                        sorted(
+                            relations,
+                            key=lambda relation: (
+                                relation.target_record_id.value,
+                                relation.relation.value,
+                            ),
+                        )
+                    ),
                 }
             )
             fingerprint: str = fingerprint_request("import_links", canonical)

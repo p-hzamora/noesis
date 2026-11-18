@@ -6,6 +6,7 @@ from datetime import datetime
 from noesis.bounded_context.knowledge.domain.value_objects import RecordId, SpaceId
 from noesis.bounded_context.knowledge.domain.value_objects.link_set_digest import LinkSetDigest
 from noesis.bounded_context.knowledge.domain.value_objects.record_link import RecordLink
+from noesis.bounded_context.knowledge.domain.value_objects.record_relation import RecordRelation
 from noesis.exceptions import InvalidRecordError
 from noesis.shared_kernel.domain.entities import AggregateRoot
 
@@ -25,9 +26,10 @@ class LinkSet(AggregateRoot["LinkSet"]):
     digest: LinkSetDigest
     links: frozenset[RecordLink]
     updated_at: datetime
+    relations: frozenset[RecordRelation] = frozenset()
 
     def __post_init__(self) -> None:
-        """Reject self links, duplicate target/kind pairs and invalid versions."""
+        """Reject self links or relations, duplicate target/kind pairs and invalid versions."""
         pairs: set[tuple[RecordId, str]] = {
             (link.target_record_id, link.link_type) for link in self.links
         }
@@ -37,7 +39,9 @@ class LinkSet(AggregateRoot["LinkSet"]):
             )
         if any(link.target_record_id == self.source_record_id for link in self.links):
             raise InvalidRecordError("A link set cannot link to its own source.")
-        if self.digest != LinkSetDigest.of(self.links, self.origin):
+        if any(relation.target_record_id == self.source_record_id for relation in self.relations):
+            raise InvalidRecordError("A link set cannot relate a record to itself.")
+        if self.digest != LinkSetDigest.of(self.links, self.origin, self.relations):
             raise InvalidRecordError("The link-set digest does not match its content.")
 
     @classmethod
@@ -50,6 +54,7 @@ class LinkSet(AggregateRoot["LinkSet"]):
         version: int,
         links: frozenset[RecordLink],
         now: datetime,
+        relations: frozenset[RecordRelation] = frozenset(),
     ) -> LinkSet:
         """Build a valid version and derive its digest inside Knowledge."""
         return cls(
@@ -58,7 +63,8 @@ class LinkSet(AggregateRoot["LinkSet"]):
             origin=origin,
             version=version,
             links=links,
-            digest=LinkSetDigest.of(links, origin),
+            relations=relations,
+            digest=LinkSetDigest.of(links, origin, relations),
             created_at=now,
             updated_at=now,
         )

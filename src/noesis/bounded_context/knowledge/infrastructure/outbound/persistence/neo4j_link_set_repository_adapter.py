@@ -1,4 +1,4 @@
-"""The sole owner of imported LINKS_TO/EMBEDS edge writes."""
+"""The sole owner of imported LINKS_TO/EMBEDS/RELATES_TO edge writes."""
 
 from typing import Any, LiteralString
 
@@ -7,8 +7,10 @@ from noesis.bounded_context.knowledge.domain.repositories.i_link_set_repository 
     ILinkSetRepository,
 )
 from noesis.bounded_context.knowledge.domain.value_objects import RecordId, SpaceId
+from noesis.bounded_context.knowledge.domain.value_objects.enums import RecordRelationEnum
 from noesis.bounded_context.knowledge.domain.value_objects.link_set_digest import LinkSetDigest
 from noesis.bounded_context.knowledge.domain.value_objects.record_link import RecordLink
+from noesis.bounded_context.knowledge.domain.value_objects.record_relation import RecordRelation
 
 from .neo4j_write_support import TransactionProvider
 
@@ -18,6 +20,12 @@ MATCH (:Knowledge {id: $source})-[r:LINKS_TO|EMBEDS]->(target:Knowledge)
 WHERE r.origin = $origin
 RETURN target.id AS target, type(r) AS kind, r.count AS count, r.anchors AS anchors
 ORDER BY target.id, type(r)
+"""
+_RELATIONS: LiteralString = """
+MATCH (:Knowledge {id: $source})-[r:RELATES_TO]->(target:Knowledge)
+WHERE r.origin = $origin
+RETURN target.id AS target, r.relation AS relation
+ORDER BY target.id, r.relation
 """
 _LOCK: LiteralString = """
 MERGE (s:LinkSet {source_record_id: $source})
@@ -33,6 +41,15 @@ _DELETE: LiteralString = """
 MATCH (:Knowledge {id: $source})-[r:LINKS_TO|EMBEDS]->(:Knowledge {id: $target})
 WHERE r.origin = $origin AND type(r) = $kind
 DELETE r
+"""
+_DELETE_RELATION: LiteralString = """
+MATCH (:Knowledge {id: $source})-[r:RELATES_TO]->(:Knowledge {id: $target})
+WHERE r.origin = $origin AND r.relation = $relation
+DELETE r
+"""
+_MERGE_RELATION: LiteralString = """
+MATCH (s:Knowledge {id: $source}), (t:Knowledge {id: $target})
+MERGE (s)-[:RELATES_TO {origin: $origin, relation: $relation}]->(t)
 """
 _MERGE_LINK: LiteralString = """
 MATCH (s:Knowledge {id: $source}), (t:Knowledge {id: $target})
@@ -65,6 +82,9 @@ class Neo4jLinkSetRepositoryAdapter(ILinkSetRepository):
         edges = await self._transaction().run(
             _EDGES, {"source": source.value, "origin": node["origin"]}
         )
+        relations = await self._transaction().run(
+            _RELATIONS, {"source": source.value, "origin": node["origin"]}
+        )
         return LinkSet(
             source_record_id=source,
             space_id=SpaceId(value=node["space_id"]),
@@ -80,6 +100,13 @@ class Neo4jLinkSetRepositoryAdapter(ILinkSetRepository):
                     anchors=tuple(row["anchors"]),
                 )
                 for row in edges
+            ),
+            relations=frozenset(
+                RecordRelation(
+                    target_record_id=RecordId(value=row["target"]),
+                    relation=RecordRelationEnum(row["relation"]),
+                )
+                for row in relations
             ),
         )
 
@@ -111,6 +138,7 @@ class Neo4jLinkSetRepositoryAdapter(ILinkSetRepository):
                 await self._transaction().run(
                     _MERGE_EMBED if kind == "EMBEDS" else _MERGE_LINK, parameters
                 )
+        await self._save_relations(link_set)
         await self._transaction().run(
             _SAVE,
             {
@@ -122,3 +150,23 @@ class Neo4jLinkSetRepositoryAdapter(ILinkSetRepository):
                 "updated_at": link_set.updated_at,
             },
         )
+
+    async def _save_relations(self, link_set: LinkSet) -> None:
+        """Diff this origin's relation edges by (target, relation)."""
+        parameters: dict[str, Any] = {
+            "source": link_set.source_record_id.value,
+            "origin": link_set.origin,
+        }
+        old = await self._transaction().run(_RELATIONS, parameters)
+        wanted: set[tuple[str, str]] = {
+            (relation.target_record_id.value, relation.relation.value)
+            for relation in link_set.relations
+        }
+        existing: set[tuple[str, str]] = {(row["target"], row["relation"]) for row in old}
+        for target, relation in sorted(existing | wanted):
+            query: LiteralString = (
+                _MERGE_RELATION if (target, relation) in wanted else _DELETE_RELATION
+            )
+            await self._transaction().run(
+                query, {**parameters, "target": target, "relation": relation}
+            )

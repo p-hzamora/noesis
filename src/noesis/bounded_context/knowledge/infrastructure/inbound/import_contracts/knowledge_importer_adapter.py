@@ -31,11 +31,13 @@ from noesis.bounded_context.knowledge.domain.value_objects import (
     ImportOnChangeEnum,
     Key,
     RecordId,
+    RecordRelationEnum,
     Slug,
     SourceKindEnum,
     Tag,
 )
 from noesis.bounded_context.knowledge.domain.value_objects.record_link import RecordLink
+from noesis.bounded_context.knowledge.domain.value_objects.record_relation import RecordRelation
 from noesis.exceptions import (
     AppException,
     EntryAlreadyExistsError,
@@ -152,6 +154,13 @@ def _link_request(request: ImportLinkSetRequestContract) -> LinkSetRequest:
                 anchors=link.anchors,
             )
             for link in request.links
+        ),
+        relations=tuple(
+            RecordRelation(
+                target_record_id=RecordId(value=relation.target_record_id),
+                relation=_enum_of(RecordRelationEnum, relation.relation, "relation"),
+            )
+            for relation in request.relations
         ),
     )
 

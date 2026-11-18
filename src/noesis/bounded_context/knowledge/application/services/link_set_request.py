@@ -4,6 +4,7 @@ from typing import Literal
 
 from noesis.bounded_context.knowledge.domain.value_objects import Actor, Key, RecordId, Tag
 from noesis.bounded_context.knowledge.domain.value_objects.record_link import RecordLink
+from noesis.bounded_context.knowledge.domain.value_objects.record_relation import RecordRelation
 from noesis.shared_kernel.application.dtos import BaseDto
 from noesis.utils import FrozenObject
 
@@ -16,6 +17,7 @@ class LinkSetRequest(FrozenObject):
     origin_tag: Tag
     links: tuple[RecordLink, ...]
     actor: Actor
+    relations: tuple[RecordRelation, ...] = ()
 
 
 class LinkSetResultDto(BaseDto):

@@ -19,15 +19,23 @@ class ImportLinkContract(FrozenObject):
     anchors: tuple[str, ...] = ()
 
 
-class ImportLinkSetRequestContract(FrozenObject):
-    """Replace this source's migrated links as one unit."""
+class ImportRelationContract(FrozenObject):
+    """One typed outgoing relation; Knowledge validates the relation word."""
 
-    contract_version: Literal[1] = 1
+    target_record_id: str
+    relation: str
+
+
+class ImportLinkSetRequestContract(FrozenObject):
+    """Replace this source's migrated links and relations as one unit."""
+
+    contract_version: Literal[2] = 2
     space_key: str
     source_record_id: str
     origin_tag: str
     links: tuple[ImportLinkContract, ...]
     actor: ImportActorContract
+    relations: tuple[ImportRelationContract, ...] = ()
 
 
 class ImportLinkSetOutcomeContract(FrozenObject):

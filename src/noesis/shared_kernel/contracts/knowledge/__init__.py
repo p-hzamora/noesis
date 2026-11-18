@@ -18,6 +18,7 @@ from .import_link_set_contract import (
     ImportLinkContract,
     ImportLinkSetOutcomeContract,
     ImportLinkSetRequestContract,
+    ImportRelationContract,
 )
 from .indexable_record_contract import IndexableRecordContract, RecordBodyMissingError
 from .record_changed_contract import RecordChangedContract
@@ -40,6 +41,7 @@ __all__ = [
     "ImportLinkContract",
     "ImportLinkSetRequestContract",
     "ImportLinkSetOutcomeContract",
+    "ImportRelationContract",
     "IndexableRecordContract",
     "RecordBodyMissingError",
     "RecordChangedContract",

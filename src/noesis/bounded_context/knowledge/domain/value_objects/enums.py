@@ -50,6 +50,19 @@ class AssertionPredicateEnum(StrEnum):
     RECOMMENDS = "recommends"
 
 
+class RecordRelationEnum(StrEnum):
+    """How one record relates to another in an imported link set (vault vocabulary)."""
+
+    REFINES = "refines"
+    PART_OF = "part_of"
+    CONTAINS = "contains"
+    IMPLEMENTS = "implements"
+    CONSUMES = "consumes"
+    EXTENDS = "extends"
+    CONTRADICTS = "contradicts"
+    SUPERSEDES = "supersedes"
+
+
 class CatalogEntryKindEnum(StrEnum):
     """What a catalog entry describes (D-029)."""
 
