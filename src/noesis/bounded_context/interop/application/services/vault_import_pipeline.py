@@ -329,6 +329,10 @@ class VaultImportPipeline:
                     warning.startswith(f"{NoteWarningEnum.DROPPED_TAG.value}:")
                     for warning in warnings
                 ),
+                ignored_field=sum(
+                    warning.startswith(f"{NoteWarningEnum.IGNORED_FIELD.value}:")
+                    for warning in warnings
+                ),
             ),
             sources_skipped=sum(
                 note.mapping.sources_skipped

@@ -83,6 +83,7 @@ class ImportWarningCountsResponse(FrozenObject):
 
     legacy_header: int
     dropped_tag: int
+    ignored_field: int
 
 
 class ImportRunResponse(IRenderableResponse):

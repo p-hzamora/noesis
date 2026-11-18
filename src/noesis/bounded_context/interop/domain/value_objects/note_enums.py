@@ -26,8 +26,9 @@ class NoteOutcomeEnum(StrEnum):
 
 
 class NoteWarningEnum(StrEnum):
-    """Warnings of a note; `dropped_tag` is written `dropped_tag:<value>`."""
+    """Warnings of a note; `dropped_tag` and `ignored_field` are written `<warning>:<value>`."""
 
     LEGACY_HEADER = "legacy_header"
     DROPPED_TAG = "dropped_tag"
     IGNORED_SCOPE = "ignored_scope"
+    IGNORED_FIELD = "ignored_field"

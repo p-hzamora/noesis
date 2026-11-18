@@ -70,6 +70,7 @@ class ImportWarningCountsDto(BaseDto):
 
     legacy_header: int = 0
     dropped_tag: int = 0
+    ignored_field: int = 0
 
 
 class VaultImportResultDto(BaseDto):

@@ -20,6 +20,10 @@ BLOCK_KEY: str = "noesis"
 DEFAULT_SUBTYPE: str = "note"
 REPO_PREFIX: str = "repo:"
 TOPIC_PREFIX: str = "topic:"
+CURRENT_READ_KEYS: frozenset[str] = frozenset({BLOCK_KEY, "title", "tags"})
+LEGACY_READ_KEYS: frozenset[str] = frozenset(
+    {"title", "tags", "type", "project", "repo", "topic", "area"}
+)
 type Header = Mapping[str, object]
 
 
@@ -71,6 +75,7 @@ class NoteMapper:
         elif header is not None:
             warnings.append(NoteWarningEnum.LEGACY_HEADER.value)
         source: Header = header or {}
+        warnings.extend(self._ignored_fields(source, current is not None))
         record_id: str | None = None
         project_key: str | None
         extra_tags: list[str] = []
@@ -129,6 +134,7 @@ class NoteMapper:
                 return NoteBlockReasonEnum.INVALID_HEADER
             current = {str(key): value for key, value in block.items()}
         source: Header = header or {}
+        warnings.extend(self._ignored_fields(source, current is not None))
         header_subtype: str | None
         header_project: str | None
         collected: set[str] = self._header_tags(source, warnings)
@@ -168,6 +174,16 @@ class NoteMapper:
             tag: str = self._tags.normalise(text)
             return _Scope(valid=self._tags.is_valid(tag), tag=tag)
         return _Scope(valid=False)
+
+    @staticmethod
+    def _ignored_fields(header: Header, has_block: bool) -> list[str]:
+        """`ignored_field:<key>` for each top-level header key the mapping never reads."""
+        read: frozenset[str] = CURRENT_READ_KEYS if has_block else LEGACY_READ_KEYS
+        return [
+            f"{NoteWarningEnum.IGNORED_FIELD.value}:{key}"
+            for key in sorted(str(key) for key in header)
+            if key not in read
+        ]
 
     def _header_tags(self, header: Header, warnings: list[str]) -> set[str]:
         """Valid tags of `H.tags`; the others are dropped with a warning."""
