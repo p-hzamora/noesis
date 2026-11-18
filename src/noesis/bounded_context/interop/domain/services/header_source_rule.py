@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 from noesis.bounded_context.interop.domain.value_objects import HeaderSource
 
-COMMIT_SHA: re.Pattern[str] = re.compile(r"^[0-9a-fA-F]{40}$")
+COMMIT_SHA: re.Pattern[str] = re.compile(r"^[0-9a-fA-F]{7,40}$")
 PREFIX_KINDS: dict[str, str] = {
     "commit": "commit",
     "session": "agent_session",

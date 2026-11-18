@@ -19,7 +19,7 @@ from noesis.shared_kernel.domain.entities import AggregateRoot
 class Source(AggregateRoot["Source"]):
     """A commit, file version, session, URL or work brief a record cites.
 
-    Locator formats: `commit` = full sha, `agent_session` = session id, `work_brief` =
+    Locator formats: `commit` = sha (full, or 7+ hex digits from a vault header), `agent_session` = session id, `work_brief` =
     submission key, `file_version` = `vault://<vault_key>/<relative path>`.
 
     Attributes:
