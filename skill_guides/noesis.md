@@ -462,6 +462,16 @@ Changed notes defer outgoing edges unless `--update` is given; proposed successo
 outgoing edges while incoming links stay on the accepted record. Link classes do not block
 `--strict`. After a busy-store error, rerun the same import. `import file` has no link pass.
 
+A current-layout note's top-level `related: [{id, relation}]` becomes typed `RELATES_TO` edges
+in the same link set. `relation` is one of refines, part_of, contains, implements, consumes,
+extends, contradicts, supersedes; they are plain edges, never Assertions, and recall does not
+follow them. `id` is `<repo>--<kind>--<slug>`: the note named `<slug>` under `repos/<repo>/`, else
+the one note with that name in the vault (two or more is ambiguous). JSON adds a `relations`
+block (resolved, dangling, ambiguous, not_imported, self, unknown_relation, invalid_relation);
+`--verbose` rows list the unresolved entries under `unresolved_relations`. No stub records, and
+relation classes never block `--strict`. A top-level `commit` (7-40 hex) becomes a `commit`
+Source, de-duplicated with `noesis.sources`; `branch` and top-level `sources` stay ignored.
+
 ## Recall before a task
 
 Use `noesis recall "task" --project KEY --no-synthesis --json` for a deterministic,

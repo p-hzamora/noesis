@@ -29,7 +29,9 @@ noesis import run [--yes] [--update] [--strict] [--verbose] [--json]
   code is 0 whenever the run finishes, blocked notes included.
 - Warnings (`warnings` counts; one entry per note in `result.notes[].warnings`): `legacy_header`
   (no `noesis:` block), `dropped_tag:<tag>`, `ignored_field:<key>` (a top-level header key the
-  import does not read; with a `noesis:` block only `title` and `tags` are read beside it).
+  import does not read; with a `noesis:` block only `title`, `tags`, `related` and `commit` are read
+  beside it).
+- Result also carries `relations` (totals per class, see [Relations](#relations)).
 - Block reasons: `not_text`, `invalid_header`, `invalid_id`, `duplicate_id`, `invalid_scope`,
   `id_conflict`, `target_closed`, `revision_conflict`, `idempotency_key_reused`, `invalid_metadata`.
 
@@ -82,6 +84,35 @@ remain valid targets. A successor receives new outgoing links; incoming links ke
 the accepted record. Retracted and superseded records retain their edges. Link classifications
 never affect `--strict`; a refused link set is counted as `blocked` without changing `complete`.
 `import file` does not import links.
+
+## Relations
+
+A current-layout note's top-level `related: [{id, relation}]` becomes typed `RELATES_TO` edges
+from its record to the target record, with origin `migrated`. They are stored in the same
+link set, in the same save, as the wiki-link edges; a target can be both a wiki link and a
+relation. `relation` is one of `refines`, `part_of`, `contains`, `implements`, `consumes`,
+`extends`, `contradicts`, `supersedes`, stored under the same names. They are plain edges: no
+Assertion is created and no record status, revision or recall result changes.
+
+`id` is `<repo>--<kind>--<slug>`. The target is the note whose file name equals `<slug>` under a
+`repos/<repo>/` folder (matched like links: NFC, case-insensitive). When there is none, the
+same file name anywhere in the vault is used, but only when exactly one note has it. Two or
+more candidates at the deciding step are `ambiguous`; nothing is guessed and no stub record is
+created. Older-layout notes keep ignoring `related`.
+
+`result.relations` and each verbose row's `relations` count entries by class: `resolved` (edge
+written), `dangling` (no such note), `ambiguous`, `not_imported` (the note has no record),
+`self`, `unknown_relation` (word outside the eight), `invalid_relation` (malformed entry or id).
+The row also holds the link-set `outcome` (`planned`, `created`, `replaced`, `unchanged`,
+`deferred`, `no_record`, `blocked`) when the note declares relations. `--verbose` rows list every
+unresolved entry under `unresolved_relations` with candidate paths for ambiguous ones. No relation
+class blocks `--strict`. Wiki-link totals do not include relations.
+
+Relation edits re-apply: a note whose only change is `related` stays `unchanged` as a record and
+its link set is `replaced`. A top-level `commit` of 7 to 40 hex characters becomes a `commit`
+Source on the record (lowercased, no expansion), de-duplicated with `noesis.sources`; a commit
+that is not hex counts in `sources_skipped`. `branch` and the top-level `sources` stay ignored.
+A change to tags or header Sources alone is still not re-applied by `--update`.
 
 Run `noesis store init` after upgrading to apply the `links` schema step. An apply checks for
 this step before writing records; a preview needs no link schema. Each source's link set is
