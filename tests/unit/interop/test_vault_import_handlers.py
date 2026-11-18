@@ -329,6 +329,17 @@ async def test_row_carries_the_outcome_fields_of_the_note() -> None:
             "self": 0,
             "outcome": None,
         },
+        "relations": {
+            "resolved": 0,
+            "dangling": 0,
+            "ambiguous": 0,
+            "not_imported": 0,
+            "self": 0,
+            "unknown_relation": 0,
+            "invalid_relation": 0,
+            "outcome": None,
+        },
+        "unresolved_relations": [],
     }
 
 

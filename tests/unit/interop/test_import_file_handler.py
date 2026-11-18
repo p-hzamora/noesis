@@ -150,6 +150,17 @@ async def test_an_invalid_header_scope_is_ignored_with_a_warning_and_never_block
     assert "legacy_header" not in result["warnings"]
 
 
+async def test_a_file_import_still_ignores_related_and_commit_with_a_warning() -> None:
+    header = "commit: 965bc44\nrelated:\n- id: x--c--y\n  relation: part_of\nnoesis:\n  kind: howto"
+
+    result, importer = await _import({DESIGN: note("Body.", header)})
+
+    request = importer.requests("apply")[DESIGN].model_dump(mode="json")
+    assert request["header_sources"] == []
+    assert "ignored_field:commit" in result["warnings"]
+    assert "ignored_field:related" in result["warnings"]
+
+
 async def test_an_older_layout_header_gives_no_legacy_warning_and_its_invalid_tags_are_dropped() -> (
     None
 ):

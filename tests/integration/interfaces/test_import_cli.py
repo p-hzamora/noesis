@@ -302,6 +302,131 @@ def test_ac005_rerun_changes_nothing(
     assert graph(neo4j_settings) == (counts, d1)
 
 
+REL_A = "company/rel/repos/rel/concepts/a.md"
+REL_B = "company/rel/repos/rel/concepts/b.md"
+REL_C = "company/rel/repos/rel/concepts/c.md"
+REL_ELSEWHERE = "learning/only-here.md"
+KA, KB, KC, KD = (f"01JCKMNP{n:018d}" for n in range(21, 25))
+
+
+def _rel_note(record_id: str, body: str, related: list[tuple[str, str]], commit: str = "") -> bytes:
+    lines: list[str] = [f"commit: {commit}"] if commit else []
+    if related:
+        lines.append("related:")
+        lines += [f"  - {{id: {target}, relation: {word}}}" for target, word in related]
+    lines += ["noesis:", f"  id: {record_id}", "  scope: repo:rel", "  kind: concept"]
+    return ("---\n" + "\n".join(lines) + f"\n---\n{body}\n").encode()
+
+
+def _relation_edges(settings: Neo4jConnectionSettings) -> list[tuple[str, str, str, str]]:
+    with graph_session(settings) as session:
+        return sorted(
+            (row["s"], row["t"], row["relation"], row["origin"])
+            for row in session.run(
+                "MATCH (a:Knowledge)-[r:RELATES_TO]->(b:Knowledge) "
+                "RETURN a.id AS s, b.id AS t, r.relation AS relation, r.origin AS origin"
+            )
+        )
+
+
+def _count(settings: Neo4jConnectionSettings, label: str) -> int:
+    with graph_session(settings) as session:
+        row = session.run(f"MATCH (n:{label}) RETURN count(n) AS c").single()
+    assert row is not None
+    return int(row["c"])
+
+
+def test_relations_become_typed_edges_beside_wiki_links_and_are_idempotent(
+    ready: dict[str, str], vault: Folder, neo4j_settings: Neo4jConnectionSettings
+) -> None:
+    vault.write(
+        REL_A,
+        _rel_note(
+            KA,
+            "See [[b]].",
+            [
+                ("rel--concept--b", "refines"),
+                ("rel--concept--c", "contradicts"),
+                ("rel--concept--only-here", "supersedes"),
+                ("rel--concept--ghost", "part_of"),
+                ("rel--concept--b", "not_a_word"),
+            ],
+            commit="965BC44",
+        ),
+    )
+    vault.write(REL_B, _rel_note(KB, "B.", []))
+    vault.write(REL_C, _rel_note(KC, "C.", []))
+    vault.write(REL_ELSEWHERE, _rel_note(KD, "D.", []))
+    assertions: int = _count(neo4j_settings, "Assertion")
+
+    strict_preview = preview(ready, "--strict")
+    assert strict_preview.code == 0 and strict_preview.result["complete"] is True
+    assert _relation_edges(neo4j_settings) == []
+
+    first = apply(ready, "--strict")
+
+    assert first.code == 0
+    expected = sorted(
+        [
+            (KA, KB, "refines", "migrated"),
+            (KA, KC, "contradicts", "migrated"),
+            (KA, KD, "supersedes", "migrated"),
+        ]
+    )
+    assert _relation_edges(neo4j_settings) == expected
+    assert _count(neo4j_settings, "Assertion") == assertions
+    assert first.result["relations"] == {
+        "resolved": 3,
+        "dangling": 1,
+        "ambiguous": 0,
+        "not_imported": 0,
+        "self": 0,
+        "unknown_relation": 1,
+        "invalid_relation": 0,
+    }
+    named = {(u["classification"], u["target"]) for u in rows(first)[REL_A]["unresolved_relations"]}
+    assert named == {("dangling", "rel--concept--ghost"), ("unknown_relation", "rel--concept--b")}
+    assert first.result["links"]["resolved"] >= 1
+    with graph_session(neo4j_settings) as session:
+        wiki = session.run(
+            "MATCH (:Knowledge {id: $a})-[r:LINKS_TO]->(:Knowledge {id: $b}) RETURN count(r) AS c",
+            a=KA,
+            b=KB,
+        ).single()
+    assert wiki is not None and wiki["c"] == 1
+    sources = record(ready, KA)["sources"]
+    assert {"kind": "commit", "locator": "965bc44"} in [
+        {"kind": s["kind"], "locator": s["locator"]} for s in sources
+    ]
+    counts, stable = graph(neo4j_settings)
+
+    second = apply(ready, "--strict")
+
+    totals = second.result["totals"]
+    assert totals["unchanged"] + totals["skipped_empty"] == totals["notes"]
+    assert second.result["relations"]["resolved"] == 3
+    assert rows(second)[REL_A]["relations"]["outcome"] == "unchanged"
+    assert second.result["link_sets"]["created"] == second.result["link_sets"]["replaced"] == 0
+    assert _relation_edges(neo4j_settings) == expected
+    assert graph(neo4j_settings) == (counts, stable)
+
+
+def test_a_related_only_edit_replaces_the_link_set_and_leaves_the_record_unchanged(
+    ready: dict[str, str], vault: Folder, neo4j_settings: Neo4jConnectionSettings
+) -> None:
+    vault.write(REL_A, _rel_note(KA, "A.", [("rel--concept--b", "refines")]))
+    vault.write(REL_B, _rel_note(KB, "B.", []))
+    apply(ready)
+    assert _relation_edges(neo4j_settings) == [(KA, KB, "refines", "migrated")]
+
+    vault.write(REL_A, _rel_note(KA, "A.", [("rel--concept--b", "extends")]))
+    edited = apply(ready)
+
+    assert rows(edited)[REL_A]["outcome"] == "unchanged"
+    assert rows(edited)[REL_A]["relations"]["outcome"] == "replaced"
+    assert _relation_edges(neo4j_settings) == [(KA, KB, "extends", "migrated")]
+
+
 def test_ac006_edit_and_revert_make_revisions(
     ready: dict[str, str], vault: Folder, neo4j_settings: Neo4jConnectionSettings
 ) -> None:

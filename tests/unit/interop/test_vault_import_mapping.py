@@ -214,14 +214,77 @@ async def test_older_layout_drops_an_invalid_tag_with_a_warning_and_keeps_the_no
 
 async def test_current_layout_warns_for_each_top_level_key_outside_the_block() -> None:
     header: str = (
-        "title: T\ntags: [a]\ncommit: 965bc44\nrelated:\n- id: x\n  relation: part_of\n"
+        "title: T\ntags: [a]\nbranch: main\nsources: [{path: a.py, lines: 1}]\nstack: py\n"
         + current_header(id=K1, scope="repo:alpha", kind="concept")
     )
 
     result = await plan({PATH: note("Text.", header)})
 
-    assert row(result, PATH)["warnings"] == ["ignored_field:commit", "ignored_field:related"]
-    assert result["warnings"]["ignored_field"] == 2
+    assert row(result, PATH)["warnings"] == [
+        "ignored_field:branch",
+        "ignored_field:sources",
+        "ignored_field:stack",
+    ]
+    assert result["warnings"]["ignored_field"] == 3
+
+
+async def test_related_and_commit_are_read_so_they_do_not_warn() -> None:
+    header: str = (
+        "commit: 965BC44\nrelated:\n- id: x--c--y\n  relation: part_of\n"
+        + current_header(id=K1, scope="repo:alpha", kind="concept")
+    )
+
+    request, result_row = await _map(note("Text.", header))
+
+    assert result_row["warnings"] == []
+    assert request is not None
+    assert request["header_sources"] == [{"kind": "commit", "locator": "965bc44"}]
+
+
+async def test_a_top_level_commit_is_deduplicated_against_the_block_sources() -> None:
+    header: str = "commit: 965BC44\n" + _header_with_sources(["commit:965bc44", "url:https://a"])
+
+    request, result_row = await _map(note("Text.", header))
+
+    assert request is not None
+    assert request["header_sources"] == [
+        {"kind": "commit", "locator": "965bc44"},
+        {"kind": "url", "locator": "https://a"},
+    ]
+    assert result_row["warnings"] == []
+
+
+async def test_a_short_commit_and_the_full_sha_stay_distinct_sources() -> None:
+    header: str = f"commit: {C1SHA[:7]}\n" + _header_with_sources([f"commit:{C1SHA}"])
+
+    request, _ = await _map(note("Text.", header))
+
+    assert request is not None
+    assert [source["locator"] for source in request["header_sources"]] == [C1SHA, C1SHA[:7]]
+
+
+@pytest.mark.parametrize("commit", ["abc12", "xyz1234", "''", "[a, b]", "{a: b}", "a" * 41])
+async def test_a_top_level_commit_that_is_not_7_to_40_hex_is_skipped_and_counted(commit) -> None:
+    header: str = f"commit: {commit}\n" + current_header(id=K1, scope="repo:alpha", kind="concept")
+    importer = FakeKnowledgeImporter()
+
+    result = await plan({PATH: note("Text.", header)}, importer)
+
+    assert importer.requests()[LOCATOR].header_sources == ()
+    assert result["sources_skipped"] == 1
+
+
+async def test_a_legacy_note_still_ignores_commit_and_related() -> None:
+    header: str = "commit: 965bc44\nrelated:\n- id: x--c--y\n  relation: part_of\ntype: learning"
+
+    result = await plan({PATH: note("Text.", header)})
+
+    assert row(result, PATH)["warnings"] == [
+        "legacy_header",
+        "ignored_field:commit",
+        "ignored_field:related",
+    ]
+    assert result["relations"]["resolved"] == 0
 
 
 async def test_older_layout_warns_for_each_key_it_does_not_read() -> None:

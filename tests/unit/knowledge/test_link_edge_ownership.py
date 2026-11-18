@@ -16,7 +16,7 @@ def test_only_link_repository_mentions_imported_relationship_types() -> None:
         str(path.relative_to(root))
         for path in root.rglob("*.py")
         if path.name != "neo4j_link_set_repository_adapter.py"
-        and any(token in path.read_text() for token in ("LINKS_TO", "EMBEDS"))
+        and any(token in path.read_text() for token in ("LINKS_TO", "EMBEDS", "RELATES_TO"))
     ]
     assert offenders == []
 

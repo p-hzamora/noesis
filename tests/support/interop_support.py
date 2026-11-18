@@ -147,9 +147,9 @@ class FakeKnowledgeImporter:
     ) -> ImportLinkSetOutcomeContract:
         self.link_calls.append(("assess", request))
         return ImportLinkSetOutcomeContract(
-            outcome="created" if request.links else "unchanged",
+            outcome="created" if request.links or request.relations else "unchanged",
             source_record_id=request.source_record_id,
-            edges=len(request.links),
+            edges=len(request.links) + len(request.relations),
         )
 
     async def replace_links(
@@ -157,9 +157,9 @@ class FakeKnowledgeImporter:
     ) -> ImportLinkSetOutcomeContract:
         self.link_calls.append(("replace", request))
         return ImportLinkSetOutcomeContract(
-            outcome="created" if request.links else "unchanged",
+            outcome="created" if request.links or request.relations else "unchanged",
             source_record_id=request.source_record_id,
-            edges=len(request.links),
+            edges=len(request.links) + len(request.relations),
         )
 
     def requests(self, kind: str = "assess") -> dict[str, ImportKnowledgeRequestContract]:
