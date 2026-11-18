@@ -431,7 +431,8 @@ after normalisation, e.g. a links-only index), `blocked`. A note is blocked with
 (`target_record_id`) and the `supersedes` assertion proposed between them (`assertion_id`); both wait
 in `noesis review queue`. With blocked notes the run still exits 0 with `complete: false`; read the
 `blocked_reasons` counts and the rows. Wiki links become their text, sections holding only links
-are removed, code is left alone.
+are removed, code is left alone. Warnings: `legacy_header` (no `noesis:` block), `dropped_tag:<tag>`
+and `ignored_field:<key>` (a top-level header key that is not imported; report these to the user).
 
 `import file` registers one file (anywhere on disk) by its resolved path; `--dry-run` shows the
 outcome without writing. A header `id` is ignored, so a copy of a migrated note is a new record.

@@ -27,6 +27,9 @@ noesis import run [--yes] [--update] [--strict] [--verbose] [--json]
 - Result: `applied`, `update`, `vault_key`, `totals`, `blocked_reasons`, `warnings`,
   `sources_skipped`, `complete` (no note blocked), `notes` (verbose only), `next_steps`. The exit
   code is 0 whenever the run finishes, blocked notes included.
+- Warnings (`warnings` counts; one entry per note in `result.notes[].warnings`): `legacy_header`
+  (no `noesis:` block), `dropped_tag:<tag>`, `ignored_field:<key>` (a top-level header key the
+  import does not read; with a `noesis:` block only `title` and `tags` are read beside it).
 - Block reasons: `not_text`, `invalid_header`, `invalid_id`, `duplicate_id`, `invalid_scope`,
   `id_conflict`, `target_closed`, `revision_conflict`, `idempotency_key_reused`, `invalid_metadata`.
 
