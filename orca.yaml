@@ -1,0 +1,4 @@
+scripts:
+  setup: |
+    uv sync
+setupAgentStartupPolicy: wait-for-setup

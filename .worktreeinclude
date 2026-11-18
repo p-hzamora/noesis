@@ -1,0 +1,3 @@
+# Gitignored paths copied into every new Orca worktree (one literal path per line).
+.claude
+.env
