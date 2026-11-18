@@ -1,6 +1,7 @@
 """Q-014: which `noesis.sources` entries become extra Sources."""
 
 import re
+from collections.abc import Mapping
 from dataclasses import dataclass
 
 from noesis.bounded_context.interop.domain.value_objects import HeaderSource
@@ -45,6 +46,19 @@ class HeaderSourceRule:
             elif source not in found:
                 found.append(source)
         return HeaderSourceResult(sources=tuple(found), skipped=skipped)
+
+    def map_commit(self, value: object) -> HeaderSourceResult:
+        """Map a top-level `commit` value as a commit Source (None when absent)."""
+        if value is None:
+            return HeaderSourceResult(sources=(), skipped=0)
+        source: HeaderSource | None = (
+            None
+            if isinstance(value, Mapping | list | tuple | set)
+            else self._entry(f"commit:{value}")
+        )
+        if source is None:
+            return HeaderSourceResult(sources=(), skipped=1)
+        return HeaderSourceResult(sources=(source,), skipped=0)
 
     def _entry(self, entry: object) -> HeaderSource | None:
         if not isinstance(entry, str):

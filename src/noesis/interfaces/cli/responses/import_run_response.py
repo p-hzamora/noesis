@@ -27,6 +27,15 @@ class AmbiguousLinkResponse(FrozenObject):
     candidates: tuple[str, ...]
 
 
+class UnresolvedRelationResponse(FrozenObject):
+    """A relation entry that created no edge, with candidate paths when ambiguous."""
+
+    classification: str
+    target: str
+    relation: str
+    candidates: tuple[str, ...] = ()
+
+
 class ImportNoteRowResponse(FrozenObject):
     """One note of a run (`--verbose`).
 
@@ -63,6 +72,8 @@ class ImportNoteRowResponse(FrozenObject):
     warnings: tuple[str, ...] = ()
     links: dict[str, int | str | None] = Field(default_factory=dict)
     ambiguous: tuple[AmbiguousLinkResponse, ...] = ()
+    relations: dict[str, int | str | None] = Field(default_factory=dict)
+    unresolved_relations: tuple[UnresolvedRelationResponse, ...] = ()
 
 
 class ImportTotalsResponse(FrozenObject):
@@ -104,6 +115,7 @@ class ImportRunResponse(IRenderableResponse):
 
     links: dict[str, int] = Field(default_factory=dict)
     link_sets: dict[str, int] = Field(default_factory=dict)
+    relations: dict[str, int] = Field(default_factory=dict)
     applied: bool
     update: bool
     vault_key: str
@@ -139,6 +151,11 @@ class ImportRunResponse(IRenderableResponse):
             f"  blocked by {reason}: {count}" for reason, count in self.blocked_reasons.items()
         ]
         lines.append("links: " + ", ".join(f"{count} {name}" for name, count in self.links.items()))
+        if any(self.relations.values()):
+            lines.append(
+                "relations: "
+                + ", ".join(f"{count} {name}" for name, count in self.relations.items())
+            )
         lines.append(f"complete: {'yes' if self.complete else 'no'}")
         for row in self.notes or ():
             suffix: str = f" ({row.reason})" if row.reason else ""

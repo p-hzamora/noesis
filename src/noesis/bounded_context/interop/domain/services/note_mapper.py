@@ -8,6 +8,10 @@ from noesis.bounded_context.interop.domain.services.header_source_rule import (
     HeaderSourceResult,
     HeaderSourceRule,
 )
+from noesis.bounded_context.interop.domain.services.relation_rule import (
+    RelationParseResult,
+    RelationRule,
+)
 from noesis.bounded_context.interop.domain.services.tag_rule import TagRule
 from noesis.bounded_context.interop.domain.value_objects import (
     NoteBlockReasonEnum,
@@ -20,7 +24,8 @@ BLOCK_KEY: str = "noesis"
 DEFAULT_SUBTYPE: str = "note"
 REPO_PREFIX: str = "repo:"
 TOPIC_PREFIX: str = "topic:"
-CURRENT_READ_KEYS: frozenset[str] = frozenset({BLOCK_KEY, "title", "tags"})
+FILE_READ_KEYS: frozenset[str] = frozenset({BLOCK_KEY, "title", "tags"})
+CURRENT_READ_KEYS: frozenset[str] = FILE_READ_KEYS | {"related", "commit"}
 LEGACY_READ_KEYS: frozenset[str] = frozenset(
     {"title", "tags", "type", "project", "repo", "topic", "area"}
 )
@@ -60,6 +65,7 @@ class NoteMapper:
     def __init__(self) -> None:
         self._tags: TagRule = TagRule()
         self._sources: HeaderSourceRule = HeaderSourceRule()
+        self._relations: RelationRule = RelationRule()
 
     def map_vault_note(
         self, header: Header | None, *, title: str
@@ -75,7 +81,7 @@ class NoteMapper:
         elif header is not None:
             warnings.append(NoteWarningEnum.LEGACY_HEADER.value)
         source: Header = header or {}
-        warnings.extend(self._ignored_fields(source, current is not None))
+        warnings.extend(self._ignored_fields(source, current is not None, CURRENT_READ_KEYS))
         record_id: str | None = None
         project_key: str | None
         extra_tags: list[str] = []
@@ -93,13 +99,17 @@ class NoteMapper:
             project_key = scope.project_key
             if scope.tag is not None:
                 extra_tags.append(scope.tag)
-            sources: HeaderSourceResult = self._sources.map(current.get("sources"))
+            sources: HeaderSourceResult = self._with_commit(
+                self._sources.map(current.get("sources")), source.get("commit")
+            )
+            parsed: RelationParseResult = self._relations.parse(source.get("related"))
         else:
             declared = _declared(source.get("type"))
             subtype = DEFAULT_SUBTYPE if declared is None else declared
             project_key = _text(source.get("project")) or _text(source.get("repo"))
             extra_tags.extend(self._facet_tags(source, warnings))
             sources = HeaderSourceResult(sources=(), skipped=0)
+            parsed = RelationParseResult(relations=(), rejected=())
         tags: set[str] = self._header_tags(source, warnings)
         tags.update(extra_tags)
         return NoteMapping(
@@ -110,6 +120,8 @@ class NoteMapper:
             tags=tuple(sorted(tags)),
             header_sources=sources.sources,
             sources_skipped=sources.skipped,
+            relations=parsed.relations,
+            rejected_relations=parsed.rejected,
             warnings=tuple(warnings),
         )
 
@@ -134,7 +146,7 @@ class NoteMapper:
                 return NoteBlockReasonEnum.INVALID_HEADER
             current = {str(key): value for key, value in block.items()}
         source: Header = header or {}
-        warnings.extend(self._ignored_fields(source, current is not None))
+        warnings.extend(self._ignored_fields(source, current is not None, FILE_READ_KEYS))
         header_subtype: str | None
         header_project: str | None
         collected: set[str] = self._header_tags(source, warnings)
@@ -175,10 +187,18 @@ class NoteMapper:
             return _Scope(valid=self._tags.is_valid(tag), tag=tag)
         return _Scope(valid=False)
 
+    def _with_commit(self, sources: HeaderSourceResult, commit: object) -> HeaderSourceResult:
+        """`sources` plus the top-level `commit`, de-duplicated against them."""
+        found: HeaderSourceResult = self._sources.map_commit(commit)
+        return HeaderSourceResult(
+            sources=(*sources.sources, *(s for s in found.sources if s not in sources.sources)),
+            skipped=sources.skipped + found.skipped,
+        )
+
     @staticmethod
-    def _ignored_fields(header: Header, has_block: bool) -> list[str]:
+    def _ignored_fields(header: Header, has_block: bool, current_keys: frozenset[str]) -> list[str]:
         """`ignored_field:<key>` for each top-level header key the mapping never reads."""
-        read: frozenset[str] = CURRENT_READ_KEYS if has_block else LEGACY_READ_KEYS
+        read: frozenset[str] = current_keys if has_block else LEGACY_READ_KEYS
         return [
             f"{NoteWarningEnum.IGNORED_FIELD.value}:{key}"
             for key in sorted(str(key) for key in header)

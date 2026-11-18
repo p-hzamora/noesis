@@ -12,6 +12,15 @@ class AmbiguousLinkDto(BaseDto):
     candidates: tuple[str, ...]
 
 
+class UnresolvedRelationDto(BaseDto):
+    """A `related` entry that created no edge, with the candidates when ambiguous."""
+
+    classification: str
+    target: str
+    relation: str
+    candidates: tuple[str, ...] = ()
+
+
 class ImportNoteRowDto(BaseDto):
     """One note of a run, in path order.
 
@@ -50,6 +59,8 @@ class ImportNoteRowDto(BaseDto):
     warnings: tuple[str, ...] = ()
     links: dict[str, int | str | None] = Field(default_factory=dict)
     ambiguous: tuple[AmbiguousLinkDto, ...] = ()
+    relations: dict[str, int | str | None] = Field(default_factory=dict)
+    unresolved_relations: tuple[UnresolvedRelationDto, ...] = ()
 
 
 class ImportTotalsDto(BaseDto):
@@ -91,6 +102,7 @@ class VaultImportResultDto(BaseDto):
 
     links: dict[str, int] = Field(default_factory=dict)
     link_sets: dict[str, int] = Field(default_factory=dict)
+    relations: dict[str, int] = Field(default_factory=dict)
     applied: bool
     update: bool
     vault_key: str

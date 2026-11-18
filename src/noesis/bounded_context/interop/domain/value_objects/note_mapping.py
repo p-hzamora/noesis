@@ -1,6 +1,10 @@
 """The record fields a note's header maps to."""
 
 from noesis.bounded_context.interop.domain.value_objects.header_source import HeaderSource
+from noesis.bounded_context.interop.domain.value_objects.vault_relation import (
+    RawRelation,
+    RejectedRelation,
+)
 from noesis.shared_kernel.domain.value_objects import ValueObject
 
 
@@ -15,6 +19,8 @@ class NoteMapping(ValueObject):
         tags: Valid tags, lowercased, sorted and de-duplicated (without the origin tag).
         header_sources: Extra Sources, in header order, de-duplicated.
         sources_skipped: Header source entries that did not map.
+        relations: Well-formed `related` entries of a current-layout note.
+        rejected_relations: `related` entries that cannot become edges.
         warnings: Warnings, `dropped_tag:<value>` included.
     """
 
@@ -25,4 +31,6 @@ class NoteMapping(ValueObject):
     tags: tuple[str, ...] = ()
     header_sources: tuple[HeaderSource, ...] = ()
     sources_skipped: int = 0
+    relations: tuple[RawRelation, ...] = ()
+    rejected_relations: tuple[RejectedRelation, ...] = ()
     warnings: tuple[str, ...] = ()

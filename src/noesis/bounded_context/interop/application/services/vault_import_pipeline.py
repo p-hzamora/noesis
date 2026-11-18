@@ -11,7 +11,10 @@ from noesis.bounded_context.interop.application.dtos import (
     ImportWarningCountsDto,
     VaultImportResultDto,
 )
-from noesis.bounded_context.interop.application.dtos.vault_import_result_dto import AmbiguousLinkDto
+from noesis.bounded_context.interop.application.dtos.vault_import_result_dto import (
+    AmbiguousLinkDto,
+    UnresolvedRelationDto,
+)
 from noesis.bounded_context.interop.application.ports import (
     IHeaderParser,
     IKnowledgeImporter,
@@ -31,6 +34,14 @@ from noesis.bounded_context.interop.domain.services import (
 from noesis.bounded_context.interop.domain.services.link_parser import LinkParser
 from noesis.bounded_context.interop.domain.services.link_set_builder import LinkSetBuilder
 from noesis.bounded_context.interop.domain.services.link_target_index import LinkTargetIndex
+from noesis.bounded_context.interop.domain.services.relation_set_builder import (
+    RELATION_CLASSES,
+    BuiltRelationSet,
+    RelationSetBuilder,
+)
+from noesis.bounded_context.interop.domain.services.relation_target_index import (
+    RelationTargetIndex,
+)
 from noesis.bounded_context.interop.domain.value_objects import (
     ImportActor,
     NoteBlockReasonEnum,
@@ -74,6 +85,9 @@ class _Note:
     link_outcome: str | None = None
     link_block_reason: str | None = None
     ambiguous: tuple[AmbiguousLinkDto, ...] = ()
+    relation_counts: dict[str, int] = field(default_factory=dict)
+    relation_outcome: str | None = None
+    unresolved_relations: tuple[UnresolvedRelationDto, ...] = ()
     mapping: NoteMapping | None = None
     block_reason: str | None = None
     skipped_empty: bool = False
@@ -195,6 +209,7 @@ class VaultImportPipeline:
     async def _links(self, notes: list[_Note], *, apply: bool) -> None:
         """Step 8: outgoing source set differs from the incoming target map."""
         index = LinkTargetIndex([note.path for note in notes])
+        relation_index = RelationTargetIndex([note.path for note in notes])
         targets: dict[str, str] = {}
         pending: set[str] = set()
         for note in notes:
@@ -218,6 +233,25 @@ class VaultImportPipeline:
             built = LinkSetBuilder().build(
                 tuple(index.resolve(link, source=note.path) for link in note.parsed_links), targets
             )
+            built_relations: BuiltRelationSet = RelationSetBuilder().build(
+                source=note.path,
+                raw=note.mapping.relations if note.mapping else (),
+                rejected=note.mapping.rejected_relations if note.mapping else (),
+                index=relation_index,
+                targets=targets,
+            )
+            note.relation_counts = built_relations.counts
+            note.unresolved_relations = tuple(
+                UnresolvedRelationDto(
+                    classification=entry.classification,
+                    target=entry.target_key,
+                    relation=entry.relation,
+                    candidates=entry.candidates,
+                )
+                for entry in built_relations.entries
+                if entry.classification != "resolved"
+            )
+            has_edges: bool = bool(built.links or built_relations.relations)
             counts: Counter[str] = Counter(item.classification for item in built.occurrences)
             note.link_counts = {name: counts[name] for name in LINK_CLASSES}
             note.ambiguous = tuple(
@@ -229,22 +263,32 @@ class VaultImportPipeline:
                 note.link_outcome = "deferred"
             elif note.outcome in {NoteOutcomeEnum.BLOCKED, NoteOutcomeEnum.SKIPPED_EMPTY}:
                 # Header-only notes have no link set to account for.
-                note.link_outcome = "no_record" if note.parsed_links else None
+                note.link_outcome = (
+                    "no_record" if note.parsed_links or built_relations.entries else None
+                )
             elif note.path in pending:
-                note.link_outcome = "planned" if built.links else None
-            elif any(link.target_record_id.startswith("pending:") for link in built.links):
+                note.link_outcome = "planned" if has_edges else None
+            elif any(
+                target.startswith("pending:")
+                for target in (
+                    *(link.target_record_id for link in built.links),
+                    *(relation.target_record_id for relation in built_relations.relations),
+                )
+            ):
                 note.link_outcome = "planned"
             elif note.answer is not None and note.answer.record_id is not None:
                 outcome, reason = await self._knowledge.links(
-                    note.answer.record_id, built.links, apply=apply
+                    note.answer.record_id, built.links, built_relations.relations, apply=apply
                 )
                 note.link_outcome = (
                     "planned" if not apply and outcome in {"created", "replaced"} else outcome
                 )
                 note.link_block_reason = reason
-                if outcome == "unchanged" and not built.links:
+                if outcome == "unchanged" and not has_edges:
                     # Empty stored sets and absent sets both need no reported work.
                     note.link_outcome = None
+            if built_relations.entries:
+                note.relation_outcome = note.link_outcome
 
     def _refuse_blocked(self, notes: list[_Note]) -> None:
         blocked: list[ImportNoteRowDto] = [
@@ -291,6 +335,16 @@ class VaultImportPipeline:
                 **({"block_reason": note.link_block_reason} if note.link_block_reason else {}),
             },
             ambiguous=note.ambiguous,
+            relations={
+                **note.relation_counts,
+                "outcome": note.relation_outcome,
+                **(
+                    {"block_reason": note.link_block_reason}
+                    if note.link_block_reason and note.relation_outcome
+                    else {}
+                ),
+            },
+            unresolved_relations=note.unresolved_relations,
         )
 
     def _report(self, notes: list[_Note], *, update: bool, applied: bool) -> VaultImportResultDto:
@@ -312,6 +366,14 @@ class VaultImportPipeline:
                     if note.outcome not in {NoteOutcomeEnum.SKIPPED_EMPTY, NoteOutcomeEnum.BLOCKED}
                 )
                 for name in LINK_CLASSES
+            },
+            relations={
+                name: sum(
+                    note.relation_counts.get(name, 0)
+                    for note in notes
+                    if note.outcome not in {NoteOutcomeEnum.SKIPPED_EMPTY, NoteOutcomeEnum.BLOCKED}
+                )
+                for name in RELATION_CLASSES
             },
             link_sets={
                 name: link_sets[name]
