@@ -4,7 +4,7 @@ topic: python
 area: backend
 id: learning-python-legacy
 status: draft
-tags: [draft, .dotfiles]
+tags: [draft, two words]
 ---
 # Legacy note
 

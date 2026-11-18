@@ -153,12 +153,12 @@ async def test_an_invalid_header_scope_is_ignored_with_a_warning_and_never_block
 async def test_an_older_layout_header_gives_no_legacy_warning_and_its_invalid_tags_are_dropped() -> (
     None
 ):
-    result, importer = await _import({DESIGN: note("Body.", "type: learning\ntags: [ok, .bad]")})
+    result, importer = await _import({DESIGN: note("Body.", "type: learning\ntags: [ok, not ok]")})
 
     request = importer.requests("apply")[DESIGN].model_dump(mode="json")
     assert (request["subtype"], request["tags"]) == ("learning", ["ok"])
     assert "legacy_header" not in result["warnings"]
-    assert "dropped_tag:.bad" in result["warnings"]
+    assert "dropped_tag:not ok" in result["warnings"]
 
 
 async def test_invalid_option_values_are_not_dropped_but_left_to_knowledge() -> None:

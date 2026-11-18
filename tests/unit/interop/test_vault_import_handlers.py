@@ -260,7 +260,7 @@ async def test_apply_result_header_fields() -> None:
     assert result["complete"] is True
     assert result["totals"] == {**ZERO_TOTALS, "notes": 5, "created": 5}
     assert result["blocked_reasons"] == {}
-    assert result["warnings"] == {"legacy_header": 0, "dropped_tag": 0}
+    assert result["warnings"] == {"legacy_header": 0, "dropped_tag": 0, "ignored_field": 0}
     assert result["sources_skipped"] == 0
     assert not {"noesis import run --yes --update", "noesis import run --verbose"} & set(
         result["next_steps"]
@@ -270,7 +270,7 @@ async def test_apply_result_header_fields() -> None:
 async def test_totals_warnings_and_rows_add_up_for_a_mixed_vault() -> None:
     files = {
         "a.md": note("x", current_header(id=K1, scope="repo:alpha", kind="concept")),
-        "b.md": note("Legacy.", "type: learning\ntags: [ok, .bad]"),
+        "b.md": note("Legacy.", "type: learning\ntags: [ok, not ok]"),
         "c.md": note("# Index\n\n- [[a]]", "type: index"),
         "d.md": b"",
         "e.md": b"\xff\xfe\x00\x01",
@@ -284,7 +284,7 @@ async def test_totals_warnings_and_rows_add_up_for_a_mixed_vault() -> None:
     assert (totals["created"], totals["skipped_empty"], totals["blocked"]) == (2, 2, 2)
     assert sum(value for key, value in totals.items() if key != "notes") == totals["notes"]
     assert result["blocked_reasons"] == {"not_text": 1, "invalid_header": 1}
-    assert result["warnings"] == {"legacy_header": 2, "dropped_tag": 1}
+    assert result["warnings"] == {"legacy_header": 2, "dropped_tag": 1, "ignored_field": 0}
     assert [item["path"] for item in result["notes"]] == sorted(files)
     assert result["complete"] is False
 

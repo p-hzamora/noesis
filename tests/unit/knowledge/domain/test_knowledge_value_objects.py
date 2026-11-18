@@ -88,6 +88,9 @@ def test_content_hash_rejects_malformed_values_with_knowledge_003(value: str) ->
         ("  Billing  ", "billing", None),
         ("Area:Billing", "area:billing", "area"),
         ("a-b:c-d-1", "a-b:c-d-1", "a-b"),
+        ("pm_inma", "pm_inma", None),
+        (".dotfiles", ".dotfiles", None),
+        ("repo:.dotfiles", "repo:.dotfiles", "repo"),
     ],
 )
 def test_tag_normalises_and_exposes_facet(raw: str, normalised: str, facet: str | None) -> None:
@@ -98,7 +101,24 @@ def test_tag_normalises_and_exposes_facet(raw: str, normalised: str, facet: str 
 
 
 @pytest.mark.parametrize(
-    "raw", ["", "  ", "two words", "a:", ":b", "a:b:c", "-a", "a-", "a--b", "a_b", "x" * 65]
+    "raw",
+    [
+        "",
+        "  ",
+        "two words",
+        "a:",
+        ":b",
+        "a:b:c",
+        "-a",
+        "a-",
+        "a--b",
+        "a__b",
+        "_a",
+        "a_",
+        "..a",
+        ".",
+        "x" * 65,
+    ],
 )
 def test_tag_rejects_invalid_slug_parts_with_knowledge_002(raw: str) -> None:
     with pytest.raises(InvalidSlugError) as error:

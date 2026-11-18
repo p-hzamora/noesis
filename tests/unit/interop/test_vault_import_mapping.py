@@ -160,7 +160,7 @@ async def test_the_same_ulid_in_two_notes_blocks_both_and_the_others_still_go() 
     ("header", "kwargs"),
     [
         pytest.param(
-            "type: learning\ntopic: python\narea: backend\ntags: [draft, .dotfiles]",
+            "type: learning\ntopic: python\narea: backend\ntags: [draft, two words]",
             {
                 "subtype": "learning",
                 "project_key": None,
@@ -206,10 +206,31 @@ async def test_older_layout_mapping(header: str, kwargs: dict[str, Any]) -> None
 
 
 async def test_older_layout_drops_an_invalid_tag_with_a_warning_and_keeps_the_note() -> None:
-    result = await plan({PATH: note("Text.", "type: learning\ntags: [draft, .dotfiles]")})
+    result = await plan({PATH: note("Text.", "type: learning\ntags: [draft, two words]")})
 
-    assert result["warnings"] == {"legacy_header": 1, "dropped_tag": 1}
-    assert sorted(row(result, PATH)["warnings"]) == ["dropped_tag:.dotfiles", "legacy_header"]
+    assert result["warnings"] == {"legacy_header": 1, "dropped_tag": 1, "ignored_field": 0}
+    assert sorted(row(result, PATH)["warnings"]) == ["dropped_tag:two words", "legacy_header"]
+
+
+async def test_current_layout_warns_for_each_top_level_key_outside_the_block() -> None:
+    header: str = (
+        "title: T\ntags: [a]\ncommit: 965bc44\nrelated:\n- id: x\n  relation: part_of\n"
+        + current_header(id=K1, scope="repo:alpha", kind="concept")
+    )
+
+    result = await plan({PATH: note("Text.", header)})
+
+    assert row(result, PATH)["warnings"] == ["ignored_field:commit", "ignored_field:related"]
+    assert result["warnings"]["ignored_field"] == 2
+
+
+async def test_older_layout_warns_for_each_key_it_does_not_read() -> None:
+    header: str = "type: index\nrepo: dafne\nid: dafne--index\ndate: 2026-10-12\ntags: [index]"
+
+    request, result_row = await _map(note("Text.", header))
+
+    assert request is not None and request["project_key"] == "dafne"
+    assert result_row["warnings"] == ["legacy_header", "ignored_field:date", "ignored_field:id"]
 
 
 async def test_older_layout_drops_a_topic_that_is_not_a_slug_with_a_warning() -> None:
@@ -234,6 +255,8 @@ async def test_tag_rule_agrees_with_the_knowledge_tag_on_a_fixed_list() -> None:
         " spaced ",
         "with space",
         ".dotfiles",
+        "pm_inma",
+        "a__b",
         "a:b:c",
         "facet:",
         "area:core",
@@ -259,7 +282,7 @@ async def test_tag_rule_agrees_with_the_knowledge_tag_on_a_fixed_list() -> None:
     assert sorted(w for w in result_row["warnings"] if w.startswith("dropped_tag:")) == sorted(
         f"dropped_tag:{value}" for value in rejected
     )
-    assert rejected == ["with space", ".dotfiles", "a:b:c", "facet:"]
+    assert rejected == ["with space", "a__b", "a:b:c", "facet:"]
 
 
 @pytest.mark.parametrize(
@@ -272,7 +295,13 @@ async def test_tag_rule_agrees_with_the_knowledge_tag_on_a_fixed_list() -> None:
             0,
             id="commit-uppercase-lowercased",
         ),
-        pytest.param(["commit:abc123"], [], 1, id="short-commit-skipped"),
+        pytest.param(["commit:abc123"], [], 1, id="six-char-commit-skipped"),
+        pytest.param(
+            ["commit:6876F8F"],
+            [{"kind": "commit", "locator": "6876f8f"}],
+            0,
+            id="short-commit-lowercased",
+        ),
         pytest.param(
             ["session:s-1"], [{"kind": "agent_session", "locator": "s-1"}], 0, id="session"
         ),

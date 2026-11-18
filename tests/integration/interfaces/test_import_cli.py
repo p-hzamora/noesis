@@ -498,7 +498,12 @@ def test_ac020_migrated_record_shape(
     assert k3["revision"]["title"] == "diseño hexagonal"
 
     id7, id8 = by_path[N7]["record_id"], by_path[N8]["record_id"]
-    assert sorted(by_path[N7]["warnings"]) == ["dropped_tag:.dotfiles", "legacy_header"]
+    assert sorted(by_path[N7]["warnings"]) == [
+        "dropped_tag:two words",
+        "ignored_field:id",
+        "ignored_field:status",
+        "legacy_header",
+    ]
     n7, n8 = record(ready, id7), record(ready, id8)
     assert [s["kind"] for s in n7["sources"]] == ["file_version"]
     assert [s["kind"] for s in n8["sources"]] == ["file_version"]
