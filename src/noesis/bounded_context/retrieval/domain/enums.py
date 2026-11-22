@@ -52,3 +52,42 @@ class SemanticModeEnum(StrEnum):
     RESIDENT = "resident"
     PER_CALL = "per-call"
     OFF = "off"
+
+
+class RequirementSourceEnum(StrEnum):
+    """Where a requirement facet came from."""
+
+    NEED = "need"
+    QUERY = "query"
+
+
+class CoverageStatusEnum(StrEnum):
+    """How well the selected resources and records answer one requirement facet."""
+
+    COVERED = "covered"
+    PARTIAL = "partial"
+    MISSING = "missing"
+    UNKNOWN = "unknown"
+
+
+class EndorsementEnum(StrEnum):
+    """Who stands behind a resource; derived from `recommends` assertions only."""
+
+    USER = "user"
+    PROJECT = "project"
+    PROPOSED = "proposed"
+    NONE = "none"
+
+
+class DecisionBasisEnum(StrEnum):
+    """Who decided an assertion's status."""
+
+    USER = "user"
+    AGENT = "agent"
+
+
+class SupportKindEnum(StrEnum):
+    """What backs a requirement facet."""
+
+    RESOURCE = "resource"
+    RECORD = "record"
