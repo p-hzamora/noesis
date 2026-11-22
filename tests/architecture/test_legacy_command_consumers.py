@@ -44,6 +44,8 @@ LEGACY_USE: Final[re.Pattern[str]] = re.compile(
 HISTORICAL: Final[frozenset[str]] = frozenset(
     {
         "CHANGELOG.md",  # release history
+        "docs/adr/0007-remember.md",  # decision record
+        "docs/adr/0008-legacy-command-retirement.md",  # decision record
         "tests/fixtures/vault_import/repos/alpha/howtos/capture.md",  # imported note text
         "tests/fixtures/vault_import_expected/B2.txt",  # expected import of that note
     }
