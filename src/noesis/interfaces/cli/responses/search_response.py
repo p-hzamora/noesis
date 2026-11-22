@@ -13,7 +13,7 @@ class SearchScopeResponse(FrozenObject):
     Attributes:
         space: Key of the active space.
         project: The project key applied or asked for; None when no key was resolved.
-        project_source: `option`, `git_root`, `all_projects` or `none`.
+        project_source: `option`, `target_root`, `git_root`, `all_projects` or `none`.
         space_wide_only: True when only space-wide records were searched.
     """
 

@@ -1,6 +1,7 @@
 """`noesis recall`: scoped, grounded guidance from graph bodies."""
 
 import asyncio
+from pathlib import Path
 from typing import Annotated
 
 import typer
@@ -27,6 +28,14 @@ from noesis.interfaces.cli.state import cli_state
 def recall(
     context: typer.Context,
     task: Annotated[str, typer.Argument(help="The task to prepare for.")],
+    target_root: Annotated[
+        Path | None,
+        typer.Option(
+            "--target-root",
+            file_okay=False,
+            help="Root of the existing or planned target repository.",
+        ),
+    ] = None,
     project: Annotated[
         str | None, typer.Option("--project", help="Project key; defaults to git repository name.")
     ] = None,
@@ -43,8 +52,8 @@ def recall(
     if not task.strip():
         raise typer.BadParameter("Give a non-empty task.", ctx=context, param_hint="TASK")
     parse_runtimes(runtime or [])
+    key, source = resolve_project(project, False, target_root)
     env = cli_state(context).environment()
-    key, source = resolve_project(project, False)
     runtimes = resolve_runtimes(runtime or [], env.identity)
 
     async def run(handlers: RetrievalHandlers, space_id: str) -> RecallResultDto:

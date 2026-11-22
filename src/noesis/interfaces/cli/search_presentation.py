@@ -3,6 +3,8 @@
 from enum import StrEnum
 from pathlib import Path
 
+import typer
+
 from noesis.bounded_context.retrieval.application.dtos.record_search_dtos import (
     RecordSearchResultDto,
 )
@@ -24,12 +26,22 @@ class ProjectSourceEnum(StrEnum):
     GIT_ROOT = "git_root"
     ALL_PROJECTS = "all_projects"
     NONE = "none"
+    TARGET_ROOT = "target_root"
 
 
 def resolve_project(
-    project: str | None, all_projects: bool
+    project: str | None, all_projects: bool, target_root: Path | None = None
 ) -> tuple[str | None, ProjectSourceEnum]:
-    """The project key and where it came from: option, git root, all projects or none."""
+    """Resolve the selected project using the same repository identity as record capture."""
+    if sum((project is not None, all_projects, target_root is not None)) > 1:
+        raise typer.BadParameter("Choose only one of --project, --all-projects and --target-root.")
+    if target_root is not None:
+        # A planned project within an existing checkout must not inherit its parent's identity.
+        root = target_root.expanduser().resolve()
+        common = find_common_dir(root)
+        if common is not None and ((root / ".git").exists() or common == root):
+            return repository_name(common), ProjectSourceEnum.TARGET_ROOT
+        return None, ProjectSourceEnum.TARGET_ROOT
     if all_projects:
         return None, ProjectSourceEnum.ALL_PROJECTS
     if project is not None:
@@ -40,9 +52,13 @@ def resolve_project(
     return repository_name(common_dir), ProjectSourceEnum.GIT_ROOT
 
 
-def _warnings(result: RecordSearchResultDto, key: str | None, space: str) -> tuple[str, ...]:
+def _warnings(
+    result: RecordSearchResultDto, key: str | None, space: str, source: ProjectSourceEnum
+) -> tuple[str, ...]:
     if result.project_scope is not ProjectScopeEnum.SPACE_WIDE_ONLY:
         return ()
+    if source is ProjectSourceEnum.TARGET_ROOT and key is None:
+        return ("target has no repository identity; searched space-wide records only",)
     reason: str = (
         "not in a git repository" if key is None else f"project {key} not found in space {space}"
     )
@@ -85,5 +101,5 @@ def search_response(
             semantic=SearchSemanticResponse(state=result.semantic_state.value),
             filter_shortfall=result.filter_shortfall,
         ),
-        warnings=(*_warnings(result, key, space), *result.warnings),
+        warnings=(*_warnings(result, key, space, source), *result.warnings),
     )

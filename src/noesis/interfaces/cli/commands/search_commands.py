@@ -2,6 +2,7 @@
 
 import asyncio
 from enum import StrEnum
+from pathlib import Path
 from typing import Annotated
 
 import typer
@@ -36,6 +37,14 @@ class SearchTypeOption(StrEnum):
 def search(
     context: typer.Context,
     query: Annotated[str, typer.Argument(help="What to look for.")],
+    target_root: Annotated[
+        Path | None,
+        typer.Option(
+            "--target-root",
+            file_okay=False,
+            help="Root of the existing or planned target repository.",
+        ),
+    ] = None,
     project: Annotated[
         str | None,
         typer.Option(
@@ -80,12 +89,7 @@ def search(
     """Find records by text, shared sources and (when available) meaning, labelled by authority."""
     if not query.strip():
         raise typer.BadParameter("Give a non-empty query.", ctx=context, param_hint="QUERY")
-    if project is not None and all_projects:
-        raise typer.BadParameter(
-            "--project and --all-projects cannot be used together.",
-            ctx=context,
-            param_hint="--project",
-        )
+    key, source = resolve_project(project, all_projects, target_root)
     env: Environment = cli_state(context).environment()
     if semantic and semantic_mode(env) is SemanticModeEnum.OFF:
         raise typer.BadParameter(
@@ -93,7 +97,6 @@ def search(
             ctx=context,
             param_hint="--semantic",
         )
-    key, source = resolve_project(project, all_projects)
     space: str = env.knowledge.knowledge_space
 
     async def run(handlers: RetrievalHandlers, space_id: str) -> RecordSearchResultDto:
