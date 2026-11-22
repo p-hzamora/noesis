@@ -52,6 +52,12 @@ def resolve_project(
     return repository_name(common_dir), ProjectSourceEnum.GIT_ROOT
 
 
+def invocation_project() -> str | None:
+    """The project detected from the working directory, independent of any scope override."""
+    common_dir: Path | None = find_common_dir(Path.cwd())
+    return None if common_dir is None else repository_name(common_dir)
+
+
 def _warnings(
     result: RecordSearchResultDto, key: str | None, space: str, source: ProjectSourceEnum
 ) -> tuple[str, ...]:
@@ -71,6 +77,7 @@ def search_response(
     space: str,
     key: str | None,
     source: ProjectSourceEnum,
+    invoked_from: str | None = None,
 ) -> SearchResponse:
     return SearchResponse(
         scope=SearchScopeResponse(
@@ -78,6 +85,7 @@ def search_response(
             project=key,
             project_source=source.value,
             space_wide_only=result.project_scope is ProjectScopeEnum.SPACE_WIDE_ONLY,
+            invocation_project=invoked_from,
         ),
         hits=tuple(
             SearchHitResponse(

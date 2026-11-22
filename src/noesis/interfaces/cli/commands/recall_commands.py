@@ -21,7 +21,11 @@ from noesis.interfaces.cli.bootstrap.retrieval_handlers_builder import (
 from noesis.interfaces.cli.options import JsonOption
 from noesis.interfaces.cli.responses.recall_response import RecallRecordResponse, RecallResponse
 from noesis.interfaces.cli.runtime_resolution import parse_runtimes, resolve_runtimes
-from noesis.interfaces.cli.search_presentation import resolve_project, search_response
+from noesis.interfaces.cli.search_presentation import (
+    invocation_project,
+    resolve_project,
+    search_response,
+)
 from noesis.interfaces.cli.state import cli_state
 
 
@@ -72,7 +76,11 @@ def recall(
 
     result = asyncio.run(with_retrieval(env, run))
     search = search_response(
-        result.search, space=env.knowledge.knowledge_space, key=key, source=source
+        result.search,
+        space=env.knowledge.knowledge_space,
+        key=key,
+        source=source,
+        invoked_from=invocation_project(),
     )
     output.emit(
         RecallResponse(

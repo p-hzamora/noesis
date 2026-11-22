@@ -20,7 +20,11 @@ from noesis.interfaces.cli.bootstrap.retrieval_handlers_builder import (
     with_retrieval,
 )
 from noesis.interfaces.cli.options import JsonOption
-from noesis.interfaces.cli.search_presentation import resolve_project, search_response
+from noesis.interfaces.cli.search_presentation import (
+    invocation_project,
+    resolve_project,
+    search_response,
+)
 from noesis.interfaces.cli.state import cli_state
 
 DEFAULT_LIMIT: int = 10
@@ -117,4 +121,8 @@ def search(
     result: RecordSearchResultDto = asyncio.run(
         with_retrieval(env, run, semantic_opt_in=semantic or require_semantic)
     )
-    output.emit(search_response(result, space=space, key=key, source=source))
+    output.emit(
+        search_response(
+            result, space=space, key=key, source=source, invoked_from=invocation_project()
+        )
+    )

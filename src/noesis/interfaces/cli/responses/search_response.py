@@ -15,12 +15,15 @@ class SearchScopeResponse(FrozenObject):
         project: The project key applied or asked for; None when no key was resolved.
         project_source: `option`, `target_root`, `git_root`, `all_projects` or `none`.
         space_wide_only: True when only space-wide records were searched.
+        invocation_project: The project detected from the working directory, even when
+            `--target-root`, `--project` or `--all-projects` scopes the search elsewhere.
     """
 
     space: str
     project: str | None = None
     project_source: str
     space_wide_only: bool
+    invocation_project: str | None = None
 
 
 class SearchHitResponse(FrozenObject):
