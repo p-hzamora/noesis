@@ -125,6 +125,22 @@ async def test_ac027_default_project(
     )
     assert any("project zeta not found in space" in str(w) for w in unknown.result["warnings"])  # type: ignore[attr-defined]
 
+    target = search(zeta, "--target-root", str(worktree))
+    assert _ids(target) == {ka, kg}
+    assert target.result["scope"]["project_source"] == "target_root"  # type: ignore[index]
+
+    planned = acme / "new-repository"
+    fresh = search(acme, "--target-root", str(planned))
+    assert _ids(fresh) == {kg}
+    assert fresh.result["scope"]["space_wide_only"] is True  # type: ignore[index]
+    assert not planned.exists()
+
+    briefing = run_noesis_in(
+        acme, ["recall", "layout", "--no-synthesis", "--target-root", str(planned)], child_env
+    )
+    assert briefing.code == 0, briefing.stdout
+    assert {record["id"] for record in briefing.result["records"]} == {kg}  # type: ignore[attr-defined]
+
     everything = search(acme, "--all-projects")
     assert _ids(everything) == {ka, ko, kg}
     assert everything.result["scope"]["project_source"] == "all_projects"  # type: ignore[index]
