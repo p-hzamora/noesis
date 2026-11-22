@@ -2,7 +2,8 @@
 
 Reads `<codex home>/config.toml` only for the names of the `[plugins."<plugin>@<marketplace>"]`
 tables (no value is copied anywhere), then looks for
-`<codex home>/plugins/cache/<marketplace>/<plugin>/<version>/skills/<s>/SKILL.md`.
+`<codex home>/plugins/cache/<marketplace>/<plugin>/<version>/skills/<s>/SKILL.md`, of which only
+the frontmatter (description, declared requirements) and a digest of the whole file are taken.
 """
 
 import re

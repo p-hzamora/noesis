@@ -1,9 +1,10 @@
 """`IRuntimeInventoryProbe` for Claude Code: user, plugin and project skills and agents.
 
-Reads, by name only: `<config>/skills/<name>/SKILL.md`, the plugin registry
+Reads `<config>/skills/<name>/SKILL.md`, the plugin registry
 `<config>/plugins/installed_plugins.json` (plugin names, install paths and versions), each
 install's `skills/<s>/SKILL.md` and `agents/<a>.md`, and `<project>/.claude/skills|agents`.
-Nothing is executed and no file content other than the registry is read.
+Of each manifest only the frontmatter (description, declared requirements) and a digest of the
+whole file are taken. Nothing is executed and no other file content is read.
 """
 
 import json

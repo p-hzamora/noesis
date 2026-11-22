@@ -11,7 +11,7 @@ from noesis.bounded_context.knowledge.application.dtos import (
 class IRuntimeInventoryProbe(abc.ABC):
     """A read-only probe of one runtime.
 
-    It executes nothing and reads names only. A kind it cannot read (broken configuration) or
+    It executes nothing and reads names and manifest frontmatter only. A kind it cannot read (broken configuration) or
     does not probe is reported in `unreadable_kinds`, never raised.
     """
 
