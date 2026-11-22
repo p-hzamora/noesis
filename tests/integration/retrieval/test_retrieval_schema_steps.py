@@ -20,7 +20,16 @@ ALL_STEPS = [
     "consolidation",
 ]
 NEW_STEPS = ["change_feed", "knowledge_fulltext", "retrieval_index"]
-INIT_STEPS = ["review", *NEW_STEPS, "retrieval_semantic", "catalog", "links", "consolidation"]
+INIT_STEPS = [
+    "review",
+    *NEW_STEPS,
+    "retrieval_semantic",
+    "catalog",
+    "catalog_discovery",
+    "catalog_fulltext",
+    "links",
+    "consolidation",
+]
 
 
 def _schema(settings: Neo4jConnectionSettings) -> tuple[list[object], list[object], list[object]]:

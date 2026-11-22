@@ -104,6 +104,11 @@ ALLOWED_REVISION_PROPERTIES: frozenset[str] = frozenset(
         "declared_version",
         "prerequisites",
         "location",
+        "name",
+        "capabilities",
+        "capabilities_text",
+        "manifest_digest",
+        "origin",
         "source_ids",
         "actor_kind",
         "actor_name",
@@ -639,7 +644,7 @@ async def test_stored_revisions_are_runtime_neutral(
 
     assert {tuple(sorted(row["labels"])) for row in nodes} >= {
         ("CatalogEntry", "Record"),
-        ("Revision",),
+        ("CatalogRevision", "Revision"),
     }
     for row in nodes:
         for name, value in row["props"].items():

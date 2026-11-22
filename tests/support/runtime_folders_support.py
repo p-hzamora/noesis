@@ -1,6 +1,7 @@
 """Temporary folder fixtures shaped like the observed Claude Code and Codex layouts (C6 adapters)."""
 
 import json
+from collections.abc import Mapping
 from pathlib import Path
 
 
@@ -30,6 +31,8 @@ def add_claude_plugin(
     skills: tuple[str, ...] = (),
     agents: tuple[str, ...] = (),
     skill_dirs_without_file: tuple[str, ...] = (),
+    skill_manifests: Mapping[str, str] | None = None,
+    agent_manifests: Mapping[str, str] | None = None,
 ) -> Path:
     """Register `<plugin>@<marketplace>` at `version` and create its skill and agent files.
 
@@ -47,9 +50,11 @@ def add_claude_plugin(
     ]
     write_registry(config_dir, json.dumps(registry))
     for skill in skills:
-        touch(install / "skills" / skill / "SKILL.md", "# skill")
+        touch(
+            install / "skills" / skill / "SKILL.md", (skill_manifests or {}).get(skill, "# skill")
+        )
     for agent in agents:
-        touch(install / "agents" / f"{agent}.md", "# agent")
+        touch(install / "agents" / f"{agent}.md", (agent_manifests or {}).get(agent, "# agent"))
     for skill in skill_dirs_without_file:
         (install / "skills" / skill).mkdir(parents=True, exist_ok=True)
     return install
@@ -63,6 +68,7 @@ def add_codex_plugin(
     *,
     skills: tuple[str, ...] = (),
     extra_lines: tuple[str, ...] = (),
+    skill_manifests: Mapping[str, str] | None = None,
 ) -> None:
     """Add `[plugins."<plugin>@<marketplace>"]` to `config.toml` and cache its skills."""
     config: Path = codex_home / "config.toml"
@@ -80,5 +86,25 @@ def add_codex_plugin(
             / "skills"
             / skill
             / "SKILL.md",
-            "# skill",
+            (skill_manifests or {}).get(skill, "# skill"),
         )
+
+
+def skill_manifest(
+    description: str | None = "Does a thing",
+    *,
+    requires: tuple[str, ...] = (),
+    body: str = "# body",
+) -> str:
+    """A `SKILL.md` with YAML frontmatter holding a description and `metadata.noesis.requires`."""
+    lines: list[str] = ["---", "name: demo"]
+    if description is not None:
+        lines.append(f"description: {description}")
+    if requires:
+        lines += [
+            "metadata:",
+            "  noesis:",
+            "    requires:",
+            *[f"      - {item}" for item in requires],
+        ]
+    return "\n".join([*lines, "---", body, ""])

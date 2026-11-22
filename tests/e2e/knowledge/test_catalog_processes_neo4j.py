@@ -496,6 +496,8 @@ async def test_ac014_core_only_store_rejects_register_until_store_init_adds_cata
                 "retrieval_index",
                 "retrieval_semantic",
                 "catalog",
+                "catalog_discovery",
+                "catalog_fulltext",
                 "links",
                 "consolidation",
             ]

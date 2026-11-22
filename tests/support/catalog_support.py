@@ -5,6 +5,7 @@ fakes stay untouched. Committed catalog state lives in `FakeCatalogStore`, next 
 """
 
 import copy
+import hashlib
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass, field
 from types import TracebackType
@@ -35,6 +36,10 @@ from noesis.bounded_context.knowledge.application.handlers.commands.catalog.regi
 from noesis.bounded_context.knowledge.application.handlers.commands.catalog.revise_catalog_entry_handler import (
     ReviseCatalogEntryCommand,
     ReviseCatalogEntryHandler,
+)
+from noesis.bounded_context.knowledge.application.handlers.commands.catalog.sync_runtime_catalog_handler import (
+    SyncRuntimeCatalogCommand,
+    SyncRuntimeCatalogHandler,
 )
 from noesis.bounded_context.knowledge.application.handlers.queries.catalog import (
     CheckCatalogAvailabilityHandler,
@@ -95,11 +100,30 @@ MCP_SERVER: CatalogEntryKindEnum = CatalogEntryKindEnum.MCP_SERVER
 # --- inventory and DTO builders ---------------------------------------------------------------
 
 
-def artifact(kind: str, name: str, version: str | None = None) -> InstalledArtifactDto:
-    """An installed artifact with a fake install location."""
+def artifact(
+    kind: str,
+    name: str,
+    version: str | None = None,
+    *,
+    description: str | None = None,
+    digest: str | None = None,
+    requires: tuple[str, ...] = (),
+) -> InstalledArtifactDto:
+    """An installed artifact with a fake install location and, optionally, manifest facts."""
     return InstalledArtifactDto(
-        kind=kind, name=name, observed_version=version, install_location=f"/fake/{kind}/{name}"
+        kind=kind,
+        name=name,
+        observed_version=version,
+        install_location=f"/fake/{kind}/{name}",
+        description=description,
+        manifest_digest=digest,
+        declared_requires=requires,
     )
+
+
+def digest_of(seed: str) -> str:
+    """A valid `sha256:` digest that differs per `seed`."""
+    return "sha256:" + hashlib.sha256(seed.encode()).hexdigest()
 
 
 def unreadable(kind: str, reason: str) -> UnreadableKindDto:
@@ -365,6 +389,9 @@ class FakeCatalogEntryReadRepository(ICatalogEntryReadRepository):
             declared_version=head.version,
             prerequisites=tuple(p.as_text() for p in head.prerequisites),
             location=head.location,
+            capabilities=tuple(sorted(tag.value for tag in head.capabilities)),
+            manifest_digest=head.manifest_digest.value if head.manifest_digest else None,
+            origin=head.origin,
         )
 
     @staticmethod
@@ -379,6 +406,9 @@ class FakeCatalogEntryReadRepository(ICatalogEntryReadRepository):
             declared_version=revision.version,
             prerequisites=tuple(p.as_text() for p in revision.prerequisites),
             location=revision.location,
+            capabilities=tuple(sorted(tag.value for tag in revision.capabilities)),
+            manifest_digest=revision.manifest_digest.value if revision.manifest_digest else None,
+            origin=revision.origin,
             number=revision.number,
             actor_kind=revision.actor.kind.value,
             actor_name=revision.actor.name,
@@ -553,6 +583,15 @@ def scan_query(
     return ScanRuntimeCatalogQuery(runtimes=runtimes, **space)  # type: ignore[arg-type]
 
 
+def sync_command(
+    *runtimes: RuntimeEnum, dry_run: bool = False, space_key: Key = DEFAULT_SPACE_KEY
+) -> SyncRuntimeCatalogCommand:
+    """A sync command for `runtimes` (Claude Code by default)."""
+    return SyncRuntimeCatalogCommand(
+        space_key=space_key, runtimes=runtimes or (CLAUDE,), actor=AGENT, dry_run=dry_run
+    )
+
+
 # --- environment ------------------------------------------------------------------------------
 
 
@@ -633,6 +672,17 @@ class CatalogEnv:
             schema=self.base.schema,
             runtime_probes=probes_of(*probes),
             host_tools=host_tools or FakeHostToolProbe(),
+        )
+
+    def syncer(self, *probes: IRuntimeInventoryProbe) -> SyncRuntimeCatalogHandler:
+        """Sync handler over the given probes, writing through this environment's handlers."""
+        return SyncRuntimeCatalogHandler(
+            read_repository=self.read,
+            records=self.records,
+            schema=self.base.schema,
+            runtime_probes=probes_of(*probes),
+            register=self.register,
+            revise=self.revise,
         )
 
     def scanner(
