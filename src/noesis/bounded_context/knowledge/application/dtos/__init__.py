@@ -8,6 +8,7 @@ from .availability_summary_dto import AvailabilitySummaryDto
 from .capture_result_dto import CaptureResultDto
 from .catalog_entry_detail_dto import CatalogEntryDetailDto
 from .catalog_entry_dto import CatalogEntryDto
+from .catalog_sync_dtos import SkippedArtifactDto, SyncedEntryDto, SyncReportDto, SyncRuntimeDto
 from .catalog_write_result_dto import CatalogWriteResultDto
 from .consolidation_dtos import (
     LINK_POLICY,
@@ -147,6 +148,10 @@ __all__ = [
     "RuntimeInventoryDto",
     "ScanReportDto",
     "ScanRuntimeDto",
+    "SkippedArtifactDto",
+    "SyncReportDto",
+    "SyncRuntimeDto",
+    "SyncedEntryDto",
     "SourceDto",
     "SupersededByDto",
     "SpaceDto",

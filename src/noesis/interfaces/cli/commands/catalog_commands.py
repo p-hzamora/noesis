@@ -1,4 +1,4 @@
-"""`noesis catalog`: register capabilities and check what is actually available to run."""
+"""`noesis catalog`: register capabilities, sync them from what is installed, check availability."""
 
 import asyncio
 from typing import Annotated
@@ -12,12 +12,16 @@ from noesis.bounded_context.knowledge.application.dtos import (
     CatalogWriteResultDto,
     RuntimeEnum,
     ScanReportDto,
+    SyncReportDto,
 )
 from noesis.bounded_context.knowledge.application.handlers.commands.catalog.register_catalog_entry_handler import (
     RegisterCatalogEntryCommand,
 )
 from noesis.bounded_context.knowledge.application.handlers.commands.catalog.revise_catalog_entry_handler import (
     ReviseCatalogEntryCommand,
+)
+from noesis.bounded_context.knowledge.application.handlers.commands.catalog.sync_runtime_catalog_handler import (
+    SyncRuntimeCatalogCommand,
 )
 from noesis.bounded_context.knowledge.application.handlers.queries.catalog import (
     CheckCatalogAvailabilityQuery,
@@ -42,6 +46,7 @@ from noesis.interfaces.cli.responses import (
     CatalogListResponse,
     CatalogScanResponse,
     CatalogShowResponse,
+    CatalogSyncResponse,
     CatalogWriteResponse,
 )
 from noesis.interfaces.cli.responses.record_response import RecordActorResponse
@@ -313,3 +318,28 @@ def scan(
         with_knowledge(env, lambda handlers: handlers.scan_runtime_catalog.handle(query))
     )
     output.emit(CatalogScanResponse.model_validate(report.model_dump(mode="json")))
+
+
+@catalog_app.command("sync")
+def sync(
+    context: typer.Context,
+    runtime: RuntimeOption = None,
+    dry_run: Annotated[
+        bool,
+        typer.Option("--dry-run", help="Report what would change without writing."),
+    ] = False,
+    as_json: JsonOption = False,
+) -> None:
+    """Register and revise entries for installed skills and agents; never deletes."""
+    parse_runtimes(runtime or [])
+    env: Environment = cli_state(context).environment()
+    command = SyncRuntimeCatalogCommand(
+        space_key=Key(value=env.knowledge.knowledge_space),
+        runtimes=resolve_runtimes(runtime or [], env.identity),
+        actor=resolve_actor(env.identity),
+        dry_run=dry_run,
+    )
+    report: SyncReportDto = asyncio.run(
+        with_knowledge(env, lambda handlers: handlers.sync_runtime_catalog.handle(command))
+    )
+    output.emit(CatalogSyncResponse.model_validate(report.model_dump(mode="json")))

@@ -45,6 +45,9 @@ class CatalogEntryResponse(FrozenObject):
         declared_version: Declared version, when there is one.
         prerequisites: What must be present, as `kind:name`.
         location: Where its definition lives.
+        capabilities: Capability tags of the head revision.
+        manifest_digest: Manifest hash the head revision was synced from, when it has one.
+        origin: `registered` (stated by hand) or `discovered` (made by `catalog sync`).
     """
 
     id: str
@@ -56,6 +59,9 @@ class CatalogEntryResponse(FrozenObject):
     declared_version: str | None = None
     prerequisites: tuple[str, ...] = ()
     location: str
+    capabilities: tuple[str, ...] = ()
+    manifest_digest: str | None = None
+    origin: str = "registered"
 
 
 class CatalogListResponse(IRenderableResponse):
@@ -316,6 +322,101 @@ class CatalogScanResponse(IRenderableResponse):
             lines += [
                 f"  not installed {item.kind}:{item.name} ({item.location})"
                 for item in block.not_installed
+            ]
+            lines += [f"  unreadable {item.kind}: {item.reason}" for item in block.unreadable_kinds]
+        lines += [f"next: {step}" for step in self.next_steps]
+        return "\n".join(lines)
+
+
+class SyncedEntryResponse(FrozenObject):
+    """An entry a sync registered or revised (or would, on a dry run).
+
+    Attributes:
+        kind: Entry kind.
+        name: Entry name.
+        manifest_digest: Manifest hash the revision rests on.
+        entry_id: The entry; null on a dry run that would register it.
+        revision: Revision written; null on a dry run.
+    """
+
+    kind: str
+    name: str
+    manifest_digest: str
+    entry_id: str | None = None
+    revision: int | None = None
+
+
+class SkippedArtifactResponse(FrozenObject):
+    """An installed artifact a sync did not write.
+
+    Attributes:
+        kind: Artifact kind.
+        name: Artifact name.
+        reason: `invalid_name`, `manifest_unreadable` or `write_conflict`.
+    """
+
+    kind: str
+    name: str
+    reason: str
+
+
+class SyncRuntimeResponse(FrozenObject):
+    """The sync of one runtime.
+
+    Attributes:
+        runtime: The runtime.
+        host: Machine observed.
+        observed_at: ISO-8601 UTC time.
+        registered: Entries created.
+        revised: Entries that got a new revision.
+        unchanged: How many installed artifacts already match their entry.
+        not_installed: Entries with no installed match (kept).
+        skipped: Installed artifacts that were not written.
+        unreadable_kinds: Kinds that could not be read.
+    """
+
+    runtime: str
+    host: str
+    observed_at: str
+    registered: tuple[SyncedEntryResponse, ...] = ()
+    revised: tuple[SyncedEntryResponse, ...] = ()
+    unchanged: int = 0
+    not_installed: tuple[NotInstalledResponse, ...] = ()
+    skipped: tuple[SkippedArtifactResponse, ...] = ()
+    unreadable_kinds: tuple[UnreadableKindResponse, ...] = ()
+
+
+class CatalogSyncResponse(IRenderableResponse):
+    """`catalog sync`: what was registered, revised, kept or skipped, per runtime.
+
+    Attributes:
+        dry_run: True when nothing was written.
+        runtimes: One block per synced runtime.
+        next_steps: What to do about what was found.
+    """
+
+    dry_run: bool
+    runtimes: tuple[SyncRuntimeResponse, ...]
+    next_steps: tuple[str, ...] = ()
+
+    def render(self) -> str:
+        verb: str = "would " if self.dry_run else ""
+        lines: list[str] = []
+        for block in self.runtimes:
+            lines.append(
+                f"{block.runtime} on {block.host} at {block.observed_at}: "
+                f"{len(block.registered)} {verb}registered, {len(block.revised)} {verb}revised, "
+                f"{block.unchanged} unchanged, {len(block.not_installed)} not installed, "
+                f"{len(block.skipped)} skipped"
+            )
+            lines += [f"  {verb}register {item.kind}:{item.name}" for item in block.registered]
+            lines += [f"  {verb}revise {item.kind}:{item.name}" for item in block.revised]
+            lines += [
+                f"  not installed {item.kind}:{item.name} ({item.location})"
+                for item in block.not_installed
+            ]
+            lines += [
+                f"  skipped {item.kind}:{item.name} ({item.reason})" for item in block.skipped
             ]
             lines += [f"  unreadable {item.kind}: {item.reason}" for item in block.unreadable_kinds]
         lines += [f"next: {step}" for step in self.next_steps]

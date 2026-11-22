@@ -36,6 +36,9 @@ from noesis.bounded_context.knowledge.application.handlers.commands.catalog.regi
 from noesis.bounded_context.knowledge.application.handlers.commands.catalog.revise_catalog_entry_handler import (
     ReviseCatalogEntryHandler,
 )
+from noesis.bounded_context.knowledge.application.handlers.commands.catalog.sync_runtime_catalog_handler import (
+    SyncRuntimeCatalogHandler,
+)
 from noesis.bounded_context.knowledge.application.handlers.commands.initialise_store_handler import (
     InitialiseStoreHandler,
 )
@@ -84,8 +87,11 @@ from noesis.bounded_context.knowledge.application.ports.runtime import (
 )
 from noesis.bounded_context.knowledge.infrastructure.inbound.retrieval import (
     CatalogAvailabilityInboundAdapter,
+    Neo4jResourceCatalogReaderAdapter,
 )
 from noesis.bounded_context.knowledge.infrastructure.outbound.persistence import (
+    CATALOG_DISCOVERY_SCHEMA_STEP,
+    CATALOG_FULLTEXT_SCHEMA_STEP,
     CATALOG_SCHEMA_STEP,
     CONSOLIDATION_SCHEMA_STEP,
     CORE_SCHEMA_STEP,
@@ -113,6 +119,8 @@ EXTRA_SCHEMA_STEPS: tuple[Neo4jSchemaStep, ...] = (
     REVIEW_SCHEMA_STEP,
     *RETRIEVAL_SCHEMA_STEPS,
     CATALOG_SCHEMA_STEP,
+    CATALOG_DISCOVERY_SCHEMA_STEP,
+    CATALOG_FULLTEXT_SCHEMA_STEP,
     LINKS_SCHEMA_STEP,
     CONSOLIDATION_SCHEMA_STEP,
 )
@@ -153,6 +161,7 @@ class KnowledgeHandlers:
         get_catalog_entry: Show one catalog entry.
         check_catalog_availability: Check what is installed against the catalog.
         scan_runtime_catalog: Compare what is installed with the catalog.
+        sync_runtime_catalog: Register and revise entries for what is installed.
     """
 
     capture_knowledge: CaptureKnowledgeHandler
@@ -179,6 +188,7 @@ class KnowledgeHandlers:
     get_catalog_entry: GetCatalogEntryHandler
     check_catalog_availability: CheckCatalogAvailabilityHandler
     scan_runtime_catalog: ScanRuntimeCatalogHandler
+    sync_runtime_catalog: SyncRuntimeCatalogHandler
 
 
 def _catalog_probes(
@@ -230,6 +240,18 @@ def build_catalog_availability_adapter(
     )
 
 
+def build_resource_catalog_reader(
+    client: Neo4jClient, environment: Environment
+) -> Neo4jResourceCatalogReaderAdapter:
+    """Wire Retrieval's resource search over `client` (the caller closes it); opens no connection."""
+    clock = SystemClockAdapter()
+    persistence: KnowledgePersistence = build_knowledge_persistence(
+        client, clock=clock, extra_steps=EXTRA_SCHEMA_STEPS
+    )
+    runtime_probes, _ = _catalog_probes(clock, environment)
+    return Neo4jResourceCatalogReaderAdapter(client, persistence.schema, runtime_probes)
+
+
 def build_knowledge(client: Neo4jClient, environment: Environment) -> KnowledgeHandlers:
     """Wire the handlers over `client` (the caller closes it); opens no connection."""
     clock = SystemClockAdapter()
@@ -237,6 +259,18 @@ def build_knowledge(client: Neo4jClient, environment: Environment) -> KnowledgeH
         client, clock=clock, extra_steps=EXTRA_SCHEMA_STEPS
     )
     runtime_probes, host_tools = _catalog_probes(clock, environment)
+    register_catalog_entry = RegisterCatalogEntryHandler(
+        uow_factory=persistence.uow_factory,
+        clock=clock,
+        ids=persistence.ids,
+        schema=persistence.schema,
+    )
+    revise_catalog_entry = ReviseCatalogEntryHandler(
+        uow_factory=persistence.uow_factory,
+        clock=clock,
+        ids=persistence.ids,
+        schema=persistence.schema,
+    )
     return KnowledgeHandlers(
         capture_knowledge=CaptureKnowledgeHandler(
             uow_factory=persistence.uow_factory,
@@ -340,18 +374,8 @@ def build_knowledge(client: Neo4jClient, environment: Environment) -> KnowledgeH
             records=persistence.read_repository,
             schema=persistence.schema,
         ),
-        register_catalog_entry=RegisterCatalogEntryHandler(
-            uow_factory=persistence.uow_factory,
-            clock=clock,
-            ids=persistence.ids,
-            schema=persistence.schema,
-        ),
-        revise_catalog_entry=ReviseCatalogEntryHandler(
-            uow_factory=persistence.uow_factory,
-            clock=clock,
-            ids=persistence.ids,
-            schema=persistence.schema,
-        ),
+        register_catalog_entry=register_catalog_entry,
+        revise_catalog_entry=revise_catalog_entry,
         list_catalog_entries=ListCatalogEntriesHandler(
             read_repository=persistence.catalog_read_repository,
             records=persistence.read_repository,
@@ -369,6 +393,14 @@ def build_knowledge(client: Neo4jClient, environment: Environment) -> KnowledgeH
             schema=persistence.schema,
             runtime_probes=runtime_probes,
             host_tools=host_tools,
+        ),
+        sync_runtime_catalog=SyncRuntimeCatalogHandler(
+            read_repository=persistence.catalog_read_repository,
+            records=persistence.read_repository,
+            schema=persistence.schema,
+            runtime_probes=runtime_probes,
+            register=register_catalog_entry,
+            revise=revise_catalog_entry,
         ),
     )
 

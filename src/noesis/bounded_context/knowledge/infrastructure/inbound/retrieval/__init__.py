@@ -10,6 +10,7 @@ from .neo4j_record_change_feed_adapter import Neo4jRecordChangeFeedAdapter
 from .neo4j_record_neighbour_reader_adapter import Neo4jRecordNeighbourReaderAdapter
 from .neo4j_record_state_reader_adapter import Neo4jRecordStateReaderAdapter
 from .neo4j_record_text_search_adapter import Neo4jRecordTextSearchAdapter
+from .neo4j_resource_catalog_reader_adapter import Neo4jResourceCatalogReaderAdapter
 
 __all__ = [
     "CatalogAvailabilityInboundAdapter",
@@ -18,4 +19,5 @@ __all__ = [
     "Neo4jRecordNeighbourReaderAdapter",
     "Neo4jRecordStateReaderAdapter",
     "Neo4jRecordTextSearchAdapter",
+    "Neo4jResourceCatalogReaderAdapter",
 ]
