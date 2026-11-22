@@ -14,7 +14,8 @@ noesis search <query> [--project <key> | --target-root <path> | --all-projects] 
   searched and `result.warnings` says so. Search never creates a project.
 - `result.hits[]`: `id`, `type`, `subtype`, `title`, `revision`, `status`, `authority`, `project`,
   `sources`, `revised_at`, `rank`. `result.scope`: `space`, `project`, `project_source`
-  (`option`, `target_root`, `git_root`, `all_projects`, `none`), `space_wide_only`. `result.index`:
+  (`option`, `target_root`, `git_root`, `all_projects`, `none`), `space_wide_only`, `invocation_project` (the project detected from the working directory, even when
+  `--target-root` scopes elsewhere; null outside a git repository). `result.index`:
   `pending_changes`, `stale_hits`, `semantic.state`, `filter_shortfall`.
 - Semantic (optional, English only; see [index](index.md#semantic-search-setup-english-only)):
   in `resident` mode a running `noesis index embedder serve` adds `semantic` candidates
@@ -32,4 +33,5 @@ noesis search <query> [--project <key> | --target-root <path> | --all-projects] 
 When the task targets another checkout or a planned project, pass its repository root with
 `--target-root <path>` to search or recall. A linked worktree uses its main repository key.
 A planned or uninitialized root searches only space-wide records, even inside another checkout.
-The scope reports `project_source: target_root`. Paths mentioned in task text do not select scope.
+The scope reports `project_source: target_root` and keeps the invoking project in
+`invocation_project`. Paths mentioned in task text do not select scope.
