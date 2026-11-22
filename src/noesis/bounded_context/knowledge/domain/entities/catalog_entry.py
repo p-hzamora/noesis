@@ -13,10 +13,13 @@ from noesis.bounded_context.knowledge.domain.value_objects import (
     Actor,
     CatalogEntryKindEnum,
     CatalogEntryName,
+    CatalogOriginEnum,
     CatalogRef,
     CatalogRevision,
+    ContentHash,
     RecordId,
     SpaceId,
+    Tag,
 )
 from noesis.exceptions import InvalidCatalogPrerequisiteError, RevisionConflictError
 from noesis.shared_kernel.domain.entities import AggregateRoot
@@ -82,6 +85,9 @@ class CatalogEntry(AggregateRoot["CatalogEntry"]):
         version: str | None,
         prerequisites: tuple[CatalogRef, ...],
         location: str,
+        capabilities: frozenset[Tag] = frozenset(),
+        manifest_digest: ContentHash | None = None,
+        origin: CatalogOriginEnum = CatalogOriginEnum.REGISTERED,
     ) -> bool:
         """Whether the head already says exactly this, so a revision would change nothing.
 
@@ -94,6 +100,9 @@ class CatalogEntry(AggregateRoot["CatalogEntry"]):
             and version == head.version
             and prerequisites == head.prerequisites
             and location.strip() == head.location
+            and capabilities == head.capabilities
+            and manifest_digest == head.manifest_digest
+            and origin is head.origin
         )
 
     @classmethod
@@ -111,6 +120,9 @@ class CatalogEntry(AggregateRoot["CatalogEntry"]):
         actor: Actor,
         source_ids: tuple[RecordId, ...],
         now: datetime,
+        capabilities: frozenset[Tag] = frozenset(),
+        manifest_digest: ContentHash | None = None,
+        origin: CatalogOriginEnum = CatalogOriginEnum.REGISTERED,
     ) -> Self:
         """Register an entry with its first revision.
 
@@ -139,6 +151,9 @@ class CatalogEntry(AggregateRoot["CatalogEntry"]):
                     actor=actor,
                     source_ids=tuple(dict.fromkeys(source_ids)),
                     created_at=now,
+                    capabilities=capabilities,
+                    manifest_digest=manifest_digest,
+                    origin=origin,
                 ),
             ),
             created_at=now,
@@ -160,6 +175,9 @@ class CatalogEntry(AggregateRoot["CatalogEntry"]):
         actor: Actor,
         source_ids: tuple[RecordId, ...],
         now: datetime,
+        capabilities: frozenset[Tag] = frozenset(),
+        manifest_digest: ContentHash | None = None,
+        origin: CatalogOriginEnum = CatalogOriginEnum.REGISTERED,
     ) -> CatalogRevision:
         """Append revision n+1 with the full content given.
 
@@ -174,6 +192,9 @@ class CatalogEntry(AggregateRoot["CatalogEntry"]):
             actor: Who revises.
             source_ids: Sources of the new revision; at least one.
             now: Revision time.
+            capabilities: Capability tags of the new revision (full value, not a patch).
+            manifest_digest: Manifest hash of the new revision, or None for none.
+            origin: Origin of the new revision.
 
         Raises:
             RevisionConflictError: `expected_revision` is not the head.
@@ -203,6 +224,9 @@ class CatalogEntry(AggregateRoot["CatalogEntry"]):
             actor=actor,
             source_ids=tuple(dict.fromkeys(source_ids)),
             created_at=now,
+            capabilities=capabilities,
+            manifest_digest=manifest_digest,
+            origin=origin,
         )
         self.revisions = (*self.revisions, revision)
         self.updated_at = now

@@ -1,6 +1,9 @@
 """A catalog entry with its head revision's content."""
 
-from noesis.bounded_context.knowledge.domain.value_objects import CatalogEntryKindEnum
+from noesis.bounded_context.knowledge.domain.value_objects import (
+    CatalogEntryKindEnum,
+    CatalogOriginEnum,
+)
 from noesis.shared_kernel.application.dtos import BaseDto
 
 
@@ -17,6 +20,9 @@ class CatalogEntryDto(BaseDto):
         declared_version: Declared version, when there is one.
         prerequisites: What must be present, as `kind:name` text.
         location: Where its definition lives.
+        capabilities: Capability tags of the head revision, sorted.
+        manifest_digest: Manifest hash the head revision was synced from, when it has one.
+        origin: Whether the head revision was `registered` by a caller or `discovered` by a sync.
     """
 
     id: str
@@ -28,3 +34,6 @@ class CatalogEntryDto(BaseDto):
     declared_version: str | None = None
     prerequisites: tuple[str, ...] = ()
     location: str
+    capabilities: tuple[str, ...] = ()
+    manifest_digest: str | None = None
+    origin: CatalogOriginEnum = CatalogOriginEnum.REGISTERED

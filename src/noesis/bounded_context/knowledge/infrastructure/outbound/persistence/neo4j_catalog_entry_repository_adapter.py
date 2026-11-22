@@ -29,7 +29,7 @@ from .neo4j_write_support import TransactionProvider, already_exists, require_re
 _CREATE: LiteralString = """
 MATCH (space:Space {id: $space_id})
 CREATE (entry:Record:CatalogEntry $entry)-[:IN_SPACE]->(space)
-CREATE (revision:Revision $revision)-[:REVISION_OF]->(entry)
+CREATE (revision:Revision:CatalogRevision $revision)-[:REVISION_OF]->(entry)
 """
 _LINK_SOURCES: LiteralString = """
 MATCH (revision:Revision {revision_key: $revision_key})
@@ -57,7 +57,7 @@ RETURN entry.id AS id
 _APPEND: LiteralString = """
 MATCH (entry:CatalogEntry {id: $id, space_id: $space_id})
 WHERE entry.head_revision = $previous
-CREATE (revision:Revision $revision)-[:REVISION_OF]->(entry)
+CREATE (revision:Revision:CatalogRevision $revision)-[:REVISION_OF]->(entry)
 SET entry.head_revision = $number, entry.updated_at = $updated_at
 RETURN entry.id AS id
 """
@@ -93,7 +93,9 @@ class Neo4jCatalogEntryRepositoryAdapter(ICatalogEntryRepository):
                 {
                     "space_id": entry.space_id.value,
                     "entry": CatalogEntryNodeMapper.to_properties(entry),
-                    "revision": CatalogEntryNodeMapper.to_revision_properties(entry.id, entry.head),
+                    "revision": CatalogEntryNodeMapper.to_revision_properties(
+                        entry.id, entry.name, entry.head
+                    ),
                 },
             )
         except GraphStoreConstraintViolatedError as error:
@@ -157,7 +159,9 @@ class Neo4jCatalogEntryRepositoryAdapter(ICatalogEntryRepository):
                     "previous": revision.number - 1,
                     "number": revision.number,
                     "updated_at": entry.updated_at,
-                    "revision": CatalogEntryNodeMapper.to_revision_properties(entry.id, revision),
+                    "revision": CatalogEntryNodeMapper.to_revision_properties(
+                        entry.id, entry.name, revision
+                    ),
                 },
             )
         except GraphStoreConstraintViolatedError as error:

@@ -1,7 +1,10 @@
 """`CatalogEntry` <-> `:Record:CatalogEntry` node plus its `:Revision` nodes.
 
 A revision stores only runtime-neutral values: `purpose`, `declared_version` (absent when
-there is none), `prerequisites` as `kind:name` strings, `location`, and the usual envelope.
+there is none), `prerequisites` as `kind:name` strings, `location`, `capabilities` (and their
+`capabilities_text` for the full-text index), `manifest_digest` (absent when none), `origin`, the
+entry `name` (so the full-text index can see it) and the usual envelope. Nodes written before the
+discovery fields existed read with their defaults.
 """
 
 from collections.abc import Iterable
@@ -10,10 +13,13 @@ from noesis.bounded_context.knowledge.domain.entities import CatalogEntry
 from noesis.bounded_context.knowledge.domain.value_objects import (
     CatalogEntryKindEnum,
     CatalogEntryName,
+    CatalogOriginEnum,
     CatalogRef,
     CatalogRevision,
+    ContentHash,
     RecordId,
     SpaceId,
+    Tag,
 )
 
 from .actor_properties import to_actor, to_actor_properties
@@ -39,10 +45,14 @@ class CatalogEntryNodeMapper:
         }
 
     @staticmethod
-    def to_revision_properties(record_id: RecordId, revision: CatalogRevision) -> NodeProperties:
-        """Properties of one `:Revision` node."""
+    def to_revision_properties(
+        record_id: RecordId, name: CatalogEntryName, revision: CatalogRevision
+    ) -> NodeProperties:
+        """Properties of one `:Revision:CatalogRevision` node of the entry called `name`."""
+        capabilities: list[str] = sorted(tag.value for tag in revision.capabilities)
         return without_nulls(
             {
+                "name": name.value,
                 "revision_key": revision_key(record_id, revision.number),
                 "record_id": record_id.value,
                 "number": revision.number,
@@ -50,6 +60,12 @@ class CatalogEntryNodeMapper:
                 "declared_version": revision.version,
                 "prerequisites": [ref.as_text() for ref in revision.prerequisites],
                 "location": revision.location,
+                "capabilities": capabilities,
+                "capabilities_text": " ".join(capabilities),
+                "manifest_digest": revision.manifest_digest.value
+                if revision.manifest_digest
+                else None,
+                "origin": revision.origin.value,
                 "source_ids": [source_id.value for source_id in revision.source_ids],
                 "created_at": revision.created_at,
                 **to_actor_properties(revision.actor),
@@ -68,6 +84,11 @@ class CatalogEntryNodeMapper:
             actor=to_actor(node),
             source_ids=tuple(RecordId(value=source_id) for source_id in node["source_ids"]),
             created_at=node["created_at"],
+            capabilities=frozenset(Tag(value=tag) for tag in node.get("capabilities") or ()),
+            manifest_digest=ContentHash(value=digest)
+            if (digest := node.get("manifest_digest"))
+            else None,
+            origin=CatalogOriginEnum(node.get("origin") or CatalogOriginEnum.REGISTERED),
         )
 
     @staticmethod

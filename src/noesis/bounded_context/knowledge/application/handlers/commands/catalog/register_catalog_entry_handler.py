@@ -38,10 +38,13 @@ from noesis.bounded_context.knowledge.domain.value_objects import (
     Actor,
     CatalogEntryKindEnum,
     CatalogEntryName,
+    CatalogOriginEnum,
     CatalogRef,
+    ContentHash,
     Key,
     RecordId,
     SpaceId,
+    Tag,
 )
 from noesis.exceptions import (
     CatalogEntryAlreadyExistsError,
@@ -69,6 +72,9 @@ class RegisterCatalogEntryCommand(FrozenObject):
         location: Where its definition is version-controlled; never an install path.
         actor: Who registers.
         sources: Existing source ids and/or new source descriptions; at least one.
+        capabilities: Capability tags; empty for none.
+        manifest_digest: Hash of the manifest the values were read from, when a sync made them.
+        origin: `registered` when a caller states the values, `discovered` when a sync does.
     """
 
     idempotency_key: str = Field(min_length=1)
@@ -81,6 +87,9 @@ class RegisterCatalogEntryCommand(FrozenObject):
     location: str
     actor: Actor
     sources: tuple[SourceInput, ...]
+    capabilities: tuple[str, ...] = ()
+    manifest_digest: ContentHash | None = None
+    origin: CatalogOriginEnum = CatalogOriginEnum.REGISTERED
 
 
 class RegisterCatalogEntryHandler(IHandler[RegisterCatalogEntryCommand, CatalogWriteResultDto]):
@@ -165,6 +174,9 @@ class RegisterCatalogEntryHandler(IHandler[RegisterCatalogEntryCommand, CatalogW
             actor=action.actor,
             source_ids=source_ids,
             now=now,
+            capabilities=frozenset(Tag(value=tag) for tag in action.capabilities),
+            manifest_digest=action.manifest_digest,
+            origin=action.origin,
         )
         changes: list[PendingRecordChange] = pending_changes_from(
             entry.collect_events(), record_type="catalog_entry", status=None, occurred_at=now

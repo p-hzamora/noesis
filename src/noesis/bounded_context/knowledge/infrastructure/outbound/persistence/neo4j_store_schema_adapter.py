@@ -28,6 +28,9 @@ class Neo4jSchemaStep:
     Attributes:
         name: Stable name recorded once applied (`core`, ...).
         statements: Cypher schema statements, each idempotent (`IF NOT EXISTS`).
+        backfill: Data statements run after the schema statements commit and before `check`, in
+            a transaction of their own (Neo4j cannot mix schema and data writes); each must be
+            idempotent, so a crash before the step is recorded is repaired by the next run.
         check: Runs after the statements commit and before the step is recorded; raises when
             what exists does not match what the statements ask (an index created earlier with
             other options), so the step stays unrecorded until repaired.
@@ -35,6 +38,7 @@ class Neo4jSchemaStep:
 
     name: str
     statements: tuple[LiteralString, ...]
+    backfill: tuple[LiteralString, ...] = ()
     check: Callable[[Neo4jClient], Awaitable[None]] | None = None
 
 
@@ -134,6 +138,11 @@ class Neo4jStoreSchemaAdapter(IStoreSchema):
             for statement in step.statements:
                 await schema.run(statement)
             await schema.commit()
+        if step.backfill:
+            async with await self._client.begin() as data:
+                for statement in step.backfill:
+                    await data.run(statement)
+                await data.commit()
         if step.check is not None:
             await step.check(self._client)
         async with await self._client.begin() as meta:

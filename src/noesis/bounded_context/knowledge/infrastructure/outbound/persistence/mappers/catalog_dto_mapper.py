@@ -4,6 +4,7 @@ from noesis.bounded_context.knowledge.application.dtos import (
     CatalogEntryDetailDto,
     CatalogEntryDto,
 )
+from noesis.bounded_context.knowledge.domain.value_objects import CatalogOriginEnum
 
 from .node_properties import NodeProperties
 
@@ -24,6 +25,9 @@ class CatalogDtoMapper:
             declared_version=revision.get("declared_version"),
             prerequisites=tuple(revision["prerequisites"]),
             location=revision["location"],
+            capabilities=tuple(revision.get("capabilities") or ()),
+            manifest_digest=revision.get("manifest_digest"),
+            origin=revision.get("origin") or CatalogOriginEnum.REGISTERED,
         )
 
     @staticmethod

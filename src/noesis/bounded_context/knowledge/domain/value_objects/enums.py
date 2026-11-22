@@ -31,6 +31,7 @@ class SourceKindEnum(StrEnum):
     AGENT_SESSION = "agent_session"
     URL = "url"
     WORK_BRIEF = "work_brief"
+    MANIFEST = "manifest"
 
 
 class ExperienceSubtypeEnum(StrEnum):
@@ -70,6 +71,13 @@ class CatalogEntryKindEnum(StrEnum):
     AGENT = "agent"
     CLI_TOOL = "cli_tool"
     MCP_SERVER = "mcp_server"
+
+
+class CatalogOriginEnum(StrEnum):
+    """How a catalog revision came to be: stated by a caller or found by `catalog sync`."""
+
+    REGISTERED = "registered"
+    DISCOVERED = "discovered"
 
 
 class ActorKindEnum(StrEnum):

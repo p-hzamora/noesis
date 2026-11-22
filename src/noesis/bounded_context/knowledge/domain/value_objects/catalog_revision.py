@@ -6,7 +6,10 @@ from pydantic import Field, field_validator, model_validator
 
 from noesis.bounded_context.knowledge.domain.value_objects.actor import Actor
 from noesis.bounded_context.knowledge.domain.value_objects.catalog_ref import CatalogRef
+from noesis.bounded_context.knowledge.domain.value_objects.content_hash import ContentHash
+from noesis.bounded_context.knowledge.domain.value_objects.enums import CatalogOriginEnum
 from noesis.bounded_context.knowledge.domain.value_objects.record_id import RecordId
+from noesis.bounded_context.knowledge.domain.value_objects.tag import Tag
 from noesis.exceptions import InvalidRecordError
 from noesis.shared_kernel.domain.value_objects import ValueObject
 
@@ -36,6 +39,11 @@ class CatalogRevision(ValueObject):
         actor: Who made the revision.
         source_ids: Sources it rests on; at least one.
         created_at: When this revision was made.
+        capabilities: Tags naming what it supports; empty when none were stated.
+        manifest_digest: Hash of the manifest file a sync read it from; None when registered by
+            hand.
+        origin: Whether a caller stated it (`registered`) or `catalog sync` found it
+            (`discovered`).
     """
 
     number: int = Field(ge=1)
@@ -46,6 +54,9 @@ class CatalogRevision(ValueObject):
     actor: Actor
     source_ids: tuple[RecordId, ...]
     created_at: datetime
+    capabilities: frozenset[Tag] = frozenset()
+    manifest_digest: ContentHash | None = None
+    origin: CatalogOriginEnum = CatalogOriginEnum.REGISTERED
 
     @field_validator("purpose")
     @classmethod

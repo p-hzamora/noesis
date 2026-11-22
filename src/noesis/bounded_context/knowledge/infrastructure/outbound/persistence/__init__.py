@@ -1,5 +1,10 @@
 """Neo4j persistence of the Knowledge context (labels, edges and keys per 30-record-store.md)."""
 
+from .catalog_discovery_schema_steps import (
+    CATALOG_DISCOVERY_SCHEMA_STEP,
+    CATALOG_FULLTEXT_INDEX,
+    CATALOG_FULLTEXT_SCHEMA_STEP,
+)
 from .consolidation_schema_step import CONSOLIDATION_SCHEMA_STEP
 from .knowledge_persistence_factory import KnowledgePersistence, build_knowledge_persistence
 from .neo4j_assertion_read_adapter import Neo4jAssertionReadAdapter
@@ -40,6 +45,9 @@ from .retrieval_schema_steps import (
 )
 
 __all__ = [
+    "CATALOG_DISCOVERY_SCHEMA_STEP",
+    "CATALOG_FULLTEXT_INDEX",
+    "CATALOG_FULLTEXT_SCHEMA_STEP",
     "CATALOG_SCHEMA_STEP",
     "CHANGE_FEED_SCHEMA_STEP",
     "CONSOLIDATION_SCHEMA_STEP",

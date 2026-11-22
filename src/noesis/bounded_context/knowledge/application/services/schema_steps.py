@@ -21,6 +21,12 @@ LINKS_STEP: str = "links"
 CATALOG_STEP: str = "catalog"
 """The step C6 registers: the uniqueness constraint on `CatalogEntry.catalog_key`."""
 
+CATALOG_DISCOVERY_STEP: str = "catalog_discovery"
+"""Discovery fields on catalog revisions: label, name and defaults for nodes that predate them."""
+
+CATALOG_FULLTEXT_STEP: str = "catalog_fulltext"
+"""The `catalog_fulltext` index over catalog revision name, purpose and capability text."""
+
 
 CONSOLIDATION_STEP: str = "consolidation"
 """C9: uniqueness of the consolidation id and of the membership keys."""

@@ -40,9 +40,11 @@ from noesis.bounded_context.knowledge.domain.value_objects import (
     CatalogEntryKindEnum,
     CatalogRef,
     CatalogRevision,
+    ContentHash,
     Key,
     RecordId,
     SpaceId,
+    Tag,
 )
 from noesis.exceptions import (
     EntryAlreadyExistsError,
@@ -72,6 +74,8 @@ class ReviseCatalogEntryCommand(FrozenObject):
         location: New location; the head's when None.
         actor: Who revises.
         sources: Sources of the new revision; at least one.
+        capabilities: New capability tags; the head's when None, cleared when empty.
+        manifest_digest: Manifest hash the values were read from; the head's when None.
     """
 
     idempotency_key: str = Field(min_length=1)
@@ -84,6 +88,8 @@ class ReviseCatalogEntryCommand(FrozenObject):
     location: str | None = None
     actor: Actor
     sources: tuple[SourceInput, ...]
+    capabilities: tuple[str, ...] | None = None
+    manifest_digest: ContentHash | None = None
 
 
 class ReviseCatalogEntryHandler(IHandler[ReviseCatalogEntryCommand, CatalogWriteResultDto]):
@@ -186,12 +192,23 @@ class ReviseCatalogEntryHandler(IHandler[ReviseCatalogEntryCommand, CatalogWrite
                 merged_location: str = (
                     previous.location if action.location is None else action.location
                 )
+                merged_capabilities: frozenset[Tag] = (
+                    previous.capabilities
+                    if action.capabilities is None
+                    else frozenset(Tag(value=tag) for tag in action.capabilities)
+                )
+                merged_digest: ContentHash | None = (
+                    action.manifest_digest or previous.manifest_digest
+                )
                 # A stale request still goes through `revise` so it raises the conflict.
                 if action.expected_revision == entry.head_number and entry.head_has_content(
                     purpose=merged_purpose,
                     version=merged_version,
                     prerequisites=merged_prerequisites,
                     location=merged_location,
+                    capabilities=merged_capabilities,
+                    manifest_digest=merged_digest,
+                    origin=previous.origin,
                 ):
                     return _write_result(entry, previous.number, replayed=False)
                 revision: CatalogRevision = entry.revise(
@@ -203,6 +220,9 @@ class ReviseCatalogEntryHandler(IHandler[ReviseCatalogEntryCommand, CatalogWrite
                     actor=action.actor,
                     source_ids=new_source_ids,
                     now=now,
+                    capabilities=merged_capabilities,
+                    manifest_digest=merged_digest,
+                    origin=previous.origin,
                 )
                 ledger_entry: LedgerEntry = LedgerEntry(
                     space_id=space_id,
