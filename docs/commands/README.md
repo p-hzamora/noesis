@@ -11,7 +11,7 @@ layer, see [workflows](../workflows/README.md); for the ideas behind the CLI, se
 | `record capture \| revise \| get`, `store init` | [record.md](record.md) |
 | `search` | [search.md](search.md) |
 | `index sync \| rebuild \| status` | [index.md](index.md) |
-| `catalog register \| revise \| list \| show \| check \| scan` | [catalog.md](catalog.md) |
+| `catalog register \| revise \| list \| show \| check \| scan \| sync` | [catalog.md](catalog.md) |
 | `consolidation scan \| propose \| show \| list \| accept \| reject` | [consolidation.md](consolidation.md) |
 | `hook claude-code`, `integrate claude-code install \| uninstall \| status` | [agent-integration.md](agent-integration.md) |
 | `doctor`, `config show \| init`, `skills list \| get`, `update check` | [setup.md](setup.md) |
