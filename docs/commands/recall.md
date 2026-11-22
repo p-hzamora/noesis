@@ -63,3 +63,8 @@ requested final target limit. It reports incomplete discovery if that combined q
 is exceeded. A further 400-path expansion budget per seed bounds highly connected supersession
 DAGs; exhausting it reports a warning and does not guess a terminal. These safety bounds can
 omit otherwise relevant successor-derived candidates; they never create authoritative claims.
+
+When the task targets another checkout or a planned project, pass its repository root with
+`--target-root <path>` to search or recall. A linked worktree uses its main repository key.
+A planned or uninitialized root searches only space-wide records, even inside another checkout.
+The scope reports `project_source: target_root`. Paths mentioned in task text do not select scope.

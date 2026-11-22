@@ -198,7 +198,7 @@ noesis record get <ID> [--revision <N>] --json
 ## Search the record store
 
 ```text
-noesis search <query> [--project <key> | --all-projects] [--tag <t>]... [--type knowledge|experience]...
+noesis search <query> [--project <key> | --target-root <path> | --all-projects] [--tag <t>]... [--type knowledge|experience]...
                       [--status <s>]... [--limit 1..50] [--include-stale] [--require-semantic] [--semantic] [--json]
 ```
 
@@ -473,6 +473,11 @@ relation classes never block `--strict`. A top-level `commit` (7-40 hex) becomes
 Source, de-duplicated with `noesis.sources`; `branch` and top-level `sources` stay ignored.
 
 ## Recall before a task
+
+When the task targets another checkout or a planned project, pass its repository root with
+`--target-root <path>` to search or recall. A linked worktree uses its main repository key.
+A planned or uninitialized root searches only space-wide records, even inside another checkout.
+The scope reports `project_source: target_root`. Paths mentioned in task text do not select scope.
 
 Use `noesis recall "task" --project KEY --no-synthesis --json` for a deterministic,
 model-free digest, or omit `--no-synthesis` for a grounded briefing. Lexical and live graph
