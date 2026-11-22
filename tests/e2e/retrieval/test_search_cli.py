@@ -133,6 +133,9 @@ async def test_ac027_default_project(
     fresh = search(acme, "--target-root", str(planned))
     assert _ids(fresh) == {kg}
     assert fresh.result["scope"]["space_wide_only"] is True  # type: ignore[index]
+    assert fresh.result["scope"]["project_source"] == "target_root"  # type: ignore[index]
+    assert fresh.result["scope"]["invocation_project"] == "acme"  # type: ignore[index]
+    assert ka not in _ids(fresh)
     assert not planned.exists()
 
     briefing = run_noesis_in(
