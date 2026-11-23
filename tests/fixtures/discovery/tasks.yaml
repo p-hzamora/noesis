@@ -5,8 +5,7 @@ tasks:
   - id: golden-new-project
     task: "Create a brand-new project at ~/Desktop/new-test-project, using uv, implemented as a Python CLI, and following my DDD conventions."
     needs: [scaffold, python-ddd, cli, uv]
-    expected_resources: [design-suite:ddd-foundation, design-suite:cli-interface, design-suite:project-scaffolder]
-    optional_resources: [design-suite:python-ddd]
+    expected_resources: [design-suite:ddd-foundation, design-suite:python-ddd, design-suite:cli-interface, design-suite:project-scaffolder]
     expected_load_order: [[design-suite:ddd-foundation, design-suite:python-ddd], [design-suite:ddd-foundation, design-suite:cli-interface]]
     expected_missing: [uv]
     forbidden_records: [legacy-conventions, ddd-layering-old]

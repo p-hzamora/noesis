@@ -51,3 +51,17 @@ def test_no_facets_selects_by_relevance() -> None:
 def test_empty_candidates_and_zero_limit() -> None:
     assert policy.select([], ["a"], 3) == ()
     assert policy.select([cand("a", "skill", {"a"})], ["a"], 0) == ()
+
+
+def test_resource_named_for_a_facet_is_kept_when_another_only_mentions_it() -> None:
+    mentions = CoverageCandidate(
+        id="broad", kind="skill", facets=frozenset({"a", "b"}), named_facets=frozenset({"b"})
+    )
+    named = CoverageCandidate(
+        id="exact",
+        kind="skill",
+        facets=frozenset({"a"}),
+        named_facets=frozenset({"a"}),
+        relevance_rank=3,
+    )
+    assert ids(policy.select([mentions, named], ["a", "b"], 5)) == ["broad", "exact"]
