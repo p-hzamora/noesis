@@ -38,6 +38,7 @@ from noesis.exceptions import (
     RecordNotRevisableError,
     ReferenceNotInSpaceError,
     RelatedLookupUnavailableError,
+    RememberPartiallyAppliedError,
     RevisionConflictError,
     SimilarityUnavailableError,
     SpaceNotFoundError,
@@ -122,6 +123,11 @@ CASES: list[tuple[type[Exception], str, type[Exception]]] = [
     (
         ConsolidationPartiallyAppliedError,
         "KNOWLEDGE_295_CONSOLIDATION_PARTIALLY_APPLIED",
+        ApplicationException,
+    ),
+    (
+        RememberPartiallyAppliedError,
+        "KNOWLEDGE_296_REMEMBER_PARTIALLY_APPLIED",
         ApplicationException,
     ),
 ]

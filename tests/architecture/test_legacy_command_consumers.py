@@ -67,6 +67,7 @@ PENDING_MIGRATION: Final[frozenset[str]] = frozenset(
         "src/noesis/interfaces/cli/commands/record_commands.py",
         "src/noesis/interfaces/cli/responses/record_response.py",
         "src/noesis/interfaces/cli/search_presentation.py",
+        "tests/e2e/knowledge/test_record_capture_shim_neo4j.py",
         "tests/e2e/knowledge/test_review_processes_neo4j.py",
         "tests/e2e/retrieval/test_recall_cli.py",
         "tests/e2e/retrieval/test_search_cli.py",

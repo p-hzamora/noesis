@@ -28,6 +28,7 @@ K, E, A = RecordTypeEnum.KNOWLEDGE, RecordTypeEnum.EXPERIENCE, RecordTypeEnum.AS
 S, P, C = RecordTypeEnum.SOURCE, RecordTypeEnum.PROJECT, RecordTypeEnum.CATALOG_ENTRY
 SUPPORTS, CONTRADICTS = AssertionPredicateEnum.SUPPORTS, AssertionPredicateEnum.CONTRADICTS
 SUPERSEDES, RECOMMENDS = AssertionPredicateEnum.SUPERSEDES, AssertionPredicateEnum.RECOMMENDS
+REFINES = AssertionPredicateEnum.REFINES
 
 # the kind matrix of 20-review.md, as (predicate, subject kind, object kind)
 VALID_KINDS: set[tuple[AssertionPredicateEnum, RecordTypeEnum, RecordTypeEnum]] = {
@@ -41,6 +42,10 @@ VALID_KINDS: set[tuple[AssertionPredicateEnum, RecordTypeEnum, RecordTypeEnum]] 
     (RECOMMENDS, E, K),
     (RECOMMENDS, K, C),
     (RECOMMENDS, E, C),
+    (REFINES, K, K),
+    (REFINES, E, K),
+    (REFINES, K, C),
+    (REFINES, E, C),
 }
 SUBJECT_KINDS: dict[AssertionPredicateEnum, set[RecordTypeEnum]] = {
     predicate: {s for p, s, _ in VALID_KINDS if p == predicate}
@@ -168,3 +173,14 @@ def test_proposing_ignores_the_status_of_endpoints() -> None:
     object_ = ref(K, status=RecordStatusEnum.RETRACTED)
 
     check(SUPERSEDES, subject, object_)
+
+
+def test_refines_object_from_another_space_is_invalid() -> None:
+    with pytest.raises(InvalidAssertionError) as raised:
+        check(REFINES, ref(K), ref(C, space=OTHER_SPACE))
+
+    assert raised.value.metadata["field"] == "object"
+
+
+def test_refines_accepts_a_project_scoped_memory_over_a_global_target() -> None:
+    check(REFINES, ref(K, project=ACME), ref(C), project=ACME)
