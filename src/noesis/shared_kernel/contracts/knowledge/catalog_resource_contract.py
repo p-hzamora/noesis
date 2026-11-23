@@ -47,6 +47,27 @@ class CatalogResourceQueryContract(FrozenObject):
     include_unsynced: bool = False
 
 
+class CatalogResourceLookupContract(FrozenObject):
+    """Version 1 of the exact lookup, used to follow prerequisites and recommendations.
+
+    Attributes:
+        contract_version: Schema version of this payload.
+        space_id: The active knowledge space; only its entries are looked up.
+        refs: Resources named `kind:name`.
+        entry_ids: Catalog entry ids to look up.
+        runtimes: Runtimes whose installed artifacts answer for refs the catalog lacks.
+        include_unsynced: Also resolve refs from installed artifacts that have no entry yet,
+            read live and never written.
+    """
+
+    contract_version: Literal[1] = CATALOG_RESOURCE_CONTRACT_VERSION
+    space_id: str
+    refs: tuple[str, ...] = ()
+    entry_ids: tuple[ResourceEntryId, ...] = ()
+    runtimes: tuple[ResourceRuntime, ...] = ()
+    include_unsynced: bool = False
+
+
 class CatalogResourceHitContract(FrozenObject):
     """One resource that matches the query.
 

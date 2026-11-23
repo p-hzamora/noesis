@@ -28,6 +28,8 @@ from ..ports.briefing import (
 from ..ports.record_source.i_indexable_record_reader import IIndexableRecordReader
 from .record_searcher import RecordSearcher
 
+NO_PROJECT_WARNING: str = "no project resolved; searched space-wide records only"
+
 
 class TaskBriefingService:
     """Orchestrate evidence, review, recommendations and optional synthesis in that order."""
@@ -53,8 +55,15 @@ class TaskBriefingService:
         self._redactor = redactor
         self._budget = max_evidence_chars
 
-    async def brief(self, request: RecallRequestDto) -> RecallResultDto:
-        """Gather evidence; typed store errors always propagate before synthesis."""
+    async def brief(
+        self, request: RecallRequestDto, *, max_evidence_chars: int | None = None
+    ) -> RecallResultDto:
+        """Gather evidence; typed store errors always propagate before synthesis.
+
+        Args:
+            request: The scoped briefing request.
+            max_evidence_chars: Evidence budget for this call; the configured one when None.
+        """
         search = request.search.model_copy(
             update={
                 "include_stale": False,
@@ -68,7 +77,7 @@ class TaskBriefingService:
         project = search.project_key if result.project_id is not None else None
         warnings: list[str] = list(result.warnings)
         if result.project_id is None:
-            warnings.append("no project resolved; searched space-wide records only")
+            warnings.append(NO_PROJECT_WARNING)
         if self._reviews is None:
             warnings.append("review capability unavailable; Knowledge is unreviewed")
         if self._catalog is None:
@@ -96,7 +105,7 @@ class TaskBriefingService:
         records.sort(key=lambda record: BriefingPolicy.rank(record.type, record.authority))
         migrated = any(record.migrated and record.status == "proposed" for record in records)
         hidden: set[str] = set()
-        remaining = self._budget
+        remaining = self._budget if max_evidence_chars is None else max_evidence_chars
         for index, record in enumerate(records):
             try:
                 body = await self._bodies.get(record.id, record.revision, space_id=space)

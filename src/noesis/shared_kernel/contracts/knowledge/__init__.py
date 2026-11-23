@@ -7,7 +7,11 @@ from .catalog_availability_result_contract import (
     CatalogAvailabilityResultContract,
     CatalogAvailabilityRuntimeContract,
 )
-from .catalog_resource_contract import CatalogResourceHitContract, CatalogResourceQueryContract
+from .catalog_resource_contract import (
+    CatalogResourceHitContract,
+    CatalogResourceLookupContract,
+    CatalogResourceQueryContract,
+)
 from .graph_neighbour_contract import GraphNeighbourContract, GraphNeighboursContract
 from .import_knowledge_outcome_contract import ImportKnowledgeOutcomeContract
 from .import_knowledge_request_contract import (
@@ -34,6 +38,7 @@ __all__ = [
     "CatalogAvailabilityResultContract",
     "CatalogAvailabilityRuntimeContract",
     "CatalogResourceHitContract",
+    "CatalogResourceLookupContract",
     "CatalogResourceQueryContract",
     "GraphNeighbourContract",
     "GraphNeighboursContract",

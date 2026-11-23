@@ -33,6 +33,7 @@ from noesis.bounded_context.knowledge.infrastructure.outbound.persistence.catalo
 )
 from noesis.shared_kernel.contracts.knowledge import (
     CatalogResourceHitContract,
+    CatalogResourceLookupContract,
     CatalogResourceQueryContract,
 )
 from noesis.shared_kernel.infrastructure.outbound.neo4j import Neo4jClient
@@ -49,6 +50,15 @@ RETURN entry.id AS entry_id, entry.entry_kind AS kind, entry.name AS name,
        properties(node) AS revision, score
 ORDER BY score DESC, name
 LIMIT $limit
+"""
+_LOOKUP: Final[LiteralString] = """
+MATCH (entry:CatalogEntry {space_id: $space_id})
+WHERE entry.id IN $entry_ids OR (entry.entry_kind + ':' + entry.name) IN $refs
+MATCH (node)-[:REVISION_OF]->(entry)
+WHERE node.number = entry.head_revision
+RETURN entry.id AS entry_id, entry.entry_kind AS kind, entry.name AS name,
+       properties(node) AS revision, 1.0 AS score
+ORDER BY name
 """
 _KEYS: Final[LiteralString] = """
 MATCH (entry:CatalogEntry {space_id: $space_id})
@@ -96,6 +106,61 @@ class Neo4jResourceCatalogReaderAdapter:
             hits += _overlay_hits(installed, cataloged, words, query)
         hits.sort(key=lambda hit: (-hit.score, hit.name, hit.kind))
         return hits[: query.limit]
+
+    async def get_by_refs(
+        self, lookup: CatalogResourceLookupContract
+    ) -> list[CatalogResourceHitContract]:
+        """The entries named by `refs` or `entry_ids`, then installed artifacts for the other refs.
+
+        Exact lookups only: a ref nothing answers is absent from the result, never invented.
+
+        Raises:
+            StoreNotInitialisedError: The `catalog_fulltext` schema step is not applied.
+            GraphStoreUnavailableError: The store is down; nothing was probed.
+        """
+        await require_steps(self._schema, CATALOG_FULLTEXT_STEP)
+        if not lookup.refs and not lookup.entry_ids:
+            return []
+        async with await self._client.begin() as transaction:
+            rows: list[dict[str, Any]] = await transaction.run(
+                _LOOKUP,
+                {
+                    "space_id": lookup.space_id,
+                    "entry_ids": list(lookup.entry_ids),
+                    "refs": list(lookup.refs),
+                },
+            )
+        installed: dict[_Key, list[tuple[RuntimeEnum, InstalledArtifactDto]]] = {}
+        if lookup.runtimes and (lookup.include_unsynced or rows):
+            installed = await self._installed(lookup.runtimes)
+        hits: list[CatalogResourceHitContract] = _catalog_hits(rows, installed)
+        if lookup.include_unsynced and lookup.runtimes:
+            found: set[_Key] = {(hit.kind, hit.name) for hit in hits}
+            wanted: set[_Key] = {
+                (kind, name) for kind, _, name in (ref.partition(":") for ref in lookup.refs)
+            }
+            cataloged: set[_Key] = await self._catalog_keys(lookup.space_id)
+            for key in sorted(wanted - found - cataloged):
+                observations = installed.get(key)
+                if not observations:
+                    continue
+                artifact: InstalledArtifactDto = observations[0][1]
+                hits.append(
+                    CatalogResourceHitContract.model_validate(
+                        {
+                            "kind": key[0],
+                            "name": key[1],
+                            "purpose": artifact.description or NO_DESCRIPTION,
+                            "prerequisites": artifact.declared_requires,
+                            "manifest_digest": artifact.manifest_digest,
+                            "origin": "discovered",
+                            "cataloged": False,
+                            "discovered_runtimes": _runtimes(installed, key),
+                            "score": 1.0,
+                        }
+                    )
+                )
+        return hits
 
     async def _catalog_rows(self, query: CatalogResourceQueryContract) -> list[dict[str, Any]]:
         lucene: str = " ".join(

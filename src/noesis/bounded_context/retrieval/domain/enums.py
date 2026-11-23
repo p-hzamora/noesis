@@ -91,3 +91,13 @@ class SupportKindEnum(StrEnum):
 
     RESOURCE = "resource"
     RECORD = "record"
+
+
+class NextActionEnum(StrEnum):
+    """The closed set of things `search` tells the caller to do next; never free text."""
+
+    LOAD_SKILL = "load_skill"
+    USE_AGENT = "use_agent"
+    USE_CLI_TOOL = "use_cli_tool"
+    USE_MCP_SERVER = "use_mcp_server"
+    READ_RECORD = "read_record"

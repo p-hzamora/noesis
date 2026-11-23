@@ -29,6 +29,14 @@ class IRecommendationReader(Protocol):
     ) -> list[AssertionSummaryContract]: ...
 
 
+class IResourceAssertionReader(Protocol):
+    """Read live assertions that point at resources (recommendations, refinements)."""
+
+    async def by_objects(
+        self, ids: Sequence[str], *, space_id: str, predicates: Sequence[str]
+    ) -> list[AssertionSummaryContract]: ...
+
+
 class ICatalogAvailability(Protocol):
     """Observe catalog entries in the requested runtimes."""
 
