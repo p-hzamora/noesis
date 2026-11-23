@@ -106,7 +106,7 @@ async def test_search_reports_missing_facet(
 async def test_search_briefing_matches_recall(
     env: Neo4jKnowledgeEnv, run: Callable[..., ProcessResult]
 ) -> None:
-    """The digest equals `recall --no-synthesis` for the same question and scope."""
+    """The digest briefing for a question and scope."""
     await capture_knowledge(env, "brief", "Zanzibar routing", body=BODY)
 
     searched = _result(run("search", "zanzibar", "--briefing", "digest"))
