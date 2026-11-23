@@ -45,7 +45,7 @@ class ProjectSourceEnum(StrEnum):
 def resolve_project(
     project: str | None, all_projects: bool, target_root: Path | None = None
 ) -> tuple[str | None, ProjectSourceEnum]:
-    """Resolve the selected project using the same repository identity as record capture."""
+    """Resolve the selected project using the same repository identity as `remember`."""
     if sum((project is not None, all_projects, target_root is not None)) > 1:
         raise typer.BadParameter("Choose only one of --project, --all-projects and --target-root.")
     if target_root is not None:
