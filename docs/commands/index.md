@@ -33,9 +33,14 @@ uv tool install --force 'noesis[semantic]'   # numpy, onnxruntime (CPU), tokeniz
 noesis store init                            # adds the `retrieval_semantic` schema step
 noesis index model prepare                   # the only download: ~133 MB, verified, cached
 noesis index embedder serve                  # foreground; supervise it yourself
-noesis index rebuild --yes                   # embeds every Knowledge head and Experience
+noesis index rebuild --yes                   # embeds every Knowledge head, Experience and catalog entry
 ```
 
+- **Catalog entries.** Each catalog entry's head revision (name, purpose and capabilities) is
+  embedded like a record, through the same change feed (`catalog register`, `revise` and `catalog
+  sync` reach it with the next `index sync`). `search` uses these vectors to find resources by
+  meaning; record search never returns them. An index built before this needs one `index rebuild
+  --yes`; until then `status --verify` lists the entries as missing.
 - **Model.** `BAAI/bge-small-en-v1.5` (MIT), official fp32 ONNX export pinned to upstream commit
   `5c38ec7c405ec4b44b94cc5a9bb96e735b38267a` with fixed SHA-256 digests; 384-dimension cosine
   vectors in a Neo4j 5.26 Community native vector index (`retrieval_semantic_vector`). Retrieval

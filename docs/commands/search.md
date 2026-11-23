@@ -28,9 +28,9 @@ noesis search <query> [--project <key> | --target-root <path> | --all-projects] 
 - `requirements[]`: `id`, `source` (`need` or `query`), `coverage` (`covered`, `partial`, `missing`),
   `supported_by`. A missing facet is reported as a gap; no resource is invented for it.
 - `resources[]`: in load order, prerequisites first. Fields: `ref`, `name`, `kind`, `load_order`,
-  `requires`, `why.channels` (`catalog_text`, `recommends`, `prerequisite`), `cataloged`, `discovered`,
-  `available` (runtime to `available` or `unavailable`), `endorsement` (`user`, `project`,
-  `proposed`, `none`), `recommended_by`, `refined_by`.
+  `requires`, `why.channels` (`catalog_text`, `catalog_semantic`, `recommends`, `prerequisite`),
+  `cataloged`, `discovered`, `available` (runtime to `available` or `unavailable`),
+  `endorsement` (`user`, `project`, `proposed`, `none`), `recommended_by`, `refined_by`.
 - `next_actions[]`: `{order, action, ref}` with `action` in `load_skill`, `use_agent`,
   `use_cli_tool`, `use_mcp_server`, `read_record`. Refs are `catalog:<kind>:<name>` or
   `record:<id>@<revision>`; never shell text from stored content.
@@ -38,5 +38,10 @@ noesis search <query> [--project <key> | --target-root <path> | --all-projects] 
 - `briefing`: present only with `--briefing digest|synthesis`. Without it no record bodies are returned.
 - `warnings`: semantic search absent or unavailable (resources still return), unsynced installed
   resources (`noesis catalog sync`), prerequisites not found, prerequisite cycles.
+
+When the semantic index is `ready` or `lagging`, cataloged resources are also found by meaning
+(`catalog_semantic`) and merged with the text hits by rank fusion, one entry per catalog id. Only
+cataloged entries are embedded; installed skills not yet in the catalog stay text-only. Without
+semantic the output is unchanged.
 
 `--no-resources` without a briefing returns the record-search JSON unchanged.
