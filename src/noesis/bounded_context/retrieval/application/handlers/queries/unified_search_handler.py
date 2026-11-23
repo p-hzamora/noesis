@@ -82,6 +82,7 @@ class _Entry:
     hit: CatalogResourceHitContract
     channels: list[str] = field(default_factory=list)
     matched: frozenset[str] = frozenset()
+    named: frozenset[str] = frozenset()
 
 
 class UnifiedSearchHandler(IHandler[UnifiedSearchRequestDto, UnifiedSearchResultDto]):
@@ -272,6 +273,7 @@ class UnifiedSearchHandler(IHandler[UnifiedSearchRequestDto, UnifiedSearchResult
             if entry.hit.catalog_id in recommended:
                 entry.channels.append(RECOMMENDS_CHANNEL)
             entry.matched = self._matched(facet_ids, entry.hit)
+            entry.named = self._matcher.matched(facet_ids, entry.hit.name)
         if skipped:
             warnings.append(f"{skipped} resource(s) skipped: the name is not a valid reference")
         return candidates
@@ -294,6 +296,7 @@ class UnifiedSearchHandler(IHandler[UnifiedSearchRequestDto, UnifiedSearchResult
                 id=entry.ref,
                 kind=entry.hit.kind,
                 facets=entry.matched,
+                named_facets=entry.named,
                 relevance_rank=index,
                 authority_rank=_ENDORSEMENT_RANK.index(
                     facts[entry.hit.catalog_id].endorsement
