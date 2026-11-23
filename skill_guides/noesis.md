@@ -18,7 +18,7 @@ installed noesis version. Use `noesis <command> --help` for anything not covered
 - Costly or settings-changing commands (`curate brief`, `curate apply`, `integrate … --yes`)
   only when the user asked for them. `--dry-run` on both shows the result without writing.
 - To read what is already known before a task, use `noesis search` (add `--briefing digest` or
-  `synthesis` for a briefing). The old `recall` command is a deprecated alias of `search`.
+  `synthesis` for a briefing).
 
 ## Which env file
 
@@ -506,7 +506,7 @@ outgoing edges while incoming links stay on the accepted record. Link classes do
 
 A current-layout note's top-level `related: [{id, relation}]` becomes typed `RELATES_TO` edges
 in the same link set. `relation` is one of refines, part_of, contains, implements, consumes,
-extends, contradicts, supersedes; they are plain edges, never Assertions, and recall does not
+extends, contradicts, supersedes; they are plain edges, never Assertions, and search does not
 follow them. `id` is `<repo>--<kind>--<slug>`: the note named `<slug>` under `repos/<repo>/`, else
 the one note with that name in the vault (two or more is ambiguous). JSON adds a `relations`
 block (resolved, dangling, ambiguous, not_imported, self, unknown_relation, invalid_relation);

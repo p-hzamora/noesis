@@ -157,7 +157,7 @@ class SearchResourceIndexResponse(SearchIndexResponse):
 
 
 class SearchBriefingResponse(FrozenObject):
-    """The sections of `recall`, in today's semantics.
+    """The briefing sections of `search`.
 
     Attributes:
         synthesis: `briefing`, `digest` or `no_evidence`.

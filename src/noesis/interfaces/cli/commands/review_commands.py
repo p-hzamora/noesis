@@ -164,7 +164,7 @@ def queue(
     output.emit(ReviewQueueResponse.from_dto(page))
 
 
-def _check_acceptusage(
+def _check_accept_usage(
     context: typer.Context,
     record_id: str | None,
     tag: str | None,
@@ -227,7 +227,7 @@ def accept(
     Without --yes nothing is written: the result shows what would happen. Only the user
     applies the bulk accept, in a terminal.
     """
-    bulk: bool = _check_acceptusage(
+    bulk: bool = _check_accept_usage(
         context, record_id, tag, all_records, expected_revision, yes, idempotency_key
     )
     env: Environment = cli_state(context).environment()

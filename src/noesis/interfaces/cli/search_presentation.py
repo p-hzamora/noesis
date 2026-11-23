@@ -1,4 +1,4 @@
-"""Project resolution and search response mapping shared by `search` and `recall`."""
+"""Project resolution and search response mapping for `search`."""
 
 from enum import StrEnum
 from pathlib import Path
