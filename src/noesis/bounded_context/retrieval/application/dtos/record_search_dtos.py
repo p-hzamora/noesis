@@ -11,6 +11,7 @@ from ...domain.enums import (
     AuthorityTierEnum,
     CandidateKindEnum,
     ProjectScopeEnum,
+    SearchableRecordTypeEnum,
     SemanticStateEnum,
 )
 
@@ -36,7 +37,7 @@ class RecordSearchRequestDto(FrozenObject):
     project_key: str | None = None
     all_projects: bool = False
     tags: tuple[str, ...] = ()
-    record_types: tuple[str, ...] = ()
+    record_types: tuple[SearchableRecordTypeEnum, ...] = ()
     statuses: tuple[str, ...] = ()
     limit: int = Field(ge=1, le=50)
     include_stale: bool = False

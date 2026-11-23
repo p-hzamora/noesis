@@ -16,6 +16,7 @@ from ...domain.enums import (
     BuildStateEnum,
     CandidateKindEnum,
     ProjectScopeEnum,
+    SearchableRecordTypeEnum,
     SemanticStateEnum,
 )
 from ...domain.policies import AuthorityRankingPolicy, IdentifierQueryPolicy, RankFusionPolicy
@@ -42,7 +43,7 @@ RETRY_FETCH_FACTOR: int = 10
 RETRY_FETCH_CAP: int = 200
 SEED_COUNT: int = 5
 EXPERIENCE_QUERY_CHARACTERS: int = 200
-SEARCHABLE_TYPES: frozenset[str] = frozenset({"knowledge", "experience"})
+SEARCHABLE_TYPES: frozenset[str] = frozenset(SearchableRecordTypeEnum)
 RETRACTED: str = "retracted"
 
 

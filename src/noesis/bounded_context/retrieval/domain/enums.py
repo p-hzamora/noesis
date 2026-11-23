@@ -93,6 +93,21 @@ class SupportKindEnum(StrEnum):
     RECORD = "record"
 
 
+class BriefingModeEnum(StrEnum):
+    """What briefing `search` adds to the answer."""
+
+    NONE = "none"
+    DIGEST = "digest"
+    SYNTHESIS = "synthesis"
+
+
+class SearchableRecordTypeEnum(StrEnum):
+    """The record types a record search returns."""
+
+    KNOWLEDGE = "knowledge"
+    EXPERIENCE = "experience"
+
+
 class NextActionEnum(StrEnum):
     """The closed set of things `search` tells the caller to do next; never free text."""
 

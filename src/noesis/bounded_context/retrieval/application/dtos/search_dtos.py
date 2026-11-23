@@ -7,7 +7,7 @@ from pydantic import Field, StringConstraints
 
 from noesis.utils import FrozenObject
 
-from ...domain.enums import NextActionEnum
+from ...domain.enums import BriefingModeEnum, NextActionEnum
 from .briefing_dtos import RecallResultDto
 from .record_search_dtos import RecordSearchRequestDto, RecordSearchResultDto
 
@@ -35,7 +35,7 @@ class UnifiedSearchRequestDto(FrozenObject):
     runtimes: tuple[SearchRuntime, ...] = ()
     resource_limit: int = Field(default=DEFAULT_RESOURCE_LIMIT, ge=0, le=MAX_RESOURCE_LIMIT)
     include_resources: bool = True
-    briefing: Literal["none", "digest", "synthesis"] = "none"
+    briefing: BriefingModeEnum = BriefingModeEnum.NONE
     budget_chars: int | None = Field(default=None, ge=1)
 
 

@@ -1,7 +1,6 @@
 """`noesis search`: find knowledge and experience records of the active space."""
 
 import asyncio
-from enum import StrEnum
 from pathlib import Path
 from typing import Annotated
 
@@ -16,7 +15,11 @@ from noesis.bounded_context.retrieval.application.dtos.search_dtos import (
     UnifiedSearchRequestDto,
     UnifiedSearchResultDto,
 )
-from noesis.bounded_context.retrieval.domain.enums import SemanticModeEnum
+from noesis.bounded_context.retrieval.domain.enums import (
+    BriefingModeEnum,
+    SearchableRecordTypeEnum,
+    SemanticModeEnum,
+)
 from noesis.core import Environment
 from noesis.interfaces.cli import output
 from noesis.interfaces.cli.bootstrap.retrieval_handlers_builder import (
@@ -38,21 +41,6 @@ MAX_LIMIT: int = 50
 
 
 MAX_NEED_CHARS: int = 64
-
-
-class BriefingOption(StrEnum):
-    """What briefing `search` adds to the answer."""
-
-    NONE = "none"
-    DIGEST = "digest"
-    SYNTHESIS = "synthesis"
-
-
-class SearchTypeOption(StrEnum):
-    """The record types search returns."""
-
-    KNOWLEDGE = "knowledge"
-    EXPERIENCE = "experience"
 
 
 def search(
@@ -80,7 +68,7 @@ def search(
         list[str] | None, typer.Option("--tag", help="Only records with this tag (repeatable).")
     ] = None,
     record_type: Annotated[
-        list[SearchTypeOption] | None,
+        list[SearchableRecordTypeEnum] | None,
         typer.Option("--type", help="Only this record type (repeatable; default both)."),
     ] = None,
     status: Annotated[
@@ -116,12 +104,12 @@ def search(
         typer.Option("--no-resources", help="Records only: skip skills, agents and tools."),
     ] = False,
     briefing: Annotated[
-        BriefingOption,
+        BriefingModeEnum,
         typer.Option(
             "--briefing",
             help="none (default), digest (no model) or synthesis (a model summarises the records).",
         ),
-    ] = BriefingOption.NONE,
+    ] = BriefingModeEnum.NONE,
     budget_chars: Annotated[
         int | None,
         typer.Option(
@@ -174,7 +162,7 @@ def search(
                 project_key=key,
                 all_projects=all_projects,
                 tags=tuple(tag or ()),
-                record_types=tuple(item.value for item in record_type or ()),
+                record_types=tuple(record_type or ()),
                 statuses=tuple(status or ()),
                 limit=limit,
                 include_stale=include_stale,
@@ -184,7 +172,7 @@ def search(
             runtimes=tuple(item.value for item in runtimes),
             resource_limit=resource_limit,
             include_resources=not no_resources,
-            briefing=briefing.value,
+            briefing=briefing,
             budget_chars=budget_chars,
         )
         return await handlers.unified_search.handle(request)

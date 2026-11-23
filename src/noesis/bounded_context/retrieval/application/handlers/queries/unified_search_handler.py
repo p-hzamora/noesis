@@ -17,6 +17,7 @@ from noesis.shared_kernel.contracts.knowledge import (
 
 from ....domain.enums import (
     AuthorityTierEnum,
+    BriefingModeEnum,
     EndorsementEnum,
     NextActionEnum,
     SemanticStateEnum,
@@ -139,7 +140,7 @@ class UnifiedSearchHandler(IHandler[UnifiedSearchRequestDto, UnifiedSearchResult
         records = await self._searcher.search(action.records)
         briefing: RecallResultDto | None = None
         warnings: list[str] = []
-        if action.briefing != "none":
+        if action.briefing is not BriefingModeEnum.NONE:
             briefing = await self._brief(action)
             warnings.extend(
                 item
@@ -164,7 +165,7 @@ class UnifiedSearchHandler(IHandler[UnifiedSearchRequestDto, UnifiedSearchResult
             RecallRequestDto(
                 search=action.records,
                 runtimes=action.runtimes,
-                no_synthesis=action.briefing == "digest",
+                no_synthesis=action.briefing is BriefingModeEnum.DIGEST,
             ),
             max_evidence_chars=action.budget_chars,
         )
