@@ -10,15 +10,13 @@ from typing import Annotated
 import typer
 
 from noesis.bounded_context.knowledge.application.dtos import (
-    CaptureResultDto,
     RecordDto,
+    RememberResultDto,
     ReviseResultDto,
 )
-from noesis.bounded_context.knowledge.application.handlers.commands.capture_experience_handler import (
-    CaptureExperienceCommand,
-)
-from noesis.bounded_context.knowledge.application.handlers.commands.capture_knowledge_handler import (
-    CaptureKnowledgeCommand,
+from noesis.bounded_context.knowledge.application.handlers.commands.remember_handler import (
+    RememberCommand,
+    RememberKindEnum,
 )
 from noesis.bounded_context.knowledge.application.handlers.commands.revise_knowledge_handler import (
     ReviseKnowledgeCommand,
@@ -46,7 +44,9 @@ from noesis.interfaces.cli import output
 from noesis.interfaces.cli.actor import resolve_actor
 from noesis.interfaces.cli.bootstrap import with_knowledge
 from noesis.interfaces.cli.bootstrap.retrieval_handlers_builder import trigger_index_sync
+from noesis.interfaces.cli.deprecation import warn_deprecated
 from noesis.interfaces.cli.options import JsonOption
+from noesis.interfaces.cli.remember_support import execute_remember
 from noesis.interfaces.cli.responses import (
     RecordCaptureResponse,
     RecordResponse,
@@ -204,48 +204,32 @@ def capture(
     sources: tuple[SourceInput, ...] = parse_sources(context, source, source_id)
     if not sources:
         raise _usage(context, "Cite at least one source.", "--source")
-    result: CaptureResultDto
-    if record_type is RecordTypeOption.KNOWLEDGE:
-        title_text: str = _required(context, title, "--title")
-        subtype_text: str = _required(context, subtype, "--subtype")
-        env: Environment = cli_state(context).environment()
-        knowledge_command = CaptureKnowledgeCommand(
-            idempotency_key=idempotency_key,
-            space_key=Key(value=env.knowledge.knowledge_space),
-            title=title_text,
-            body=text,
-            subtype=Slug(value=subtype_text),
-            actor=resolve_actor(env.identity),
-            project=_project_ref(project),
-            tags=tuple(Tag(value=item) for item in tag or ()),
-            sources=sources,
-        )
-        result = asyncio.run(
-            with_knowledge(
-                env, lambda handlers: handlers.capture_knowledge.handle(knowledge_command)
-            )
-        )
-    else:
-        env = cli_state(context).environment()
-        experience_command = CaptureExperienceCommand(
-            idempotency_key=idempotency_key,
-            space_key=Key(value=env.knowledge.knowledge_space),
-            subtype=_experience_subtype(context, subtype),
-            body=text,
-            actor=resolve_actor(env.identity),
-            occurred_at=_parse_occurred(context, occurred),
-            project=_project_ref(project),
-            session=session,
-            environment=environment,
-            sources=sources,
-        )
-        result = asyncio.run(
-            with_knowledge(
-                env, lambda handlers: handlers.capture_experience.handle(experience_command)
-            )
-        )
-    if not result.replayed:
-        trigger_index_sync(env)
+    env: Environment = cli_state(context).environment()
+    warn_deprecated(f"noesis remember --as {record_type.value} ...")
+    knowledge: bool = record_type is RecordTypeOption.KNOWLEDGE
+    command = RememberCommand(
+        kind=RememberKindEnum(record_type.value),
+        space_key=Key(value=env.knowledge.knowledge_space),
+        actor=resolve_actor(env.identity),
+        project=_project_ref(project),
+        sources=sources,
+        body=text,
+        title=_required(context, title, "--title") if knowledge else None,
+        knowledge_subtype=(
+            Slug(value=_required(context, subtype, "--subtype")) if knowledge else None
+        ),
+        tags=tuple(Tag(value=item) for item in tag or ()),
+        experience_subtype=(
+            ExperienceSubtypeEnum.OBSERVATION
+            if knowledge
+            else _experience_subtype(context, subtype)
+        ),
+        occurred_at=_parse_occurred(context, occurred),
+        session=session,
+        environment=environment,
+        idempotency_key=idempotency_key,
+    )
+    result: RememberResultDto = execute_remember(env, command)
     output.emit(RecordCaptureResponse.model_validate(result, from_attributes=True))
 
 

@@ -12,6 +12,7 @@ from .import_commands import import_app
 from .index_commands import index_app
 from .integrate_commands import integrate_app
 from .record_commands import record_app
+from .remember_commands import remember
 from .review_commands import review_app
 from .search_commands import search
 from .skills_commands import skills_app
@@ -31,6 +32,7 @@ __all__ = [
     "index_app",
     "integrate_app",
     "record_app",
+    "remember",
     "review_app",
     "search",
     "skills_app",

@@ -104,6 +104,13 @@ from .record_response import (
     StoreInitResponse,
     StoreSpaceResponse,
 )
+from .remember_response import (
+    RememberAssertionResponse,
+    RememberReconciledResponse,
+    RememberReconciliationResponse,
+    RememberResponse,
+    RememberScopeResponse,
+)
 from .review_response import (
     ReviewAcceptResponse,
     ReviewBulkAcceptResponse,
@@ -213,6 +220,11 @@ __all__ = [
     "RecordRevisionResponse",
     "RecordSourceResponse",
     "RecordSupersededByResponse",
+    "RememberAssertionResponse",
+    "RememberReconciledResponse",
+    "RememberReconciliationResponse",
+    "RememberResponse",
+    "RememberScopeResponse",
     "StoreInitResponse",
     "StoreSpaceResponse",
     "SkillGuideListResponse",

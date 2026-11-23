@@ -66,6 +66,9 @@ from noesis.bounded_context.retrieval.application.handlers.queries.recall_handle
 from noesis.bounded_context.retrieval.application.handlers.queries.search_records_handler import (
     SearchRecordsHandler,
 )
+from noesis.bounded_context.retrieval.application.handlers.queries.unified_search_handler import (
+    UnifiedSearchHandler,
+)
 from noesis.bounded_context.retrieval.application.ports.candidates.i_candidate_source import (
     ICandidateSource,
 )
@@ -79,6 +82,9 @@ from noesis.bounded_context.retrieval.application.ports.indexing.i_index_cursor_
 from noesis.bounded_context.retrieval.application.ports.indexing.i_index_writer import IIndexWriter
 from noesis.bounded_context.retrieval.application.services.briefing_redactor import BriefingRedactor
 from noesis.bounded_context.retrieval.application.services.record_searcher import RecordSearcher
+from noesis.bounded_context.retrieval.application.services.resource_facts_service import (
+    ResourceFactsService,
+)
 from noesis.bounded_context.retrieval.domain.enums import SemanticModeEnum
 from noesis.bounded_context.retrieval.domain.value_objects import EmbeddingProfile
 from noesis.bounded_context.retrieval.infrastructure.inbound.embedder_runtime.unix_socket_embedder_server import (
@@ -365,6 +371,8 @@ class RetrievalHandlers:
         index_status: Report cursors, lag and divergences.
         searcher: The search pipeline (for other contexts' adapters).
         projection_kinds: Names of the registered projections.
+        recall: The recall pipeline, also the briefing of the unified search.
+        unified_search: Records, resources, requirements and next actions in one answer.
     """
 
     search: SearchRecordsHandler
@@ -375,6 +383,7 @@ class RetrievalHandlers:
     searcher: RecordSearcher
     projection_kinds: tuple[str, ...]
     recall: RecallHandler | None = None
+    unified_search: UnifiedSearchHandler | None = None
 
 
 def build_retrieval(
@@ -411,25 +420,42 @@ def build_retrieval(
         feed,
         projection_kinds=kinds,
     )
-    from .knowledge_handlers_builder import build_catalog_availability_adapter  # import cycle
+    from .knowledge_handlers_builder import (  # import cycle
+        build_catalog_availability_adapter,
+        build_resource_catalog_reader,
+    )
 
     reviews = ReviewReadersAdapter(client)
     settings = environment.retrieval
     ttl: int = settings.index_lock_ttl_seconds
+    availability = build_catalog_availability_adapter(client, environment)
+    recall = RecallHandler(
+        searcher,
+        indexables,
+        reviews=reviews,
+        recommendations=reviews,
+        catalog=availability,
+        model=ClaudeCliBriefingAdapter(
+            claude_bin=settings.retrieval_briefing_claude_bin,
+            timeout_seconds=settings.retrieval_briefing_timeout_seconds,
+            max_budget_usd=settings.retrieval_briefing_max_budget_usd,
+        ),
+        redactor=BriefingRedactor(),
+        max_evidence_chars=settings.retrieval_briefing_max_evidence_chars,
+    )
     return RetrievalHandlers(
-        recall=RecallHandler(
+        recall=recall,
+        unified_search=UnifiedSearchHandler(
             searcher,
-            indexables,
-            reviews=reviews,
-            recommendations=reviews,
-            catalog=build_catalog_availability_adapter(client, environment),
-            model=ClaudeCliBriefingAdapter(
-                claude_bin=settings.retrieval_briefing_claude_bin,
-                timeout_seconds=settings.retrieval_briefing_timeout_seconds,
-                max_budget_usd=settings.retrieval_briefing_max_budget_usd,
+            resources=build_resource_catalog_reader(client, environment),
+            facts=ResourceFactsService(
+                reviews=reviews,
+                recommendations=reviews,
+                assertions=reviews,
+                availability=availability,
             ),
-            redactor=BriefingRedactor(),
-            max_evidence_chars=settings.retrieval_briefing_max_evidence_chars,
+            briefing=recall,
+            clock=clock,
         ),
         search=SearchRecordsHandler(searcher),
         find_similar=FindSimilarRecordsHandler(searcher),

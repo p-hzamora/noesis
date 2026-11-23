@@ -5,9 +5,11 @@ from pathlib import Path
 
 import typer
 
+from noesis.bounded_context.retrieval.application.dtos.briefing_dtos import RecallResultDto
 from noesis.bounded_context.retrieval.application.dtos.record_search_dtos import (
     RecordSearchResultDto,
 )
+from noesis.bounded_context.retrieval.application.dtos.search_dtos import UnifiedSearchResultDto
 from noesis.bounded_context.retrieval.domain.enums import ProjectScopeEnum
 from noesis.core.git_root import find_common_dir, repository_name
 from noesis.interfaces.cli.responses import (
@@ -16,6 +18,17 @@ from noesis.interfaces.cli.responses import (
     SearchResponse,
     SearchScopeResponse,
     SearchSemanticResponse,
+)
+from noesis.interfaces.cli.responses.recall_response import RecallRecordResponse
+from noesis.interfaces.cli.responses.search_resource_response import (
+    ResourceSearchResponse,
+    SearchBriefedResponse,
+    SearchBriefingResponse,
+    SearchCatalogIndexResponse,
+    SearchNextActionResponse,
+    SearchRequirementResponse,
+    SearchResourceIndexResponse,
+    SearchResourceResponse,
 )
 
 
@@ -110,4 +123,69 @@ def search_response(
             filter_shortfall=result.filter_shortfall,
         ),
         warnings=(*_warnings(result, key, space, source), *result.warnings),
+    )
+
+
+def _briefing(result: RecallResultDto) -> SearchBriefingResponse:
+    return SearchBriefingResponse(
+        synthesis=result.synthesis,
+        records=tuple(
+            RecallRecordResponse.model_validate(record.model_dump(exclude={"body"}))
+            for record in result.records
+        ),
+        constraints=result.constraints,
+        decisions=result.decisions,
+        context=result.context,
+        unconfirmed=result.unconfirmed,
+        unsupported=result.unsupported,
+        capabilities=result.capabilities,
+        tools=result.tools,
+        tools_state=result.tools_state,
+    )
+
+
+def unified_search_response(
+    result: UnifiedSearchResultDto,
+    *,
+    space: str,
+    key: str | None,
+    source: ProjectSourceEnum,
+    invoked_from: str | None = None,
+) -> SearchResponse:
+    """The record-only shape for `--no-resources`; with resources, the same keys plus the new ones."""
+    base: SearchResponse = search_response(
+        result.records, space=space, key=key, source=source, invoked_from=invoked_from
+    )
+    warnings: tuple[str, ...] = (*base.warnings, *result.warnings)
+    briefing: SearchBriefingResponse | None = (
+        None if result.briefing is None else _briefing(result.briefing)
+    )
+    if not result.resources_included:
+        if briefing is None:
+            return base
+        return SearchBriefedResponse(
+            scope=base.scope, hits=base.hits, index=base.index, warnings=warnings, briefing=briefing
+        )
+    return ResourceSearchResponse(
+        scope=base.scope,
+        hits=base.hits,
+        index=SearchResourceIndexResponse(
+            **base.index.model_dump(),
+            catalog=None
+            if result.catalog is None
+            else SearchCatalogIndexResponse.model_validate(result.catalog),
+        ),
+        warnings=warnings,
+        briefing=briefing,
+        requirements=tuple(
+            SearchRequirementResponse.model_validate(item) for item in result.requirements
+        ),
+        resources=tuple(
+            SearchResourceResponse.model_validate(item.model_dump(mode="python"))
+            for item in result.resources
+        ),
+        next_actions=tuple(
+            SearchNextActionResponse(order=item.order, action=item.action.value, ref=item.ref)
+            for item in result.next_actions
+        ),
     )

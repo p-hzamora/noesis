@@ -54,6 +54,7 @@ from .knowledge_handlers_builder import (
     registered_schema_step_names,
     with_knowledge,
 )
+from .remember_handlers_builder import build_remember, with_remember
 
 __all__ = [
     "AgentHooksHandlers",
@@ -78,6 +79,7 @@ __all__ = [
     "build_diagnostics",
     "build_knowledge",
     "build_parked_listing",
+    "build_remember",
     "build_update_check",
     "curate_brief_argv",
     "curation_system_prompt",
@@ -94,4 +96,5 @@ __all__ = [
     "run_update_check",
     "with_consolidation",
     "with_knowledge",
+    "with_remember",
 ]
