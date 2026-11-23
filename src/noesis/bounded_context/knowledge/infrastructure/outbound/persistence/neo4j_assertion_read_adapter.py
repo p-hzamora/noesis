@@ -45,6 +45,20 @@ MATCH (assertion:Assertion {id: $id, space_id: $space_id})
 """
     + _TAIL
 )
+_SUMMARY_TAIL: LiteralString = """
+MATCH (assertion)-[subject_edge:SUBJECT]->(:Record)
+MATCH (assertion)-[object_edge:OBJECT]->(target:Record)
+OPTIONAL MATCH (assertion)-[:BELONGS_TO_PROJECT]->(project:Project)
+OPTIONAL MATCH (decision:Decision)-[:DECIDES]->(assertion)
+WITH assertion, project, subject_edge, object_edge, target, decision
+ORDER BY decision.seq DESC
+WITH assertion, project, subject_edge, object_edge, target, head(collect(decision.basis)) AS basis
+RETURN properties(assertion) AS node, project.key AS project_key,
+       subject_edge.at_revision AS subject_at_revision,
+       object_edge.at_revision AS object_at_revision, labels(target) AS object_labels,
+       basis AS decision_basis
+ORDER BY assertion.id
+"""
 _BY_SUBJECTS: LiteralString = (
     """
 MATCH (assertion:Assertion {space_id: $space_id})
@@ -52,7 +66,16 @@ WHERE assertion.subject_id IN $subject_ids
   AND (size($statuses) = 0 OR assertion.status IN $statuses)
   AND (size($predicates) = 0 OR assertion.predicate IN $predicates)
 """
-    + _TAIL
+    + _SUMMARY_TAIL
+)
+_BY_OBJECTS: LiteralString = (
+    """
+MATCH (assertion:Assertion {space_id: $space_id})
+WHERE assertion.object_id IN $object_ids
+  AND (size($statuses) = 0 OR assertion.status IN $statuses)
+  AND (size($predicates) = 0 OR assertion.predicate IN $predicates)
+"""
+    + _SUMMARY_TAIL
 )
 
 
@@ -117,6 +140,29 @@ class Neo4jAssertionReadAdapter(IAssertionReadRepository):
             )
         return [self._summary(row) for row in rows]
 
+    async def list_by_objects(
+        self,
+        object_ids: Sequence[RecordId],
+        *,
+        space_id: SpaceId,
+        predicates: Sequence[AssertionPredicateEnum],
+        statuses: Sequence[RecordStatusEnum],
+    ) -> list[AssertionSummaryDto]:
+        """Summaries of the assertions whose object is in `object_ids`, ascending id."""
+        if not object_ids:
+            return []
+        async with await self._client.begin() as transaction:
+            rows: list[dict[str, Any]] = await transaction.run(
+                _BY_OBJECTS,
+                {
+                    "space_id": space_id.value,
+                    "object_ids": [item.value for item in object_ids],
+                    "statuses": [item.value for item in statuses],
+                    "predicates": [item.value for item in predicates],
+                },
+            )
+        return [self._summary(row) for row in rows]
+
     @staticmethod
     def _summary(row: dict[str, Any]) -> AssertionSummaryDto:
         node: dict[str, Any] = row["node"]
@@ -133,6 +179,7 @@ class Neo4jAssertionReadAdapter(IAssertionReadRepository):
             evidence_ids=tuple(node.get("evidence_ids", [])),
             project_key=row["project_key"],
             tags=tuple(node.get("tags", [])),
+            decision_basis=row.get("decision_basis"),
         )
 
     @staticmethod

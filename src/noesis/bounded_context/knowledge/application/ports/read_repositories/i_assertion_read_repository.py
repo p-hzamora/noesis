@@ -45,3 +45,15 @@ class IAssertionReadRepository(abc.ABC):
     ) -> list[AssertionSummaryDto]:
         """Summaries of the assertions whose subject is in `subject_ids`, ascending id."""
         ...
+
+    @abc.abstractmethod
+    async def list_by_objects(
+        self,
+        object_ids: Sequence[RecordId],
+        *,
+        space_id: SpaceId,
+        predicates: Sequence[AssertionPredicateEnum],
+        statuses: Sequence[RecordStatusEnum],
+    ) -> list[AssertionSummaryDto]:
+        """Summaries of the assertions whose object is in `object_ids`, ascending id."""
+        ...

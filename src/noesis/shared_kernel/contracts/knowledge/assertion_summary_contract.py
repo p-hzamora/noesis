@@ -15,7 +15,7 @@ class AssertionSummaryContract(FrozenObject):
     Attributes:
         contract_version: Schema version of this payload.
         assertion_id: ULID of the assertion.
-        predicate: `supports`, `contradicts`, `supersedes` or `recommends`.
+        predicate: `supports`, `contradicts`, `supersedes`, `recommends` or `refines`.
         subject_id: Subject record.
         subject_at_revision: Revision of the subject judged; None for types without revisions.
         object_id: Object record.
@@ -25,6 +25,8 @@ class AssertionSummaryContract(FrozenObject):
         evidence_ids: Evidence record ids.
         project_key: The assertion's applicability project key, or None.
         tags: The assertion's applicability tags.
+        decision_basis: Why the latest review decision was taken (`user`, `agent_project`, ...);
+            None while no decision exists.
     """
 
     contract_version: Literal[1] = ASSERTION_SUMMARY_CONTRACT_VERSION
@@ -39,3 +41,4 @@ class AssertionSummaryContract(FrozenObject):
     evidence_ids: list[str] = Field(default_factory=list)
     project_key: str | None = None
     tags: list[str] = Field(default_factory=list)
+    decision_basis: str | None = None

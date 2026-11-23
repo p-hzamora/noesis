@@ -8,6 +8,7 @@ from noesis.shared_kernel.contracts.knowledge import (
 )
 from noesis.shared_kernel.infrastructure.outbound.neo4j import Neo4jClient
 
+from ....application.dtos import AssertionSummaryDto
 from ....domain.value_objects import AssertionPredicateEnum, RecordId, RecordStatusEnum, SpaceId
 from ...outbound.persistence.neo4j_assertion_read_adapter import Neo4jAssertionReadAdapter
 from ...outbound.persistence.neo4j_review_state_read_adapter import Neo4jReviewStateReadAdapter
@@ -42,6 +43,30 @@ class ReviewReadersAdapter:
             predicates=[AssertionPredicateEnum.RECOMMENDS],
             statuses=[RecordStatusEnum.PROPOSED, RecordStatusEnum.ACCEPTED],
         )
+        return await self._live(assertions, space_id)
+
+    async def by_objects(
+        self, ids: Sequence[str], *, space_id: str, predicates: Sequence[str]
+    ) -> list[AssertionSummaryContract]:
+        """Live assertions of the given predicates whose object is one of `ids`.
+
+        Scope admission, staleness and the meaning of each predicate belong to the consumer.
+        """
+        known = {member.value for member in AssertionPredicateEnum}
+        wanted = [AssertionPredicateEnum(item) for item in predicates if item in known]
+        if not wanted:
+            return []
+        assertions = await self._assertions.list_by_objects(
+            [RecordId(value=item) for item in ids],
+            space_id=SpaceId(value=space_id),
+            predicates=wanted,
+            statuses=[RecordStatusEnum.PROPOSED, RecordStatusEnum.ACCEPTED],
+        )
+        return await self._live(assertions, space_id)
+
+    async def _live(
+        self, assertions: Sequence[AssertionSummaryDto], space_id: str
+    ) -> list[AssertionSummaryContract]:
         states = {
             state.record_id: state
             for state in await self.get_states(

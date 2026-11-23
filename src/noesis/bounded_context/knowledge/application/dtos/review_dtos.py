@@ -146,6 +146,7 @@ class AssertionSummaryDto(BaseDto):
         evidence_ids: Evidence ids.
         project_key: Applicability project key.
         tags: Applicability tags.
+        decision_basis: Basis of the latest review decision; None while undecided.
     """
 
     assertion_id: str
@@ -159,6 +160,7 @@ class AssertionSummaryDto(BaseDto):
     evidence_ids: tuple[str, ...] = ()
     project_key: str | None = None
     tags: tuple[str, ...] = ()
+    decision_basis: str | None = None
 
 
 class ReviewDecisionDto(BaseDto):
