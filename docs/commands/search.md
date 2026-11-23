@@ -2,7 +2,7 @@
 
 Unified search over the record store and the resource catalog: one call returns matching records,
 the skills, agents, CLI tools and MCP servers that cover the task, and an ordered list of next
-actions. `noesis recall` stays available for briefings alone.
+actions. With `--briefing` it also returns the briefing the deprecated `recall` command used to give.
 
 ```text
 noesis search <query> [--project <key> | --target-root <path> | --all-projects] [--tag <t>]...

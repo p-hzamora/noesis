@@ -57,8 +57,9 @@ noesis update check [--json]                # is this checkout behind its origin
 noesis curate brief --brief-file FILE [--dry-run]   # the curator judges a work brief, then stores proposed records ([details](docs/commands/curate.md))
 noesis curate apply --decisions-file FILE|- [--dry-run] # store candidates you wrote, no curator
 noesis curate parked | retry TICKET|--all [--yes]  # failed curations
-noesis search TEXT [--project P]            # find records
-noesis record capture|revise|get ...        # write and read records of the knowledge store
+noesis search TEXT [--project P]            # find records and resources; --briefing digest|synthesis for a briefing
+noesis remember --as knowledge|experience ...   # capture a record on purpose ([details](docs/commands/remember.md))
+noesis record revise|get ...                # revise and read records of the knowledge store
 noesis import run | file ...                # import a notes vault as proposed records (reads NOESIS_VAULT_DIR)
 noesis capture on|off|status|runs [--session ID] [--mode live|dry-run] [--parent ID] [--children]
 noesis hook claude-code                     # stdin: Claude Code hook JSON (always exits 0)

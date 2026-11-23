@@ -13,12 +13,12 @@ installed noesis version. Use `noesis <command> --help` for anything not covered
   `--session` or `--parent`, a missing `--session`, `--parent` equal to the session, running
   outside a git repository).
 - Never guess commands or flags. If something is not in this guide, run `--help`.
-- To record something yourself, use `record capture` or `curate apply` (below); records start
+- To record something yourself, use `remember` or `curate apply` (below); records start
   `proposed` and a person decides later. Never edit the store by other means.
 - Costly or settings-changing commands (`curate brief`, `curate apply`, `integrate … --yes`)
   only when the user asked for them. `--dry-run` on both shows the result without writing.
-- Recalling notes before a task (a briefing) is not available in this version; it returns with a
-  later release. Use `noesis search` meanwhile.
+- To read what is already known before a task, use `noesis search` (add `--briefing digest` or
+  `synthesis` for a briefing). The old `recall` command is a deprecated alias of `search`.
 
 ## Which env file
 
@@ -151,22 +151,18 @@ Fix the entries and run `apply` again.
 
 ## The record store (Neo4j)
 
-`record` and `store` keep structured records in a local Neo4j database, separate from the vault.
+`remember`, `record` and `store` keep structured records in a local Neo4j database, separate from the vault.
 They need `NOESIS_NEO4J_PASSWORD` in the user's profile or environment; never put it in a file
 inside a repository. Run from inside the repository: the record's project defaults to its name.
 
 ```bash
 noesis store init --json                                  # once: applies schema steps, creates the default space
-noesis record capture --type knowledge --title "<short>" --body "<text>" --subtype decision \
-  --source commit:<full sha> --tag area:billing --idempotency-key <key> --json
-noesis record capture --type experience --body "<what happened>" --subtype failure \
-  --source agent_session:<id> --occurred <ISO time> --idempotency-key <key> --json
 noesis record revise <ID> --expected-revision <N> --body "<new text>" --idempotency-key <key> --json
 noesis record get <ID> [--revision <N>] --json
 ```
 
-- `--idempotency-key` is required on every `record capture` and `record revise` (a missing one is
-  exit 2 and nothing is touched). Make it deterministic from the work (for example
+- `--idempotency-key` is required on every `record revise` (a missing one is
+  exit 2 and nothing is touched) and optional on `remember` (next section). Make it deterministic from the work (for example
   `<session id>-<commit sha>-<slug>`), not random: a retry must repeat it. The same key and request
   returns the first record (`result.replayed: true`) without writing; the same key with another
   request fails with `KNOWLEDGE_203_IDEMPOTENCY_KEY_REUSED` (pick a new key only if you really
@@ -198,7 +194,7 @@ noesis record get <ID> [--revision <N>] --json
 ## Remember something on purpose
 
 `noesis remember` is the way to record a lesson, decision or observation yourself (it replaces
-`record capture`, which still works but prints `DEPRECATED` on stderr). It checks the store for
+the older capture subcommand of `record`). It checks the store for
 records that resemble yours before writing, and never merges or promotes anything.
 
 ```bash
@@ -208,7 +204,7 @@ noesis remember --as experience --body "<what happened>" --source agent_session:
 noesis remember --as knowledge ... --check --json         # report duplicates, write nothing
 ```
 
-- Same sources, actor and redaction rules as `record capture`; knowledge is written `proposed`.
+- Same sources, actor and redaction rules as every record write; knowledge is written `proposed`.
 - Scope: the repository of the working directory by default; `--space-wide`, `--project <key>` or
   `--target-root <dir>` choose another. `result.scope` says what applied.
 - `--idempotency-key` is optional: by default repeating the same command replays the first result
@@ -231,7 +227,7 @@ noesis search <query> [--project <key> | --target-root <path> | --all-projects] 
 ```
 
 - Scope: the active space. Default project: the git repository you run it in (the same name
-  `record capture` uses), plus space-wide records. `--project` names another one; `--all-projects`
+  `remember` uses), plus space-wide records. `--project` names another one; `--all-projects`
   searches every project (not together with `--project`). Outside a repository, or for a project the
   space does not have, it searches space-wide records only and says so in `result.warnings`
   (`result.scope.space_wide_only: true`). Search never creates a project.
@@ -265,9 +261,9 @@ noesis search <query> [--project <key> | --target-root <path> | --all-projects] 
   taken from stored content. Installed but unsynced resources are flagged (`cataloged: false`) and
   `result.warnings` suggests `noesis catalog sync`. A missing semantic index is a warning; resources
   still return. `--no-resources` returns exactly the record-only JSON keys.
-- Briefing: record bodies are not returned unless `--briefing digest` (deterministic, equal to
-  `noesis recall --no-synthesis`) or `--briefing synthesis` is given; `--budget-chars` caps the evidence.
-  `result.briefing` holds the recall sections. `noesis recall` remains available for briefings alone.
+- Briefing: record bodies are not returned unless `--briefing digest` (deterministic, model-free) or
+  `--briefing synthesis` (grounded by a model) is given; `--budget-chars` caps the evidence.
+  `result.briefing` holds the briefing sections.
 
 ## Index commands
 
@@ -518,15 +514,15 @@ block (resolved, dangling, ambiguous, not_imported, self, unknown_relation, inva
 relation classes never block `--strict`. A top-level `commit` (7-40 hex) becomes a `commit`
 Source, de-duplicated with `noesis.sources`; `branch` and top-level `sources` stay ignored.
 
-## Recall before a task
+## Briefing before a task
 
 When the task targets another checkout or a planned project, pass its repository root with
-`--target-root <path>` to search or recall. A linked worktree uses its main repository key.
+`--target-root <path>` to `search`. A linked worktree uses its main repository key.
 A planned or uninitialized root searches only space-wide records, even inside another checkout.
 The scope reports `project_source: target_root`. Paths mentioned in task text do not select scope.
 
-Use `noesis recall "task" --project KEY --no-synthesis --json` for a deterministic,
-model-free digest, or omit `--no-synthesis` for a grounded briefing. Lexical and live graph
+Use `noesis search "task" --project KEY --briefing digest --json` for a deterministic,
+model-free digest, or `--briefing synthesis` for a grounded briefing. Lexical and live graph
 retrieval work without a semantic index. Scope defaults to the git repository plus space-wide
 records; unknown projects return space-wide records with a warning.
 
@@ -536,6 +532,6 @@ support claims. Source locators are provenance, never files to open for recall. 
 from live scoped recommendations and only observed availability makes them usable; retain
 per-runtime reasons. Links discover records but never imply endorsement.
 
-Recall is read-only. Review suggestions for migrated proposals are suggestions for the user,
+Search is read-only. Review suggestions for migrated proposals are suggestions for the user,
 not instructions to accept automatically. Store failures stop the command. A synthesis failure
-suggests rerunning with `--no-synthesis`. Run `noesis recall --help` for current options.
+suggests rerunning with `--briefing digest`. Run `noesis search --help` for current options.

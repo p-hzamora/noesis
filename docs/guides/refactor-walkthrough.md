@@ -2,7 +2,7 @@
 
 Noesis now keeps its knowledge in Neo4j. Capture collects finished work; curation turns it
 into Experiences and proposed Knowledge; review determines which guidance is accepted.
-Search finds records, and recall assembles a task briefing with revision citations. An
+Search finds records, and `search --briefing` assembles a task briefing with revision citations. An
 Obsidian vault is an optional, one-time import source, not the database or a live mirror.
 There is no Notes context, Vectra backend, or filesystem fallback for record bodies.
 
@@ -307,7 +307,7 @@ requires reviewing what the import proposed; the bulk form is shown in step 8.
 This also makes the walkthrough work when import was skipped:
 
 ```sh
-uv run noesis record capture --type knowledge --subtype convention \
+uv run noesis remember --as knowledge --subtype convention \
   --title 'Walkthrough retry policy' \
   --body 'Retry transient network failures with bounded exponential backoff.' \
   --project walkthrough --source 'agent_session:walkthrough-demo' \
@@ -449,15 +449,16 @@ uv run noesis review accept --tag origin:migrated --all
 uv run noesis review accept --tag origin:migrated --all --yes
 ```
 
-That accepts proposed Knowledge with the tag, not every assertion. No import, capture, recall
+That accepts proposed Knowledge with the tag, not every assertion. No import, capture, search
 or consolidation command runs bulk acceptance for you.
 
-### 9. Recall a memory briefing
+### 9. Get a memory briefing
 
 ```sh
-uv run noesis recall 'implement bounded retries for network requests' \
-  --project RULE_PROJECT --no-synthesis --json
-uv run noesis recall 'implement bounded retries for network requests' --project RULE_PROJECT
+uv run noesis search 'implement bounded retries for network requests' \
+  --project RULE_PROJECT --briefing digest --json
+uv run noesis search 'implement bounded retries for network requests' \
+  --project RULE_PROJECT --briefing synthesis
 ```
 
 Expect a deterministic digest with exact record/revision citations from the first command.
@@ -471,7 +472,7 @@ can contribute candidates, but recall never starts an embedder or loads a per-ca
 Create a second same-project, same-subtype candidate to make the example reproducible:
 
 ```sh
-uv run noesis record capture --type knowledge --subtype convention \
+uv run noesis remember --as knowledge --subtype convention \
   --title 'Walkthrough transient retry limit' \
   --body 'Bound network retries with a finite attempt limit and exponential backoff.' \
   --project RULE_PROJECT --source 'agent_session:walkthrough-demo' \
@@ -502,7 +503,7 @@ uv run noesis consolidation show CONSOLIDATION_ID --json
 uv run noesis consolidation accept CONSOLIDATION_ID
 uv run noesis consolidation accept CONSOLIDATION_ID --yes \
   --idempotency-key walkthrough-consolidation-accept-v1 --json
-uv run noesis recall 'bounded network retries' --project RULE_PROJECT --no-synthesis --json
+uv run noesis search 'bounded network retries' --project RULE_PROJECT --briefing digest --json
 ```
 
 Expect successor acceptance followed by each `supersedes` acceptance; originals become
@@ -544,7 +545,7 @@ an actual session, turn it off with `uv run noesis capture off --session SESSION
 | `RETRIEVAL_202_INDEX_REBUILD_REQUIRED` or interrupted rebuild | Run `uv run noesis index rebuild --yes` in the affected space. Ordinary sync cannot finish an interrupted rebuild. |
 | `RETRIEVAL_203_INDEX_SYNC_IN_PROGRESS` | Another holder may be active or the lease was lost; allow it to finish and retry sync. A crashed holder's lease expires. See [index](../commands/index.md). |
 | Curation parked / invalid candidate payload | Inspect `curate parked --json` and the error's ticket/cause; fix authentication, lookup or payload, then retry. State is under `NOESIS_STATE_DIR/knowledge/curation`. See [curate](../commands/curate.md). |
-| Recall synthesis failure | Check Claude authentication/executable/budget; explicitly use `--no-synthesis` for the deterministic digest. See [recall](../commands/recall.md). |
+| Briefing synthesis failure | Check Claude authentication/executable/budget; explicitly use `--briefing digest` for the deterministic digest. See [search](../commands/search.md). |
 | Review denied / revision conflict | Read `record get` and `review queue` again. Use the revision actually reviewed; use a person for space-wide or bulk acceptance. `review accept --help` and `assertion propose --help` describe the current flags. |
 | Supersession effect interrupted | Preview `uv run noesis review repair`; apply pending effects with `uv run noesis review repair --yes` under the normal actor rules. |
 | Import has blocked notes or missing links | Inspect `--verbose --json`; aliases are not lookup keys, and unresolved/non-note/self targets are skipped. `--strict` blocks on note findings before writing, not on link classifications. See [import](../commands/import.md). |

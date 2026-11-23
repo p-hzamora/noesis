@@ -8,7 +8,7 @@ layer, see [workflows](../workflows/README.md); for the ideas behind the CLI, se
 |---|---|
 | `capture on \| off \| status \| runs` | [capture.md](capture.md) |
 | `curate brief \| apply \| retry \| parked` | [curate.md](curate.md) |
-| `record capture \| revise \| get`, `store init` | [record.md](record.md) |
+| `record revise \| get`, `store init` | [record.md](record.md) |
 | `search` | [search.md](search.md) |
 | `remember` | [remember.md](remember.md) |
 | `index sync \| rebuild \| status` | [index.md](index.md) |

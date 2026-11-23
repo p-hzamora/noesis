@@ -57,7 +57,7 @@ errors are `AppException`s with a stable `__error_code__`, an `__exit_code__`, a
 them in Neo4j. The Notes context it grew beside was retired.
 
 ```text
-CaptureKnowledgeHandler / CaptureExperienceHandler            (`record capture`)
+CaptureKnowledgeHandler / CaptureExperienceHandler            (`remember`)
   ├─ IIdempotencyLedger.get(space, key)            read first: replay the result or reject a reused key
   ├─ ensure project (by key), ensure each Source (by natural key)   one unit of work each
   └─ IKnowledgeUnitOfWork: repository.add(new aggregate) + ledger entry + commit   one aggregate per transaction

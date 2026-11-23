@@ -1,8 +1,8 @@
 ---
 name: noesis
-description: Capture finished work into the knowledge store, record knowledge directly, search past decisions and gotchas, import a notes vault, and manage failed curations with the `noesis` CLI.
-when_to_use: Use when the user asks to record work or knowledge, turn capture on or off, check what was captured, search past decisions and gotchas, import a vault, or retry a parked curation.
-argument-hint: "[capture on|off|status|runs | curate apply|parked|retry | record | search <text> | import]"
+description: Capture finished work into the knowledge store, remember knowledge directly with `noesis remember`, search past decisions and gotchas with `noesis search`, import a notes vault, and manage failed curations with the `noesis` CLI.
+when_to_use: Use when the user asks to remember work or knowledge, turn capture on or off, check what was captured, search past decisions and gotchas, import a vault, or retry a parked curation.
+argument-hint: "[capture on|off|status|runs | curate apply|parked|retry | remember | search <text> | import]"
 ---
 
 # noesis
