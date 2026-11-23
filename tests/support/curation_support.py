@@ -84,6 +84,7 @@ from noesis.bounded_context.knowledge.domain.value_objects import (
 from noesis.exceptions import CurationInboxFailedError
 from noesis.shared_kernel.application.handlers import IHandler
 from noesis.shared_kernel.contracts import WorkBriefContract
+from noesis.shared_kernel.contracts.ports.knowledge import IRelatedRecordFinder
 from noesis.shared_kernel.contracts.retrieval import RecordSearchHitContract, RecordSearchHitItem
 from noesis.shared_kernel.contracts.work_brief_contract import CommitRefContract
 
@@ -260,7 +261,7 @@ class FakeCurator(ICurator):
         return self.answer
 
 
-class FakeRelatedFinder:
+class FakeRelatedFinder(IRelatedRecordFinder):
     """Answers with hits for the given record ids, or raises."""
 
     def __init__(

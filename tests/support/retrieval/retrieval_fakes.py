@@ -19,21 +19,6 @@ from noesis.bounded_context.retrieval.application.ports.indexing.i_index_cursor_
     IIndexCursorStore,
     ProjectionManifestDto,
 )
-from noesis.bounded_context.retrieval.application.ports.record_source.i_indexable_record_reader import (
-    IIndexableRecordReader,
-)
-from noesis.bounded_context.retrieval.application.ports.record_source.i_record_change_feed import (
-    IRecordChangeFeed,
-)
-from noesis.bounded_context.retrieval.application.ports.record_source.i_record_neighbour_reader import (
-    IRecordNeighbourReader,
-)
-from noesis.bounded_context.retrieval.application.ports.record_source.i_record_state_reader import (
-    IRecordStateReader,
-)
-from noesis.bounded_context.retrieval.application.ports.record_source.i_record_text_search import (
-    IRecordTextSearch,
-)
 from noesis.bounded_context.retrieval.application.services.projection_lock import lease_lost
 from noesis.bounded_context.retrieval.application.services.record_searcher import RecordSearcher
 from noesis.bounded_context.retrieval.domain.enums import BuildStateEnum
@@ -45,6 +30,13 @@ from noesis.shared_kernel.contracts.knowledge import (
     RecordChangedContract,
     RecordHitContract,
     RecordStateContract,
+)
+from noesis.shared_kernel.contracts.ports.retrieval import (
+    IIndexableRecordReader,
+    IRecordChangeFeed,
+    IRecordNeighbourReader,
+    IRecordStateReader,
+    IRecordTextSearch,
 )
 from noesis.shared_kernel.domain import JsonValue
 

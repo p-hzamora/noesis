@@ -55,6 +55,7 @@ from noesis.bounded_context.knowledge.infrastructure.outbound.persistence import
     CONSOLIDATION_SCHEMA_STEP,
     REVIEW_SCHEMA_STEP,
 )
+from noesis.shared_kernel.contracts.ports.knowledge import ISimilarRecordFinder
 from noesis.shared_kernel.contracts.retrieval import SimilarRecordHitItem, SimilarRecordsContract
 from noesis.shared_kernel.infrastructure.outbound.neo4j import Neo4jConnectionSettings
 
@@ -62,7 +63,7 @@ MIGRATED = "origin:migrated"
 
 
 @dataclass(slots=True)
-class StubSimilarFinder:
+class StubSimilarFinder(ISimilarRecordFinder):
     """`ISimilarRecordFinder` that answers from a table, or fails on demand."""
 
     hits: dict[str, list[tuple[str, tuple[str, ...]]]] = field(default_factory=dict)

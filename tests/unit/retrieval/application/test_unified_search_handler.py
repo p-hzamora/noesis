@@ -38,6 +38,7 @@ from noesis.shared_kernel.contracts.knowledge import (
     CatalogResourceQueryContract,
     RecordReviewStateContract,
 )
+from noesis.shared_kernel.contracts.ports.retrieval import IResourceCatalogReader
 
 pytestmark = pytest.mark.unit
 
@@ -88,7 +89,7 @@ def resource(
     )
 
 
-class FakeResources:
+class FakeResources(IResourceCatalogReader):
     """`search` answers `found` in order; `get_by_refs` answers exact refs and entry ids."""
 
     def __init__(

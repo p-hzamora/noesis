@@ -8,10 +8,11 @@ from noesis.bounded_context.knowledge.application.handlers.commands.propose_asse
     ProposeAssertionHandler,
 )
 from noesis.exceptions import GraphStoreUnavailableError
+from noesis.shared_kernel.contracts.ports.knowledge import IRelatedRecordFinder
 from noesis.shared_kernel.contracts.retrieval import RecordSearchHitContract, RecordSearchHitItem
 
 
-class FakeFinder:
+class FakeFinder(IRelatedRecordFinder):
     """Answers every lookup with fixed hits, or fails like an unavailable index."""
 
     def __init__(self, hits: Sequence[str] = (), *, fail: bool = False) -> None:

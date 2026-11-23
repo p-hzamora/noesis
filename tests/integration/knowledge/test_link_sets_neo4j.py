@@ -25,6 +25,7 @@ from noesis.shared_kernel.contracts.knowledge.import_link_set_contract import (
     ImportLinkSetOutcomeContract,
     ImportLinkSetRequestContract,
 )
+from noesis.shared_kernel.contracts.ports.interop import IKnowledgeImporter
 from noesis.shared_kernel.infrastructure.outbound.neo4j import Neo4jClient
 
 pytestmark = [pytest.mark.integration, pytest.mark.neo4j]
@@ -71,16 +72,20 @@ async def test_backfill_no_record_changes_or_retrieval_work(link_store, neo4j_se
     async with Neo4jClient(neo4j_settings) as client:
         real = _importer(client)
 
-        class WithoutLinks:
-            assess = real.assess
-            apply = real.apply
+        class WithoutLinks(IKnowledgeImporter):
+            async def assess(self, request):
+                return await real.assess(request)
+
+            async def apply(self, request):
+                return await real.apply(request)
 
             async def assess_links(self, request):
                 return ImportLinkSetOutcomeContract(
                     outcome="unchanged", source_record_id=request.source_record_id, edges=0
                 )
 
-            replace_links = assess_links
+            async def replace_links(self, request):
+                return await self.assess_links(request)
 
         snapshot = file_snapshot(root)
         first = await runner(root, WithoutLinks()).handle(RunVaultImportCommand())

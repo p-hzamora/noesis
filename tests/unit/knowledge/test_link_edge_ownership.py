@@ -21,12 +21,13 @@ def test_only_link_repository_mentions_imported_relationship_types() -> None:
     assert offenders == []
 
 
-def test_interop_contracts_are_confined_to_port_and_translator() -> None:
+def test_interop_contracts_are_confined_to_the_translator() -> None:
     root = Path(__file__).parents[3] / "src/noesis/bounded_context/interop"
     offenders = [
         str(path.relative_to(root))
         for path in root.rglob("*.py")
-        if path.name not in {"i_knowledge_importer.py", "knowledge_import_translator.py"}
-        and "noesis.shared_kernel.contracts" in path.read_text()
+        if path.name != "knowledge_import_translator.py"
+        and "noesis.shared_kernel.contracts"
+        in path.read_text().replace("noesis.shared_kernel.contracts.ports", "")
     ]
     assert offenders == []

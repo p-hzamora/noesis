@@ -6,6 +6,7 @@ import pytest
 from tests.support.retrieval.retrieval_fakes import RetrievalWorld, make_request
 
 from noesis.bounded_context.retrieval.application.services.record_searcher import RecordSearcher
+from noesis.shared_kernel.contracts.ports.retrieval import IReviewReader
 
 pytestmark = pytest.mark.unit
 
@@ -60,7 +61,7 @@ async def test_ac023_wired() -> None:
         "E": "not_reviewable",
     }  # nothing for K_U
 
-    class FakeReviewStateReader:
+    class FakeReviewStateReader(IReviewReader):
         async def get_states(self, record_ids: list[str], *, space_id: str) -> list[object]:
             return [
                 SimpleNamespace(record_id=record_id, authority=authorities[record_id])

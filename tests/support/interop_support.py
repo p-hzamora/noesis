@@ -24,6 +24,7 @@ from noesis.shared_kernel.contracts.knowledge.import_link_set_contract import (
     ImportLinkSetOutcomeContract,
     ImportLinkSetRequestContract,
 )
+from noesis.shared_kernel.contracts.ports.interop import IKnowledgeImporter
 
 MINTED_PREFIX: str = "01JCKMNPM"
 ACTOR: ImportActor = ImportActor(kind="user", name="tester", session=None)
@@ -92,7 +93,7 @@ class FakeFileReader:
         return self.files[absolute_path]
 
 
-class FakeKnowledgeImporter:
+class FakeKnowledgeImporter(IKnowledgeImporter):
     """`IKnowledgeImporter` that records every call and answers from scripts.
 
     Attributes:
