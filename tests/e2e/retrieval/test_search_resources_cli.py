@@ -103,20 +103,18 @@ async def test_search_reports_missing_facet(
     assert all(item["available"] == {"claude-code": "available"} for item in result["resources"])
 
 
-async def test_search_briefing_matches_recall(
+async def test_search_digest_briefing(
     env: Neo4jKnowledgeEnv, run: Callable[..., ProcessResult]
 ) -> None:
-    """The digest briefing for a question and scope."""
+    """`--briefing digest` grounds the matching record without a model call."""
     await capture_knowledge(env, "brief", "Zanzibar routing", body=BODY)
 
     searched = _result(run("search", "zanzibar", "--briefing", "digest"))
-    recalled = _result(run("recall", "zanzibar", "--no-synthesis"))
 
     briefing = searched["briefing"]
     assert briefing is not None
-    shared = set(briefing) & set(recalled)
-    assert {"records", "synthesis"} <= shared
-    assert {key: briefing[key] for key in shared} == {key: recalled[key] for key in shared}
+    assert briefing["synthesis"] == "digest"
+    assert [record["title"] for record in briefing["records"]] == ["Zanzibar routing"]
 
 
 async def test_search_json_compat(
