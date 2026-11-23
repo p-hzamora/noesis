@@ -6,11 +6,13 @@ type NodeProperties = dict[str, Any]
 
 
 def record_type_of(labels: list[str]) -> str | None:
-    """`knowledge` or `experience` for a record node's labels; None for anything else."""
+    """`knowledge`, `experience` or `catalog_entry` for a record node's labels; else None."""
     if "Knowledge" in labels:
         return "knowledge"
     if "Experience" in labels:
         return "experience"
+    if "CatalogEntry" in labels:
+        return "catalog_entry"
     return None
 
 

@@ -19,10 +19,17 @@ _EXPERIENCE: LiteralString = """
 MATCH (record:Experience {id: $id, space_id: $space_id})
 RETURN properties(record) AS record
 """
+_CATALOG_ENTRY: LiteralString = """
+MATCH (record:CatalogEntry {id: $id, space_id: $space_id})
+MATCH (revision:Revision {
+    revision_key: record.id + ':' + toString(coalesce($revision, record.head_revision))
+})
+RETURN properties(record) AS record, properties(revision) AS revision
+"""
 
 
 class Neo4jIndexableRecordReaderAdapter:
-    """Reads one revision (Knowledge) or one Experience with its text."""
+    """Reads one revision (Knowledge or catalog entry) or one Experience with its text."""
 
     def __init__(self, client: Neo4jClient) -> None:
         self._client: Neo4jClient = client
@@ -32,7 +39,8 @@ class Neo4jIndexableRecordReaderAdapter:
     ) -> IndexableRecordContract:
         """The record revision with its title and body.
 
-        A null `revision` on Knowledge means the head; an Experience has no revisions.
+        A null `revision` means the head of a Knowledge or catalog entry; an Experience has no
+        revisions.
 
         Raises:
             RecordNotFoundError: No such record or revision in the space.
@@ -44,10 +52,15 @@ class Neo4jIndexableRecordReaderAdapter:
             experience: list[dict[str, Any]] = (
                 [] if knowledge else await transaction.run(_EXPERIENCE, parameters)
             )
+            entry: list[dict[str, Any]] = (
+                [] if knowledge or experience else await transaction.run(_CATALOG_ENTRY, parameters)
+            )
         if knowledge:
             return _knowledge_contract(knowledge[0]["record"], knowledge[0]["revision"])
         if experience:
             return _experience_contract(experience[0]["record"])
+        if entry:
+            return _catalog_entry_contract(entry[0]["record"], entry[0]["revision"])
         raise RecordNotFoundError(
             f"No record {record_id} (revision {revision}) in space {space_id}.",
             {"record_id": record_id, "revision": revision, "space_id": space_id},
@@ -87,4 +100,22 @@ def _experience_contract(record: NodeProperties) -> IndexableRecordContract:
         tags=(),
         body=record["body"],
         revised_at=record["created_at"],
+    )
+
+
+def _catalog_entry_contract(
+    record: NodeProperties, revision: NodeProperties
+) -> IndexableRecordContract:
+    """The entry's name as title, its purpose and capability tags as body."""
+    capabilities: list[str] = sorted(revision.get("capabilities") or ())
+    body: str = "\n".join([revision["purpose"], *capabilities])
+    return IndexableRecordContract(
+        record_id=record["id"],
+        record_type="catalog_entry",
+        subtype=record["entry_kind"],
+        revision=revision["number"],
+        head_revision=record["head_revision"],
+        title=record["name"],
+        body=body,
+        revised_at=revision["created_at"],
     )

@@ -26,6 +26,7 @@ from ....domain.policies.coverage_selection_policy import CoverageSelectionPolic
 from ....domain.policies.coverage_status_policy import CoverageStatusPolicy
 from ....domain.policies.facet_match_policy import FacetMatchPolicy
 from ....domain.policies.load_order_policy import MAX_DEPTH, LoadOrderPolicy
+from ....domain.policies.rank_fusion_policy import RankFusionPolicy
 from ....domain.policies.requirement_extraction_policy import RequirementExtractionPolicy
 from ....domain.policies.resource_ref_policy import ResourceRefPolicy
 from ....domain.value_objects.coverage_candidate import CoverageCandidate
@@ -44,6 +45,10 @@ from ...dtos.search_dtos import (
     UnifiedSearchRequestDto,
     UnifiedSearchResultDto,
 )
+from ...ports.candidates.i_candidate_source import (
+    CandidateSourceUnavailableError,
+    ICandidateSource,
+)
 from ...ports.catalog import IResourceCatalogReader
 from ...services.record_searcher import RecordSearcher
 from ...services.resource_facts_service import (
@@ -58,6 +63,7 @@ CANDIDATE_POOL: int = 40
 MAX_RECORD_ACTIONS: int = 3
 """Records offered under `next_actions`; the rest stay available under `hits`."""
 CATALOG_TEXT: str = "catalog_text"
+CATALOG_SEMANTIC: str = "catalog_semantic"
 RECOMMENDS_CHANNEL: str = "recommends"
 PREREQUISITE_CHANNEL: str = "prerequisite"
 UNSYNCED_WARNING: str = (
@@ -94,6 +100,8 @@ class UnifiedSearchHandler(IHandler[UnifiedSearchRequestDto, UnifiedSearchResult
         facts: Assertion and availability facts.
         briefing: The recall pipeline; None when not wired.
         clock: Stamps the discovery observation.
+        catalog_semantic: Finds catalog entries by meaning; None when semantic search is not
+            registered. Asked only when the record search found the semantic index usable.
     """
 
     def __init__(
@@ -104,12 +112,15 @@ class UnifiedSearchHandler(IHandler[UnifiedSearchRequestDto, UnifiedSearchResult
         facts: ResourceFactsService,
         briefing: TaskBriefingService | None,
         clock: IClock,
+        catalog_semantic: ICandidateSource | None = None,
     ) -> None:
         self._searcher = searcher
         self._resources = resources
         self._facts = facts
         self._briefing = briefing
         self._clock = clock
+        self._catalog_semantic = catalog_semantic
+        self._fusion = RankFusionPolicy()
         self._extraction = RequirementExtractionPolicy()
         self._matcher = FacetMatchPolicy()
         self._selection = CoverageSelectionPolicy()
@@ -175,6 +186,7 @@ class UnifiedSearchHandler(IHandler[UnifiedSearchRequestDto, UnifiedSearchResult
         facts: dict[str, AssertionFacts] = {}
         if action.resource_limit > 0 and self._resources is not None:
             candidates = await self._candidates(action, records, facet_ids, project, warnings)
+            candidates = await self._with_semantic(candidates, action, records, facet_ids, warnings)
             facts = await self._facts.assertion_facts(
                 _entry_ids(candidates.values()), project=project, space_id=space, warnings=warnings
             )
@@ -277,6 +289,68 @@ class UnifiedSearchHandler(IHandler[UnifiedSearchRequestDto, UnifiedSearchResult
         if skipped:
             warnings.append(f"{skipped} resource(s) skipped: the name is not a valid reference")
         return candidates
+
+    async def _with_semantic(
+        self,
+        candidates: dict[str, _Entry],
+        action: UnifiedSearchRequestDto,
+        records: RecordSearchResultDto,
+        facet_ids: tuple[str, ...],
+        warnings: list[str],
+    ) -> dict[str, _Entry]:
+        """Add the catalog entries found by meaning and rank both lists by reciprocal fusion.
+
+        Does nothing, and leaves the lexical order as it is, unless the record search found the
+        semantic index usable. Entries are deduplicated by ref.
+        """
+        usable = {SemanticStateEnum.READY, SemanticStateEnum.LAGGING}
+        if self._catalog_semantic is None or self._resources is None:
+            return candidates
+        if records.semantic_state not in usable:
+            return candidates
+        space = action.records.space_id
+        try:
+            found = await self._catalog_semantic.find(
+                action.records.text, space_id=space, limit=action.resource_limit
+            )
+        except CandidateSourceUnavailableError:
+            warnings.append(SEMANTIC_WARNING.format(state=SemanticStateEnum.UNAVAILABLE.value))
+            return candidates
+        ids = tuple(key.record_id for key in found.hits)
+        if not ids:
+            return candidates
+        have = {entry.hit.catalog_id: ref for ref, entry in candidates.items()}
+        missing = tuple(item for item in ids if item not in have)
+        by_id = {
+            hit.catalog_id: hit
+            for hit in await self._resources.get_by_refs(
+                CatalogResourceLookupContract(
+                    space_id=space,
+                    entry_ids=missing,
+                    runtimes=action.runtimes,
+                    include_unsynced=True,
+                )
+            )
+            if missing
+        }
+        semantic_refs: list[str] = []
+        for item in ids:
+            ref = have.get(item)
+            hit = by_id.get(item)
+            if ref is None and hit is not None:
+                ref = self._refs.resource_ref(hit.kind, hit.name)
+                if ref is not None and ref not in candidates:
+                    candidates[ref] = _Entry(
+                        ref=ref,
+                        hit=hit,
+                        matched=self._matched(facet_ids, hit),
+                        named=self._matcher.matched(facet_ids, hit.name),
+                    )
+            if ref is not None and ref in candidates:
+                semantic_refs.append(ref)
+                candidates[ref].channels.append(CATALOG_SEMANTIC)
+        order = self._fusion.fuse([list(candidates), semantic_refs])
+        return {ref: candidates[ref] for ref in order}
 
     def _matched(
         self, facet_ids: tuple[str, ...], hit: CatalogResourceHitContract

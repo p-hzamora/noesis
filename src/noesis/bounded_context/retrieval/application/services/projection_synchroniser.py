@@ -26,7 +26,7 @@ from ..ports.record_source.i_record_change_feed import IRecordChangeFeed
 from ..ports.record_source.i_record_state_reader import IRecordStateReader
 
 BATCH_SIZE: int = 100
-INDEXABLE_TYPES: frozenset[str] = frozenset({"knowledge", "experience"})
+INDEXABLE_TYPES: frozenset[str] = frozenset({"knowledge", "experience", "catalog_entry"})
 KNOWN_CHANGE_KINDS: frozenset[str] = frozenset({"created", "revised", "status_changed"})
 HEAD_RETRIES: int = 1
 

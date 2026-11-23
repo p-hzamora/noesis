@@ -10,7 +10,7 @@ from .record_node_contracts import NodeProperties, ownership_of, record_type_of
 
 _STATES: LiteralString = """
 MATCH (record:Record {space_id: $space_id})
-WHERE (record:Knowledge OR record:Experience)
+WHERE (record:Knowledge OR record:Experience OR record:CatalogEntry)
   AND record.id IN $ids
 OPTIONAL MATCH (head:Revision {revision_key: record.id + ':' + toString(record.head_revision)})
 RETURN properties(record) AS record, labels(record) AS labels, properties(head) AS head
@@ -18,7 +18,7 @@ ORDER BY record.id
 """
 _SCAN: LiteralString = """
 MATCH (record:Record {space_id: $space_id})
-WHERE (record:Knowledge OR record:Experience)
+WHERE (record:Knowledge OR record:Experience OR record:CatalogEntry)
   AND ($after_id IS NULL OR record.id > $after_id)
 WITH record ORDER BY record.id LIMIT $limit
 OPTIONAL MATCH (head:Revision {revision_key: record.id + ':' + toString(record.head_revision)})
@@ -32,7 +32,7 @@ RETURN project.id AS id
 
 
 class Neo4jRecordStateReaderAdapter:
-    """Reads states of Knowledge and Experience records, always inside one space."""
+    """Reads states of Knowledge, Experience and catalog entry records, always inside one space."""
 
     def __init__(self, client: Neo4jClient) -> None:
         self._client: Neo4jClient = client

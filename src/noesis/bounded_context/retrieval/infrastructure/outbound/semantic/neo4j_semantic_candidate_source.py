@@ -35,6 +35,7 @@ MAX_ATTEMPTS: int = 6
 _QUERY: LiteralString = """
 CALL db.index.vector.queryNodes($index_name, $k, $vector) YIELD node, score
 WHERE node.space_id = $space_id AND node.profile_hash = $profile_hash
+  AND (coalesce(node.record_type, '') = 'catalog_entry') = $catalog_entries
 RETURN node.record_id AS record_id, node.revision AS revision, score
 """
 
@@ -51,6 +52,7 @@ class Neo4jSemanticCandidateSource(ICandidateSource):
         client: The shared Neo4j client.
         embedder: Embeds the query with the configured profile.
         inspector: Checks the vector index is online and compatible before querying.
+        catalog_entries: Answer with catalog entries only; otherwise with records only.
     """
 
     def __init__(
@@ -58,10 +60,13 @@ class Neo4jSemanticCandidateSource(ICandidateSource):
         client: Neo4jClient,
         embedder: ITextEmbedder,
         inspector: Neo4jVectorIndexInspector,
+        *,
+        catalog_entries: bool = False,
     ) -> None:
         self._client: Neo4jClient = client
         self._embedder: ITextEmbedder = embedder
         self._inspector: Neo4jVectorIndexInspector = inspector
+        self._catalog_entries: bool = catalog_entries
         self._vectors: dict[str, tuple[float, ...]] = {}
         self.last_attempts: list[int] = []
 
@@ -142,6 +147,7 @@ class Neo4jSemanticCandidateSource(ICandidateSource):
                     "vector": list(vector),
                     "space_id": space_id,
                     "profile_hash": profile_hash,
+                    "catalog_entries": self._catalog_entries,
                 },
             )
         best: dict[str, tuple[float, int | None]] = {}

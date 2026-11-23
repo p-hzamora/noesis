@@ -171,12 +171,15 @@ class RegisteredProjections:
     Attributes:
         writers: Projection writers; each `kind` is unique.
         candidate_sources: Sources that answer from a projection.
+        catalog_source: The source that answers with catalog entries; None when semantic search
+            is not registered.
         cursors: Cursor store to use instead of the Neo4j one (tests, option A's local file).
     """
 
     writers: tuple[IIndexWriter, ...]
     candidate_sources: tuple[ICandidateSource, ...]
     cursors: IIndexCursorStore | None = None
+    catalog_source: ICandidateSource | None = None
 
 
 def semantic_mode(environment: Environment) -> SemanticModeEnum:
@@ -343,11 +346,19 @@ def registered_projections(
     cursors = Neo4jIndexCursorStoreAdapter(client, SystemClockAdapter())
     writer = Neo4jSemanticProjectionAdapter(client, embedder, cursors)
     sources: tuple[ICandidateSource, ...] = ()
+    catalog_source: ICandidateSource | None = None
     if mode is SemanticModeEnum.RESIDENT or semantic_opt_in:
-        sources = (
-            Neo4jSemanticCandidateSource(client, embedder, Neo4jVectorIndexInspector(client)),
+        inspector = Neo4jVectorIndexInspector(client)
+        sources = (Neo4jSemanticCandidateSource(client, embedder, inspector),)
+        catalog_source = Neo4jSemanticCandidateSource(
+            client, embedder, inspector, catalog_entries=True
         )
-    return RegisteredProjections(writers=(writer,), candidate_sources=sources, cursors=cursors)
+    return RegisteredProjections(
+        writers=(writer,),
+        candidate_sources=sources,
+        cursors=cursors,
+        catalog_source=catalog_source,
+    )
 
 
 def registered_projection_kinds(environment: Environment) -> tuple[str, ...]:
@@ -453,6 +464,7 @@ def build_retrieval(
             ),
             briefing=briefing,
             clock=clock,
+            catalog_semantic=registered.catalog_source,
         ),
         search=SearchRecordsHandler(searcher),
         find_similar=FindSimilarRecordsHandler(searcher),

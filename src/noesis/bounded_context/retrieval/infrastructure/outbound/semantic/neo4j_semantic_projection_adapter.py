@@ -52,6 +52,7 @@ CREATE (e:Embedding {
     embedding_key: chunk.key,
     space_id: $space_id,
     record_id: $record_id,
+    record_type: $record_type,
     revision_key: $revision_key,
     profile_hash: $profile_hash,
     chunk_index: chunk.index,
@@ -247,6 +248,7 @@ class Neo4jSemanticProjectionAdapter(IStagedIndexWriter[SemanticPreparedEntryDto
             {
                 "space_id": entry.space_id,
                 "record_id": entry.key.record_id,
+                "record_type": entry.record.record_type,
                 "revision": entry.key.revision,
                 "revision_key": revision_key(entry.key.revision),
                 "profile_hash": prepared.profile_hash,
