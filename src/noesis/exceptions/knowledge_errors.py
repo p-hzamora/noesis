@@ -271,3 +271,9 @@ class ConsolidationPartiallyAppliedError(ApplicationException):
     """A consolidation step failed after earlier ones committed; the metadata lists every step."""
 
     __error_code__ = "KNOWLEDGE_295_CONSOLIDATION_PARTIALLY_APPLIED"
+
+
+class RememberPartiallyAppliedError(ApplicationException):
+    """A record was remembered but a requested assertion failed; the metadata lists each one."""
+
+    __error_code__ = "KNOWLEDGE_296_REMEMBER_PARTIALLY_APPLIED"
