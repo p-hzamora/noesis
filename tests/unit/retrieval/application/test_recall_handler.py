@@ -11,10 +11,10 @@ from noesis.bounded_context.retrieval.application.dtos.briefing_dtos import (
     CitationDto,
     RecallRequestDto,
 )
-from noesis.bounded_context.retrieval.application.handlers.queries.recall_handler import (
-    RecallHandler,
-)
 from noesis.bounded_context.retrieval.application.services.briefing_redactor import BriefingRedactor
+from noesis.bounded_context.retrieval.application.services.task_briefing_service import (
+    TaskBriefingService,
+)
 from noesis.exceptions import GraphStoreUnavailableError
 from noesis.shared_kernel.contracts.knowledge import (
     AssertionSummaryContract,
@@ -31,7 +31,7 @@ CAT = "01ARZ3NDEKTSV4RRFFQ69G5FAV"
 
 def setup_recall(
     *, budget: int = 24000, review: bool = True
-) -> tuple[RecallHandler, RetrievalWorld, AsyncMock, AsyncMock, AsyncMock, AsyncMock]:
+) -> tuple[TaskBriefingService, RetrievalWorld, AsyncMock, AsyncMock, AsyncMock, AsyncMock]:
     world = RetrievalWorld()
     world.add_knowledge("A", status="accepted", body="Use ports")
     world.add_knowledge("P", status="proposed", body="password=supersecret123")
@@ -63,7 +63,7 @@ def setup_recall(
     model = AsyncMock()
     model.synthesize.return_value = BriefingDraftDto()
     catalog = AsyncMock()
-    handler = RecallHandler(
+    handler = TaskBriefingService(
         world.searcher(),
         world.indexables,
         reviews=reviews if review else None,
@@ -84,7 +84,7 @@ def request(*, digest: bool = True) -> RecallRequestDto:
 
 async def test_digest_orders_labels_redacts_and_never_calls_model() -> None:
     handler, _, _, _, catalog, model = setup_recall()
-    result = await handler.handle(request())
+    result = await handler.brief(request())
     assert [record.id for record in result.records] == ["A", "E", "P", "O"]
     assert result.synthesis == "digest"
     assert result.search.semantic_state.value == "absent"
@@ -117,7 +117,7 @@ async def test_grounding_mixed_proposals_fabrications_wrong_revisions_and_no_cit
         ),
         context=(item("experience", ("E", None)),),
     )
-    result = await handler.handle(request(digest=False))
+    result = await handler.brief(request(digest=False))
     assert [item.text for item in result.constraints] == ["accepted"]
     assert [item.text for item in result.unconfirmed] == ["proposal", "mixed"]
     assert len(result.unsupported) == 3
@@ -127,7 +127,7 @@ async def test_grounding_mixed_proposals_fabrications_wrong_revisions_and_no_cit
 
 async def test_budget_omits_whole_bodies_and_still_suggests_migration_review() -> None:
     handler, _, _, _, _, model = setup_recall(budget=1)
-    result = await handler.handle(request(digest=False))
+    result = await handler.brief(request(digest=False))
     assert result.synthesis == "no_evidence"
     assert all(not record.read and record.omitted_reason == "budget" for record in result.records)
     assert result.next_steps
@@ -141,14 +141,14 @@ async def test_second_head_change_omits_evidence() -> None:
         states,
         [state.model_copy(update={"head_revision": 2}) for state in states],
     ]
-    result = await handler.handle(request())
+    result = await handler.brief(request())
     assert result.synthesis == "no_evidence"
     assert all(record.omitted_reason == "review_changed" for record in result.records)
 
 
 async def test_missing_review_never_makes_authoritative_guidance() -> None:
     handler, _, _, _, _, _ = setup_recall(review=False)
-    result = await handler.handle(request())
+    result = await handler.brief(request())
     assert result.constraints == ()
     assert result.capabilities["review"] == "not_available"
     assert len(result.unconfirmed) == 3
@@ -166,7 +166,7 @@ async def test_store_failure_propagates_without_model(stage: str) -> None:
         recommendations.by_subjects.return_value = [endorsement("good")]
         catalog.check.side_effect = error
     with pytest.raises(GraphStoreUnavailableError):
-        await handler.handle(request(digest=False))
+        await handler.brief(request(digest=False))
     model.synthesize.assert_not_called()
 
 
@@ -216,7 +216,7 @@ async def test_scoped_live_endorsements_and_each_runtime_observation_survive() -
             ]
         ),
     )
-    result = await handler.handle(request())
+    result = await handler.brief(request())
     (tool,) = result.tools
     assert tool.usable and tool.endorsement == "accepted"
     assert tool.assertion_ids == ("accepted", "proposed")
@@ -230,7 +230,7 @@ async def test_not_checked_has_no_invented_tool_details() -> None:
     catalog.check.return_value = CatalogAvailabilityResultContract(
         outcome="not_checked", reason_code="runtime_unresolved"
     )
-    result = await handler.handle(request())
+    result = await handler.brief(request())
     assert result.tools == () and result.tools_state == "not_verified"
     assert any("runtime_unresolved" in warning for warning in result.warnings)
 
@@ -252,7 +252,7 @@ async def test_recheck_drops_hidden_records_instead_of_leaking_old_metadata(chan
         ]
     )
     reviews.get_states.side_effect = [states, final]
-    result = await handler.handle(request())
+    result = await handler.brief(request())
     assert result.records == () and result.synthesis == "no_evidence"
 
 
@@ -266,7 +266,7 @@ async def test_first_head_refresh_reads_new_exact_revision_once() -> None:
     ]
     reviews.get_states.return_value = states
     world.add_knowledge("A", revision=2, status="accepted", body="refreshed")
-    result = await handler.handle(request())
+    result = await handler.brief(request())
     assert result.records[0].revision == 2
     assert result.records[0].body == "refreshed"
     assert world.indexables.gets == [("A", 2)]
@@ -275,10 +275,10 @@ async def test_first_head_refresh_reads_new_exact_revision_once() -> None:
 async def test_missing_catalog_capability_and_empty_search_skip_model() -> None:
     handler, world, _, _, _, model = setup_recall()
     handler._catalog = None
-    result = await handler.handle(request())
+    result = await handler.brief(request())
     assert result.tools == () and result.capabilities["catalog"] == "not_available"
     world.match()
-    result = await handler.handle(request(digest=False))
+    result = await handler.brief(request(digest=False))
     assert result.synthesis == "no_evidence" and result.records == ()
     model.synthesize.assert_not_called()
 
@@ -292,7 +292,7 @@ async def test_changed_head_with_retraction_is_hidden_before_revision_omission()
         return body.model_copy(update={"head_revision": 2, "status": "retracted"})
 
     world.indexables.get = changed
-    result = await handler.handle(request())
+    result = await handler.brief(request())
     assert result.records == ()
 
 
@@ -313,7 +313,7 @@ async def test_recheck_runs_after_tool_gathering_and_before_the_model() -> None:
 
     reviews.get_states.side_effect = get_states
     recommendations.by_subjects.side_effect = by_subjects
-    result = await handler.handle(request(digest=False))
+    result = await handler.brief(request(digest=False))
     assert calls == ["states", "tools", "states"]
     assert result.synthesis == "no_evidence"
     model.synthesize.assert_not_called()

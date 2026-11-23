@@ -82,6 +82,20 @@ async def test_fresh_digest_scope_labels_citations_readonly_and_warm_latency(
     assert p95 <= 3, measurement
 
 
+async def test_recall_shim(env: Neo4jKnowledgeEnv, child_env: dict[str, str]):
+    """AC-016: stderr names the replacement for each mode; the silence variable mutes it."""
+    await capture_knowledge(env, "shim", "python ports shim", body="Use ports")
+    child = {**child_env, "NOESIS_RETRIEVAL_BRIEFING_CLAUDE_BIN": "/missing/model"}
+    digest = run_noesis(["recall", "python ports", "--no-synthesis"], child)
+    assert digest.code == 0, (digest.stdout, digest.stderr)
+    assert "DEPRECATED: use noesis search --briefing digest" in digest.stderr
+    assert "DEPRECATED" not in digest.stdout
+    silent = run_noesis(
+        ["recall", "python ports", "--no-synthesis"], {**child, "NOESIS_SILENCE_DEPRECATION": "1"}
+    )
+    assert silent.code == 0 and "DEPRECATED" not in silent.stderr
+
+
 @pytest.mark.parametrize(
     "args,code",
     [
