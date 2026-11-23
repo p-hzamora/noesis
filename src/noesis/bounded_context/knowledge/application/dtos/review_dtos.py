@@ -1,5 +1,6 @@
 """DTOs of the review module: queue, states, assertions, decisions and command results."""
 
+from noesis.bounded_context.knowledge.domain.value_objects import RecordTypeEnum
 from noesis.shared_kernel.application.dtos import BaseDto
 
 
@@ -214,7 +215,7 @@ class ReviewStateDto(BaseDto):
     """
 
     record_id: str
-    record_type: str
+    record_type: RecordTypeEnum
     status: str | None = None
     effective_status: str | None = None
     authority: str

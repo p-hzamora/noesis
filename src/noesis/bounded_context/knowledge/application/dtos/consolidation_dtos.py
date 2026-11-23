@@ -1,5 +1,6 @@
 """DTOs of the consolidation module: read models, scan results and command results."""
 
+from noesis.bounded_context.knowledge.domain.value_objects import DismissalReasonKindEnum
 from noesis.shared_kernel.application.dtos import BaseDto
 
 LINK_POLICY: str = "preserve_originals"
@@ -33,7 +34,7 @@ class ConsolidationDismissalDto(BaseDto):
         dismissed_at: ISO 8601 time.
     """
 
-    reason_kind: str
+    reason_kind: DismissalReasonKindEnum
     reason: str
     actor_kind: str
     actor_name: str

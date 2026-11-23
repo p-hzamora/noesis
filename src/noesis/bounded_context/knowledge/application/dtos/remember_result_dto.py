@@ -1,6 +1,15 @@
 """Result of remembering a record: the capture result plus reconciliation and assertions."""
 
+from enum import StrEnum
+
 from noesis.shared_kernel.application.dtos import BaseDto
+
+
+class RememberKindEnum(StrEnum):
+    """What `remember` records."""
+
+    KNOWLEDGE = "knowledge"
+    EXPERIENCE = "experience"
 
 
 class ReconciledRecordDto(BaseDto):

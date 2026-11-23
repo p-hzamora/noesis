@@ -6,7 +6,6 @@ handlers'. Without `--yes` a command runs every check and writes nothing.
 """
 
 import asyncio
-from enum import StrEnum
 from typing import Annotated
 
 import typer
@@ -53,6 +52,7 @@ from noesis.bounded_context.knowledge.domain.value_objects import (
     Key,
     RecordId,
     RecordTypeEnum,
+    ReviewableRecordTypeEnum,
     Tag,
 )
 from noesis.core import Environment
@@ -86,13 +86,6 @@ YesOption = Annotated[
 ReasonOption = Annotated[str | None, typer.Option("--reason", help="Why; stored on the decision.")]
 
 
-class QueueTypeOption(StrEnum):
-    """The record types the review queue holds."""
-
-    KNOWLEDGE = "knowledge"
-    ASSERTION = "assertion"
-
-
 async def _state_of(
     handlers: KnowledgeHandlers, space_key: Key, record_id: RecordId
 ) -> ReviewStateDto:
@@ -112,7 +105,7 @@ async def _state_of(
             next_steps=["Check the id and the active space."],
         )
     state: ReviewStateDto = states[0]
-    if state.record_type not in (RecordTypeEnum.KNOWLEDGE.value, RecordTypeEnum.ASSERTION.value):
+    if state.record_type not in ReviewableRecordTypeEnum:
         raise RecordNotReviewableError(
             f"A {state.record_type} has no review status.",
             {"record_id": record_id.value, "record_type": state.record_type},
@@ -129,7 +122,8 @@ def queue(
     ] = None,
     global_only: Annotated[bool, typer.Option("--global", help="Only space-wide items.")] = False,
     record_type: Annotated[
-        QueueTypeOption | None, typer.Option("--type", help="Only knowledge or only assertions.")
+        ReviewableRecordTypeEnum | None,
+        typer.Option("--type", help="Only knowledge or only assertions."),
     ] = None,
     predicate: Annotated[
         AssertionPredicateEnum | None,
@@ -153,7 +147,7 @@ def queue(
         actor=resolve_actor(env.identity),
         project=Key(value=project) if project else None,
         global_only=global_only,
-        record_type=RecordTypeEnum(record_type.value) if record_type else None,
+        record_type=RecordTypeEnum(record_type) if record_type else None,
         predicate=predicate,
         limit=limit,
         cursor=cursor,

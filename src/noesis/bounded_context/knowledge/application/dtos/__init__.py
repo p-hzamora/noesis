@@ -57,6 +57,7 @@ from .remember_result_dto import (
     ReconciledRecordDto,
     ReconciliationDto,
     RememberedAssertionDto,
+    RememberKindEnum,
     RememberResultDto,
 )
 from .review_dtos import (
@@ -131,6 +132,7 @@ __all__ = [
     "CaptureResultDto",
     "ReconciledRecordDto",
     "ReconciliationDto",
+    "RememberKindEnum",
     "RememberResultDto",
     "RememberedAssertionDto",
     "CatalogEntryDetailDto",

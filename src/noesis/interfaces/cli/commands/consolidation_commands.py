@@ -8,7 +8,6 @@ no original or link changes, and a failed step is reported as an error, never as
 
 import asyncio
 import sys
-from enum import StrEnum
 from typing import Annotated
 
 import typer
@@ -96,14 +95,6 @@ KeyOption = Annotated[
         "interrupted run.",
     ),
 ]
-
-
-class ReasonKindOption(StrEnum):
-    """Why a consolidation is rejected; only `distinct` remembers the pairs."""
-
-    DISTINCT = "distinct"
-    POOR_DRAFT = "poor_draft"
-    OTHER = "other"
 
 
 def _record_id(context: typer.Context, value: str, hint: str) -> RecordId:
@@ -387,7 +378,7 @@ def reject(
     context: typer.Context,
     consolidation_id: Annotated[str, typer.Argument(help="Id of the consolidation.")],
     reason_kind: Annotated[
-        ReasonKindOption,
+        DismissalReasonKindEnum,
         typer.Option(
             "--reason-kind",
             help="distinct: remember the pair as different; poor_draft, other: do not.",
@@ -418,7 +409,7 @@ def reject(
                 apply=yes,
                 idempotency_key=idempotency_key,
                 consolidation_id=target,
-                reason_kind=DismissalReasonKindEnum(reason_kind.value),
+                reason_kind=reason_kind,
                 reason=why,
             )
         )

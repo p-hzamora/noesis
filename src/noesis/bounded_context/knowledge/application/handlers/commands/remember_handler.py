@@ -5,7 +5,6 @@ actor or scope logic of its own (FR-011).
 """
 
 from datetime import datetime
-from enum import StrEnum
 
 from noesis.bounded_context.knowledge.application.dtos import (
     CaptureResultDto,
@@ -15,6 +14,7 @@ from noesis.bounded_context.knowledge.application.dtos import (
     ReconciliationDto,
     RecordDto,
     RememberedAssertionDto,
+    RememberKindEnum,
     RememberResultDto,
 )
 from noesis.bounded_context.knowledge.application.handlers.commands.capture_experience_handler import (
@@ -95,13 +95,6 @@ CONSOLIDATE_NEXT_STEP: str = (
     "Once both are accepted, `noesis consolidation propose --member {existing} --member {new} "
     "--title ... --body ... --rationale ...` can merge them; nothing is merged automatically."
 )
-
-
-class RememberKindEnum(StrEnum):
-    """What `remember` records."""
-
-    KNOWLEDGE = "knowledge"
-    EXPERIENCE = "experience"
 
 
 class RememberCommand(FrozenObject):

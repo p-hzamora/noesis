@@ -88,6 +88,13 @@ class ActorKindEnum(StrEnum):
     AGENT = "agent"
 
 
+class ReviewableRecordTypeEnum(StrEnum):
+    """The record types with a review status: the ones the review queue holds."""
+
+    KNOWLEDGE = "knowledge"
+    ASSERTION = "assertion"
+
+
 class RecordTypeEnum(StrEnum):
     """The type of a persisted record."""
 

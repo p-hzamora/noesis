@@ -5,10 +5,12 @@ from typing import Annotated
 
 import typer
 
-from noesis.bounded_context.knowledge.application.dtos import RememberResultDto
+from noesis.bounded_context.knowledge.application.dtos import (
+    RememberKindEnum,
+    RememberResultDto,
+)
 from noesis.bounded_context.knowledge.application.handlers.commands.remember_handler import (
     RememberCommand,
-    RememberKindEnum,
 )
 from noesis.bounded_context.knowledge.application.services.inputs import SourceInput
 from noesis.bounded_context.knowledge.domain.value_objects import (
