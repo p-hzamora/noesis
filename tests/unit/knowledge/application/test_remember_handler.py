@@ -9,6 +9,7 @@ from tests.support.review_fakes import ReviewEnv, make_review_env, seed_knowledg
 from noesis.bounded_context.knowledge.application.dtos import (
     CatalogEntryDetailDto,
     CatalogEntryDto,
+    RememberKindEnum,
     RememberResultDto,
 )
 from noesis.bounded_context.knowledge.application.handlers.commands.propose_assertion_handler import (
@@ -18,7 +19,6 @@ from noesis.bounded_context.knowledge.application.handlers.commands.remember_han
     KEY_PREFIX,
     RememberCommand,
     RememberHandler,
-    RememberKindEnum,
 )
 from noesis.bounded_context.knowledge.application.ports.read_repositories import (
     ICatalogEntryReadRepository,
