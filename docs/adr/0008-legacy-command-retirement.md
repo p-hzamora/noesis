@@ -1,26 +1,23 @@
-# ADR-0008: staged retirement of `recall` and `record capture`
+# ADR-0008: removal of `recall` and `record capture`
 
-Status: accepted, 2026-11-22.
+Status: accepted, 2026-11-22; amended 2026-11-23.
 
 ## Context
 
-Both commands have first-party consumers (docs, skill guide, scripts, tests). Removing them at
-once would break agents and scripts silently.
+`search` replaces `recall` and `remember` replaces `record capture`. The first plan retired the old
+commands in stages, because docs, skill guide, scripts and tests used them. Those consumers have
+all moved, and the consumer guard (`tests/architecture/test_legacy_command_consumers.py`) finds no
+first-party use left.
 
 ## Decision
 
-| Stage | Behaviour | Release |
-| --- | --- | --- |
-| A | new commands and fields; old commands unchanged | 0.2.0 |
-| D | old commands forward to the new implementation, stdout unchanged, stderr `DEPRECATED: use ...` (silenced by `NOESIS_SILENCE_DEPRECATION=1`) | 0.2.0 |
-| R | old commands exit 2 naming the replacement | 0.3.0 |
+Both commands are removed outright. There is no deprecation stage and no exit-2 stub: with no
+consumer left, a warning protects nobody. `noesis recall` and `noesis record capture` now fail as
+any unknown command does (exit 2, "No such command"). `record revise` and `record get` stay.
 
-Stage R requires all of: Stage D shipped in a tagged release; the consumer guard
-(`tests/architecture/test_legacy_command_consumers.py`) lists no `PENDING_MIGRATION` file; the
-golden scenarios pass through `search` and `remember` alone; the digest equivalence test passes;
-the user approves in the CHANGELOG entry.
+The consumer guard stays as a permanent check: only the historical files may mention the old
+commands.
 
 ## Consequences
 
-Consumers get one release of warnings. No data migrates: both paths write the same records.
-`notes` stays retired.
+No data migrates: both paths wrote the same records. `notes` stays retired.

@@ -1,48 +1,10 @@
 # noesis record, noesis store
 
 The record store (Neo4j, [ADR-0003](../adr/0003-knowledge-context-and-neo4j-record-store.md)):
-capture knowledge and experiences, revise knowledge, read any record, and prepare the store. Set
+revise knowledge, read any record, and prepare the store. Set
 up the database first: [store workflow](../workflows/store.md). Every command needs
 `NOESIS_NEO4J_PASSWORD` (a user-side profile or the environment); `--help` and usage errors need
 nothing and never connect.
-
-## record capture
-
-> Deprecated: use [`noesis remember`](remember.md). This command forwards to it: stdout is
-> unchanged and stderr gets `DEPRECATED: use noesis remember --as <type> ...`
-> (silence it with `NOESIS_SILENCE_DEPRECATION=1`). It is removed in 0.3.0.
-
-```text
-noesis record capture --type knowledge  --title <text> --body <text|-> --subtype <slug>
-                      (--source <kind>:<locator> | --source-id <id>)...
-                      [--project <key>] [--tag <tag>]... --idempotency-key <key> [--json]
-noesis record capture --type experience --body <text|-> [--subtype observation|outcome|failure]
-                      (--source <kind>:<locator> | --source-id <id>)...
-                      [--project <key>] [--occurred <ISO 8601>] [--session <id>]
-                      [--environment <text>] --idempotency-key <key> [--json]
-```
-
-- `--idempotency-key` is required. The same key with the same request returns the first record and
-  writes nothing (`result.replayed: true`); the same key with a different request fails with
-  `KNOWLEDGE_203_IDEMPOTENCY_KEY_REUSED`. Choose the key deterministically from the work (for
-  example `<session>-<commit sha>-decision`), so a retry repeats it.
-- `--body -` reads the text from stdin. A body is never read implicitly, so a command cannot hang
-  waiting for input.
-- `--source` takes `<kind>:<locator>`, split at the first colon. Kinds: `file_version`
-  (`vault://<vault_key>/<relative path>`), `commit` (full sha), `agent_session` (session id), `url`,
-  `work_brief` (submission key). `--source-id <ULID>` cites a source that is already in the store
-  (it must be in the active space: `KNOWLEDGE_205_REFERENCE_NOT_IN_SPACE`). Both repeat; at least
-  one source is required for both record types.
-- `--project` defaults to the name of the git repository of the working directory (a linked
-  worktree uses its main repository); outside a repository the record is space-wide. An unknown
-  project is created.
-- Secrets in `--title` and `--body` are redacted before storing.
-- The actor is not an option: it is `agent` (named `claude-code`, `codex` or the harness name, with
-  its session when the harness exposes one) whenever a harness marker is in the environment
-  (`CLAUDECODE`, `CLAUDE_CODE_SESSION_ID`, `AI_AGENT`, `CODEX_THREAD_ID`, `CODEX_SESSION_ID`,
-  `NOESIS_SESSION_ID`), otherwise the `user` (login name).
-- Result: `record_id`, `record_type`, `revision`, `status` (`proposed`; knowledge only), `space_id`,
-  `project_id`, `replayed`.
 
 ## record revise
 

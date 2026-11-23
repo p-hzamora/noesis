@@ -25,5 +25,3 @@ layer, see [workflows](../workflows/README.md); for the ideas behind the CLI, se
 - Top-level `noesis --env-file <file>` overrides the configuration file (default: the
   repository's `.noesis-config` profile, else `~/.config/noesis/.env`). `--version` prints the version.
 - Exit codes: `0` ok, `1` the operation failed, `2` invalid command line.
-
-- [Recall](recall.md): scoped briefings and deterministic digests from graph evidence.

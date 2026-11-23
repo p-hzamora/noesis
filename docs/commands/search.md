@@ -2,7 +2,7 @@
 
 Unified search over the record store and the resource catalog: one call returns matching records,
 the skills, agents, CLI tools and MCP servers that cover the task, and an ordered list of next
-actions. With `--briefing` it also returns the briefing the deprecated `recall` command used to give.
+actions. With `--briefing` it also returns the task briefing.
 
 ```text
 noesis search <query> [--project <key> | --target-root <path> | --all-projects] [--tag <t>]...
@@ -20,7 +20,7 @@ noesis search <query> [--project <key> | --target-root <path> | --all-projects] 
 | `--runtime` | Runtimes whose availability is reported (default: the current session). |
 | `--resource-limit` | Maximum selected resources, 0..20 (default 8; 0 selects none). |
 | `--no-resources` | Records only. The JSON keeps exactly the record-search keys. |
-| `--briefing` | `none` (default), `digest` (equal to `recall --no-synthesis`) or `synthesis`. |
+| `--briefing` | `none` (default), `digest` (model-free) or `synthesis`. |
 | `--budget-chars` | Evidence budget for the briefing. |
 
 ## Result

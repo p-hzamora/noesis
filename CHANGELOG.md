@@ -7,6 +7,10 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Removed
+
+- `noesis recall` and `noesis record capture`, in favour of `noesis search` and `noesis remember`.
+
 ### Fixed
 
 - Recall resolves, merges and cites notes by stable ID, preserving different records with
