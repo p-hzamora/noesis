@@ -52,34 +52,26 @@ HISTORICAL: Final[frozenset[str]] = frozenset(
 )
 """Kept for good: they describe the past or are data, not invocations."""
 
-PENDING_MIGRATION: Final[frozenset[str]] = frozenset(
+PENDING_MIGRATION: Final[frozenset[str]] = frozenset()
+"""Files still to move to `search` / `remember`; empty, so a new use must go to `LEGACY_SHIMS` or fail."""
+
+LEGACY_SHIMS: Final[frozenset[str]] = frozenset(
     {
-        "README.md",
-        "docs/architecture.md",
-        "docs/commands/README.md",
-        "docs/commands/recall.md",
-        "docs/commands/record.md",
-        "docs/commands/search.md",
-        "docs/guides/refactor-walkthrough.md",
-        "skill_guides/noesis.md",
-        "src/noesis/interfaces/cli/app.py",
-        "src/noesis/interfaces/cli/commands/recall_commands.py",
-        "src/noesis/interfaces/cli/commands/record_commands.py",
-        "src/noesis/interfaces/cli/responses/record_response.py",
-        "src/noesis/interfaces/cli/search_presentation.py",
-        "tests/e2e/knowledge/test_record_capture_shim_neo4j.py",
-        "tests/e2e/knowledge/test_review_processes_neo4j.py",
-        "tests/e2e/retrieval/test_recall_cli.py",
-        "tests/e2e/retrieval/test_search_cli.py",
-        "tests/integration/interfaces/test_record_cli_neo4j.py",
-        "tests/integration/interfaces/test_record_cli_offline.py",
-        "tests/integration/interfaces/test_review_cli_offline.py",
-        "tests/support/knowledge_cli_support.py",
-        "tests/support/noesis_process_support.py",
-        "tests/unit/interfaces/test_actor_resolution.py",
+        "docs/commands/recall.md",  # documents the deprecated command
+        "docs/commands/record.md",  # documents the deprecated `record capture`
+        "src/noesis/interfaces/cli/app.py",  # registers the `recall` shim
+        "src/noesis/interfaces/cli/commands/recall_commands.py",  # the `recall` shim
+        "src/noesis/interfaces/cli/commands/record_commands.py",  # holds the `record capture` shim
+        "src/noesis/interfaces/cli/responses/record_response.py",  # output of `record capture`
+        "tests/e2e/knowledge/test_record_capture_shim_neo4j.py",  # tests the capture shim
+        "tests/e2e/retrieval/test_recall_cli.py",  # tests the recall shim
+        "tests/integration/interfaces/test_record_cli_neo4j.py",  # tests `record capture` itself
+        "tests/integration/interfaces/test_record_cli_offline.py",  # tests `record capture` usage
+        "tests/support/knowledge_cli_support.py",  # `capture_args`, used only by those record tests
+        "tests/support/noesis_process_support.py",  # `capture_command`, used by the shim tests
     }
 )
-"""Move to `search` / `remember`, then remove the entry."""
+"""Kept until the commands are removed (Stage R): the shims, their docs, and tests of them."""
 
 
 def legacy_users() -> set[str]:
@@ -103,7 +95,7 @@ def legacy_users() -> set[str]:
 
 
 def test_no_new_legacy_command_use() -> None:
-    unlisted: set[str] = legacy_users() - HISTORICAL - PENDING_MIGRATION
+    unlisted: set[str] = legacy_users() - HISTORICAL - PENDING_MIGRATION - LEGACY_SHIMS
 
     assert not unlisted, (
         f"Use `noesis search` / `noesis remember` instead of the legacy commands in: {sorted(unlisted)}"
@@ -111,7 +103,7 @@ def test_no_new_legacy_command_use() -> None:
 
 
 def test_allow_list_has_no_stale_entry() -> None:
-    stale: set[str] = (HISTORICAL | PENDING_MIGRATION) - legacy_users()
+    stale: set[str] = (HISTORICAL | PENDING_MIGRATION | LEGACY_SHIMS) - legacy_users()
 
     assert not stale, f"No legacy command use left; remove from the allow-list: {sorted(stale)}"
 

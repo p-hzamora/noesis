@@ -7,7 +7,7 @@ from tests.support.git_support import add_worktree, init_repo, isolate_git
 from tests.support.knowledge_neo4j_support import Neo4jKnowledgeEnv, query
 from tests.support.noesis_process_support import (
     ProcessResult,
-    capture_command,
+    remember_command,
     run_noesis,
 )
 from tests.support.retrieval.retrieval_neo4j_support import capture_knowledge
@@ -30,7 +30,7 @@ def test_ac006_a_capture_is_found_by_search_in_the_next_process(
 ) -> None:
     """Lexical immediacy: no sync, no cursor; the full-text index answers the next process."""
     captured = run_noesis(
-        capture_command("ac006", title="Zanzibar routing", body="Prefer zanzibar routing."),
+        remember_command("ac006", title="Zanzibar routing", body="Prefer zanzibar routing."),
         child_env,
     )
     assert captured.code == 0, captured.stdout
@@ -55,7 +55,8 @@ def test_ac006_a_capture_is_found_by_search_in_the_next_process(
 def test_ac026_absent(env: Neo4jKnowledgeEnv, child_env: dict[str, str]) -> None:
     """Production wiring registers no semantic source: state `absent`, and `--require-semantic` fails."""
     assert (
-        run_noesis(capture_command("ac026", title="Ports guide", body="ports"), child_env).code == 0
+        run_noesis(remember_command("ac026", title="Ports guide", body="ports"), child_env).code
+        == 0
     )
 
     plain = run_noesis(["search", "ports", "--all-projects"], child_env)
@@ -141,10 +142,10 @@ async def test_ac027_default_project(
     assert not planned.exists()
 
     briefing = run_noesis_in(
-        acme, ["recall", "layout", "--no-synthesis", "--target-root", str(planned)], child_env
+        acme, ["search", "layout", "--briefing", "digest", "--target-root", str(planned)], child_env
     )
     assert briefing.code == 0, briefing.stdout
-    assert {record["id"] for record in briefing.result["records"]} == {kg}  # type: ignore[attr-defined]
+    assert {record["id"] for record in briefing.result["briefing"]["records"]} == {kg}  # type: ignore[attr-defined]
 
     everything = search(acme, "--all-projects")
     assert _ids(everything) == {ka, ko, kg}

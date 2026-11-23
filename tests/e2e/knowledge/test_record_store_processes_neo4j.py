@@ -16,6 +16,7 @@ from tests.support.noesis_process_support import (
     ProcessResult,
     capture_command,
     finish,
+    remember_command,
     run_noesis,
     start_noesis,
     store_environment,
@@ -94,7 +95,7 @@ def test_capture_in_one_process_is_read_back_by_another_with_the_same_fields(
 ) -> None:
     """AC-001: init, capture and get run in three separate processes."""
     assert run_noesis(["store", "init"], env).code == 0
-    captured = run_noesis(capture_command("ac001"), env)
+    captured = run_noesis(remember_command("ac001"), env)
     record_id = str(captured.result["record_id"])
     fetched = run_noesis(["record", "get", record_id], env)
 
@@ -115,7 +116,7 @@ def test_two_processes_revising_the_same_head_yield_one_winner_and_one_conflict(
 ) -> None:
     """AC-002 / AC-023: both children are started before either is awaited."""
     record_id = str(
-        run_noesis(capture_command(f"race-{round_number}"), initialised).result["record_id"]
+        run_noesis(remember_command(f"race-{round_number}"), initialised).result["record_id"]
     )
 
     started = time.monotonic()
@@ -145,7 +146,7 @@ def test_two_processes_capturing_with_the_same_key_store_one_record(
 ) -> None:
     """AC-005: the idempotency race ends with both exit 0, one id and one record node."""
     started = time.monotonic()
-    children = [start_noesis(capture_command("same-key"), initialised) for _ in range(2)]
+    children = [start_noesis(remember_command("same-key"), initialised) for _ in range(2)]
     outcomes = [finish(child, started) for child in children]
 
     assert [o.code for o in outcomes] == [0, 0], [(o.stdout, o.stderr) for o in outcomes]
@@ -163,10 +164,10 @@ def test_a_replay_in_a_new_process_returns_the_first_record_and_a_changed_reques
     initialised: dict[str, str], neo4j_settings: Neo4jConnectionSettings
 ) -> None:
     """AC-004 across processes."""
-    first = run_noesis(capture_command("replay"), initialised)
+    first = run_noesis(remember_command("replay"), initialised)
     nodes_before = _count(neo4j_settings, "Knowledge"), _count(neo4j_settings, "Revision")
-    again = run_noesis(capture_command("replay"), initialised)
-    different = run_noesis(capture_command("replay", body="Another body."), initialised)
+    again = run_noesis(remember_command("replay"), initialised)
+    different = run_noesis(remember_command("replay", body="Another body."), initialised)
 
     assert again.code == 0
     assert again.result["record_id"] == first.result["record_id"]
@@ -187,8 +188,8 @@ def test_every_store_command_fails_closed_and_fast_on_a_closed_port(tmp_path: Pa
     bound = CONNECT_TIMEOUT_SECONDS + _startup_seconds(env) + NFR_003_SLACK_SECONDS
     record_id = "01ARZ3NDEKTSV4RRFFQ69G5FAV"
     commands: dict[str, list[str]] = {
-        "capture knowledge": capture_command("closed-1"),
-        "capture experience": capture_command("closed-2", record_type="experience"),
+        "capture knowledge": remember_command("closed-1"),
+        "capture experience": remember_command("closed-2", record_type="experience"),
         "revise": _revise(record_id, "closed-3", "x"),
         "get": ["record", "get", record_id],
         "store init": ["store", "init"],
@@ -236,7 +237,7 @@ def test_a_missing_idempotency_key_is_a_usage_error_before_any_io(
 
 def test_revising_an_experience_is_a_typed_error(initialised: dict[str, str]) -> None:
     """AC-008."""
-    experience = run_noesis(capture_command("exp", record_type="experience"), initialised)
+    experience = run_noesis(remember_command("exp", record_type="experience"), initialised)
 
     result = run_noesis(_revise(str(experience.result["record_id"]), "exp-rev", "x"), initialised)
 
@@ -288,7 +289,7 @@ def test_the_stored_actor_follows_the_harness_markers_of_the_capturing_process(
     initialised: dict[str, str], markers: dict[str, str], kind: str
 ) -> None:
     """Markers are set explicitly on the child; the parent's own are never inherited."""
-    captured = run_noesis(capture_command("actor"), {**initialised, **markers})
+    captured = run_noesis(remember_command("actor"), {**initialised, **markers})
 
     stored = run_noesis(["record", "get", str(captured.result["record_id"])], initialised)
 

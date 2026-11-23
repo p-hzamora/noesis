@@ -2,11 +2,11 @@
 
 Usage errors exit 2 before any I/O (a closed port is configured, so any attempt would exit 1 with
 `INTEGRATION_103` instead); the user-presence and bulk-authority refusals come before the store
-(AC-023, AC-027, AC-028); an invalid tag fails like `record capture --tag` does.
+(AC-023, AC-027, AC-028); an invalid tag fails like `remember --tag` does.
 """
 
 import pytest
-from tests.support.knowledge_cli_support import capture_args, run_json, use_closed_store
+from tests.support.knowledge_cli_support import remember_args, run_json, use_closed_store
 from tests.support.review_support import AGENT_SESSION, attach_terminal
 
 from noesis.interfaces.cli import run
@@ -89,7 +89,7 @@ def test_an_invalid_bulk_tag_fails_like_capture_does_and_before_the_store(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     use_closed_store(monkeypatch)
-    capture_code, capture = run_json(capsys, [*capture_args(), "--tag", "Bad Tag!"])
+    capture_code, capture = run_json(capsys, [*remember_args(), "--tag", "Bad Tag!"])
     bulk_code, bulk = run_json(capsys, ["review", "accept", "--tag", "Bad Tag!", "--all"])
 
     capture_error = capture["error"]

@@ -74,3 +74,28 @@ def capture_args(
         "--idempotency-key",
         key,
     ]
+
+
+def remember_args(
+    key: str = IDEMPOTENCY_KEY, *, title: str = "Retry policy", body: str = "Use retries."
+) -> list[str]:
+    """A valid knowledge `remember` command line."""
+    return [
+        "remember",
+        "--as",
+        "knowledge",
+        "--title",
+        title,
+        "--body",
+        body,
+        "--subtype",
+        "decision",
+        "--project",
+        "demo",
+        "--tag",
+        "area:retries",
+        "--source",
+        COMMIT_SOURCE,
+        "--idempotency-key",
+        key,
+    ]

@@ -5,7 +5,7 @@ import time
 import pytest
 from tests.support.knowledge_neo4j_support import Neo4jKnowledgeEnv, query
 from tests.support.knowledge_support import NOW
-from tests.support.noesis_process_support import capture_command, finish, run_noesis
+from tests.support.noesis_process_support import finish, remember_command, run_noesis
 from tests.support.retrieval.probe_process_support import (
     run_noesis_with_probe,
     start_noesis_with_probe,
@@ -73,9 +73,9 @@ def test_ac032_probe_sync_and_status(
 ) -> None:
     space_id = space_id_of(neo4j_settings)
     assert run_noesis_with_probe(["index", "rebuild", "--yes"], child_env).code == 0
-    knowledge = run_noesis(capture_command("k", title="Alpha record"), child_env)
+    knowledge = run_noesis(remember_command("k", title="Alpha record"), child_env)
     experience = run_noesis(
-        capture_command("e", record_type="experience", body="It broke."), child_env
+        remember_command("e", record_type="experience", body="It broke."), child_env
     )
     knowledge_id = str(knowledge.result["record_id"])
     experience_id = str(experience.result["record_id"])

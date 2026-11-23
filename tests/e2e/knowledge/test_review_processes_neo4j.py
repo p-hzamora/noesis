@@ -79,9 +79,8 @@ def _capture(
     title: str = "Retry policy",
 ) -> list[str]:
     argv = [
-        "record",
-        "capture",
-        "--type",
+        "remember",
+        "--as",
         "knowledge",
         "--title",
         title,

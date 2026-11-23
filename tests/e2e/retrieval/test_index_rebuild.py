@@ -4,7 +4,7 @@ import time
 
 import pytest
 from tests.support.knowledge_neo4j_support import Neo4jKnowledgeEnv
-from tests.support.noesis_process_support import capture_command, finish, run_noesis
+from tests.support.noesis_process_support import finish, remember_command, run_noesis
 from tests.support.retrieval.probe_process_support import start_noesis_with_probe
 from tests.support.retrieval.retrieval_neo4j_support import capture_knowledge
 from tests.support.retrieval.retrieval_process_support import (
@@ -38,7 +38,7 @@ async def test_ac010_capture_during_rebuild(
         lambda: probe_count(neo4j_settings) >= 1, "the probe holds its first entry", process=rebuild
     )
     started = time.monotonic()
-    late = run_noesis(capture_command("late", title="Captured mid-rebuild"), child_env)
+    late = run_noesis(remember_command("late", title="Captured mid-rebuild"), child_env)
     still_running = rebuild.poll() is None
     outcome = finish(rebuild, started)
 

@@ -20,7 +20,7 @@ from tests.support.neo4j_container import (
     docker_unavailable_reason,
     pinned_neo4j_image,
 )
-from tests.support.noesis_process_support import capture_command, run_noesis, store_environment
+from tests.support.noesis_process_support import remember_command, run_noesis, store_environment
 
 from noesis.shared_kernel.infrastructure.outbound.neo4j import Neo4jConnectionSettings
 
@@ -79,11 +79,11 @@ def test_a_retry_with_the_same_key_after_an_outage_stores_exactly_one_record(
     assert wrapped is not None
 
     wrapped.stop(timeout=5)
-    down = run_noesis(capture_command("outage-key"), env)
+    down = run_noesis(remember_command("outage-key"), env)
     wrapped.start()
     _wait_until_serving(settings)
-    retried = run_noesis(capture_command("outage-key"), env)
-    again = run_noesis(capture_command("outage-key"), env)
+    retried = run_noesis(remember_command("outage-key"), env)
+    again = run_noesis(remember_command("outage-key"), env)
 
     assert down.code == 1
     assert down.error["code"] == "INTEGRATION_103_GRAPH_STORE_UNAVAILABLE"

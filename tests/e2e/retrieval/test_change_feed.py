@@ -4,7 +4,7 @@ import time
 
 import pytest
 from tests.support.knowledge_neo4j_support import Neo4jKnowledgeEnv, query
-from tests.support.noesis_process_support import capture_command, finish, start_noesis
+from tests.support.noesis_process_support import finish, remember_command, start_noesis
 from tests.support.retrieval.retrieval_process_support import head_sequence, space_id_of
 
 from noesis.shared_kernel.infrastructure.outbound.neo4j import Neo4jConnectionSettings
@@ -23,7 +23,7 @@ def test_ac007(
         started = time.monotonic()
         children = [
             start_noesis(
-                capture_command(f"race-{round_number}-{side}", title=f"Race {side}"), child_env
+                remember_command(f"race-{round_number}-{side}", title=f"Race {side}"), child_env
             )
             for side in "ab"
         ]

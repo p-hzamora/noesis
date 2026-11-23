@@ -200,3 +200,47 @@ def capture_command(
         "--idempotency-key",
         key,
     ]
+
+
+def remember_command(
+    key: str,
+    *,
+    title: str = "Retry policy",
+    body: str = "Use retries.",
+    record_type: str = "knowledge",
+) -> list[str]:
+    """A valid `remember` command line (without `--json`)."""
+    source: list[str] = ["--source", "commit:" + "a" * 40]
+    if record_type == "experience":
+        return [
+            "remember",
+            "--as",
+            "experience",
+            "--body",
+            body,
+            "--subtype",
+            "outcome",
+            "--project",
+            "demo",
+            *source,
+            "--idempotency-key",
+            key,
+        ]
+    return [
+        "remember",
+        "--as",
+        "knowledge",
+        "--title",
+        title,
+        "--body",
+        body,
+        "--subtype",
+        "decision",
+        "--project",
+        "demo",
+        "--tag",
+        "area:retries",
+        *source,
+        "--idempotency-key",
+        key,
+    ]

@@ -81,9 +81,9 @@ def test_no_capture_option_lets_a_caller_claim_to_be_the_user(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     for option in ("--actor", "--actor-kind", "--as-user", "--user"):
-        argv = ["record", "capture", "--type", "knowledge", "--idempotency-key", "k"]
+        argv = ["remember", "--as", "knowledge", "--idempotency-key", "k"]
         assert run([*argv, option, "user"]) == 2
         capsys.readouterr()
-    assert run(["record", "capture", "--help"]) == 0
+    assert run(["remember", "--help"]) == 0
     help_text: str = capsys.readouterr().out
     assert "--actor" not in help_text
