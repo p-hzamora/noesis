@@ -1,6 +1,6 @@
 """`record`, `store` and `doctor` against the pinned Neo4j container, in-process.
 
-Covers AC-001 (capture then get, here in one process; the cross-process proof is the
+Covers AC-001 (remember then get, here in one process; the cross-process proof is the
 subprocess e2e), AC-004, AC-006, AC-011 and AC-012 at the CLI level.
 """
 
@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 from tests.support.knowledge_cli_support import (
     COMMIT_SOURCE,
-    capture_args,
+    remember_args,
     run_json,
     use_closed_store,
     use_store,
@@ -99,7 +99,7 @@ def test_every_command_on_an_uninitialised_store_points_to_store_init(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     for argv in (
-        capture_args(),
+        remember_args(),
         ["record", "get", MISSING_ID],
         [
             "record",
@@ -123,10 +123,10 @@ def test_every_command_on_an_uninitialised_store_points_to_store_init(
 
 
 @pytest.mark.usefixtures("store")
-def test_capture_then_get_returns_the_proposal_at_revision_one(
+def test_remember_then_get_returns_the_proposal_at_revision_one(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    code, captured = run_json(capsys, capture_args())
+    code, captured = run_json(capsys, remember_args())
     record_id = str(_result(captured)["record_id"])
 
     assert code == 0
@@ -154,10 +154,10 @@ def test_the_actor_is_the_user_outside_a_harness_and_an_agent_inside_one(
 ) -> None:
     monkeypatch.setenv("USER", "pablo")
     monkeypatch.setenv("LOGNAME", "pablo")
-    _, by_user = run_json(capsys, capture_args("by-user"))
+    _, by_user = run_json(capsys, remember_args("by-user"))
     monkeypatch.setenv("CLAUDECODE", "1")
     monkeypatch.setenv("CLAUDE_CODE_SESSION_ID", "session-42")
-    _, by_agent = run_json(capsys, capture_args("by-agent", body="Other text."))
+    _, by_agent = run_json(capsys, remember_args("by-agent", body="Other text."))
 
     _, user_record = run_json(capsys, ["record", "get", str(_result(by_user)["record_id"])])
     _, agent_record = run_json(capsys, ["record", "get", str(_result(by_agent)["record_id"])])
@@ -178,9 +178,9 @@ def test_the_actor_is_the_user_outside_a_harness_and_an_agent_inside_one(
 def test_the_same_key_and_request_returns_the_first_record_and_a_different_request_is_rejected(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    _, first = run_json(capsys, capture_args())
-    code, again = run_json(capsys, capture_args())
-    different_code, different = run_json(capsys, capture_args(body="Something else."))
+    _, first = run_json(capsys, remember_args())
+    code, again = run_json(capsys, remember_args())
+    different_code, different = run_json(capsys, remember_args(body="Something else."))
 
     assert code == 0
     assert _result(again)["record_id"] == _result(first)["record_id"]
@@ -193,7 +193,7 @@ def test_the_same_key_and_request_returns_the_first_record_and_a_different_reque
 def test_revise_appends_a_revision_and_get_reads_each_one(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    _, captured = run_json(capsys, capture_args())
+    _, captured = run_json(capsys, remember_args())
     record_id = str(_result(captured)["record_id"])
     revise = ["record", "revise", record_id, "--expected-revision", "1", "--body", "Use backoff."]
 
@@ -213,19 +213,18 @@ def test_revise_appends_a_revision_and_get_reads_each_one(
 
 
 @pytest.mark.usefixtures("store")
-def test_experience_capture_cites_an_existing_source_by_id_and_revise_rejects_it(
+def test_experience_remember_cites_an_existing_source_by_id_and_revise_rejects_it(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    _, knowledge = run_json(capsys, capture_args())
+    _, knowledge = run_json(capsys, remember_args())
     _, fetched = run_json(capsys, ["record", "get", str(_result(knowledge)["record_id"])])
     source_id = str(_result(fetched)["sources"][0]["id"])  # type: ignore[index]
 
     code, experience = run_json(
         capsys,
         [
-            "record",
-            "capture",
-            "--type",
+            "remember",
+            "--as",
             "experience",
             "--body",
             "Retries masked the outage.",
@@ -275,7 +274,7 @@ def test_experience_capture_cites_an_existing_source_by_id_and_revise_rejects_it
 def test_a_source_id_of_nothing_is_rejected_and_writes_nothing(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    argv = [a for a in capture_args() if a not in ("--source", COMMIT_SOURCE)]
+    argv = [a for a in remember_args() if a not in ("--source", COMMIT_SOURCE)]
     code, envelope = run_json(capsys, [*argv, "--source-id", MISSING_ID])
 
     assert code == 1
@@ -286,7 +285,7 @@ def test_a_source_id_of_nothing_is_rejected_and_writes_nothing(
 def test_a_record_of_another_space_is_not_found(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    _, captured = run_json(capsys, capture_args())
+    _, captured = run_json(capsys, remember_args())
     monkeypatch.setenv("NOESIS_KNOWLEDGE_SPACE", "other")
     run_json(capsys, ["store", "init"])
 
@@ -303,7 +302,7 @@ def test_body_dash_reads_stdin_and_secrets_are_redacted(
     import io
 
     monkeypatch.setattr("sys.stdin", io.StringIO("token ghp_" + "a" * 36 + " leaked"))
-    argv = capture_args()
+    argv = remember_args()
     argv[argv.index("--body") + 1] = "-"
 
     code, captured = run_json(capsys, argv)
@@ -322,7 +321,7 @@ def test_the_default_project_is_the_git_repository_name_of_the_working_directory
     repository = tmp_path / "my-repo"
     (repository / ".git").mkdir(parents=True)
     monkeypatch.chdir(repository)
-    argv = capture_args()
+    argv = remember_args()
     index = argv.index("--project")
     del argv[index : index + 2]
 

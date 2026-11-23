@@ -11,8 +11,6 @@ import time
 import pytest
 from tests.support.knowledge_cli_support import (
     CONNECT_TIMEOUT_SECONDS,
-    IDEMPOTENCY_KEY,
-    capture_args,
     run_json,
     use_closed_store,
 )
@@ -24,21 +22,6 @@ pytestmark = pytest.mark.integration
 ID = "01ARZ3NDEKTSV4RRFFQ69G5FAV"
 
 ALL_STORE_COMMANDS: list[list[str]] = [
-    capture_args(),
-    [
-        "record",
-        "capture",
-        "--type",
-        "experience",
-        "--body",
-        "It failed.",
-        "--subtype",
-        "failure",
-        "--source",
-        "agent_session:s-1",
-        "--idempotency-key",
-        IDEMPOTENCY_KEY,
-    ],
     ["record", "revise", ID, "--expected-revision", "1", "--body", "x", "--idempotency-key", "k"],
     ["record", "get", ID],
     ["store", "init"],
@@ -78,22 +61,14 @@ def test_text_mode_reports_the_code_and_next_steps_on_stderr(
     assert "next:" in captured.err
 
 
-@pytest.mark.parametrize(
-    "argv",
-    [
-        [a for a in capture_args() if a not in ("--idempotency-key", "test-key-1")],
-        ["record", "revise", ID, "--expected-revision", "1", "--body", "x"],
-    ],
-    ids=["capture", "revise"],
-)
 def test_a_missing_idempotency_key_is_a_usage_error_that_touches_nothing(
-    argv: list[str], monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     # a closed port AND no password: any attempt to load the store settings or connect would
     # fail with a different code and exit 1
     monkeypatch.setenv("NOESIS_NEO4J_URI", "bolt://127.0.0.1:1")
 
-    assert run(argv) == 2
+    assert run(["record", "revise", ID, "--expected-revision", "1", "--body", "x"]) == 2
 
     assert "--idempotency-key" in capsys.readouterr().err
 
@@ -101,48 +76,6 @@ def test_a_missing_idempotency_key_is_a_usage_error_that_touches_nothing(
 @pytest.mark.parametrize(
     "argv",
     [
-        ["record", "capture", "--idempotency-key", "k"],  # no --type
-        ["record", "capture", "--type", "knowledge", "--idempotency-key", "k", "--body", "b"],
-        [  # no source
-            "record",
-            "capture",
-            "--type",
-            "knowledge",
-            "--idempotency-key",
-            "k",
-            "--title",
-            "t",
-            "--subtype",
-            "decision",
-            "--body",
-            "b",
-        ],
-        [  # malformed source
-            *capture_args(),
-            "--source",
-            "nocolon",
-        ],
-        [*capture_args(), "--source", "bogus:thing"],
-        [  # experience without a source
-            "record",
-            "capture",
-            "--type",
-            "experience",
-            "--idempotency-key",
-            "k",
-            "--body",
-            "b",
-        ],
-        [
-            "record",
-            "capture",
-            "--type",
-            "experience",
-            "--idempotency-key",
-            "k",
-            "--source",
-            "commit:a",
-        ],
         ["record", "get"],
         ["record", "revise", ID, "--idempotency-key", "k"],  # no --expected-revision
     ],
@@ -158,17 +91,15 @@ def test_usage_errors_exit_2_without_settings_or_connection(
 def test_help_never_needs_the_store(capsys: pytest.CaptureFixture[str]) -> None:
     for argv in (
         ["record", "--help"],
-        ["record", "capture", "--help"],
         ["store", "init", "--help"],
     ):
         assert run(argv) == 0
-    assert "--idempotency-key" in run_help(capsys)
 
 
-def run_help(capsys: pytest.CaptureFixture[str]) -> str:
-    capsys.readouterr()
-    run(["record", "capture", "--help"])
-    return capsys.readouterr().out
+def test_revise_help_documents_the_idempotency_key(capsys: pytest.CaptureFixture[str]) -> None:
+    assert run(["record", "revise", "--help"]) == 0
+
+    assert "--idempotency-key" in capsys.readouterr().out
 
 
 def test_a_missing_password_names_the_variable(

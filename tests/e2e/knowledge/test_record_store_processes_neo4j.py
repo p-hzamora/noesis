@@ -14,7 +14,6 @@ from pydantic import SecretStr
 from tests.support.neo4j_container import admin_driver
 from tests.support.noesis_process_support import (
     ProcessResult,
-    capture_command,
     finish,
     remember_command,
     run_noesis,
@@ -217,19 +216,15 @@ def test_wrong_password_is_an_authentication_failure_without_echoing_it(
     assert SECRET not in result.stdout + result.stderr
 
 
-@pytest.mark.parametrize("command", ["capture", "revise"])
-def test_a_missing_idempotency_key_is_a_usage_error_before_any_io(
-    tmp_path: Path, command: str
-) -> None:
+def test_a_missing_idempotency_key_is_a_usage_error_before_any_io(tmp_path: Path) -> None:
     """Exit 2 with the store unreachable and no password: nothing was read or connected."""
     env = {
         **store_environment(tmp_path / "usage-home", SPACE, _closed_settings("x")),
         "NOESIS_NEO4J_CONNECT_TIMEOUT_SECONDS": "30",
     }
     del env["NOESIS_NEO4J_PASSWORD"]
-    argv = capture_command("k")[:-2] if command == "capture" else _revise("X", "k", "b")[:-2]
 
-    result = run_noesis(argv, env, json_output=False)
+    result = run_noesis(_revise("X", "k", "b")[:-2], env, json_output=False)
 
     assert result.code == 2, (result.stdout, result.stderr)
     assert result.seconds < 20

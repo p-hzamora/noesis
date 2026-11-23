@@ -156,52 +156,6 @@ def run_noesis(
     return finish(start_noesis(args, env, json_output=json_output, tty=tty), started)
 
 
-def capture_command(
-    key: str,
-    *,
-    title: str = "Retry policy",
-    body: str = "Use retries.",
-    record_type: str = "knowledge",
-) -> list[str]:
-    """A valid `record capture` command line (without `--json`)."""
-    source: list[str] = ["--source", "commit:" + "a" * 40]
-    if record_type == "experience":
-        return [
-            "record",
-            "capture",
-            "--type",
-            "experience",
-            "--body",
-            body,
-            "--subtype",
-            "outcome",
-            "--project",
-            "demo",
-            *source,
-            "--idempotency-key",
-            key,
-        ]
-    return [
-        "record",
-        "capture",
-        "--type",
-        "knowledge",
-        "--title",
-        title,
-        "--body",
-        body,
-        "--subtype",
-        "decision",
-        "--project",
-        "demo",
-        "--tag",
-        "area:retries",
-        *source,
-        "--idempotency-key",
-        key,
-    ]
-
-
 def remember_command(
     key: str,
     *,

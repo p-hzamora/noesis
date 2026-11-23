@@ -50,32 +50,6 @@ def run_json(
     return code, envelope
 
 
-def capture_args(
-    key: str = IDEMPOTENCY_KEY, *, title: str = "Retry policy", body: str = "Use retries."
-) -> list[str]:
-    """A valid knowledge capture command line."""
-    return [
-        "record",
-        "capture",
-        "--type",
-        "knowledge",
-        "--title",
-        title,
-        "--body",
-        body,
-        "--subtype",
-        "decision",
-        "--project",
-        "demo",
-        "--tag",
-        "area:retries",
-        "--source",
-        COMMIT_SOURCE,
-        "--idempotency-key",
-        key,
-    ]
-
-
 def remember_args(
     key: str = IDEMPOTENCY_KEY, *, title: str = "Retry policy", body: str = "Use retries."
 ) -> list[str]:

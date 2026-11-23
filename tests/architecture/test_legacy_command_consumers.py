@@ -1,8 +1,8 @@
-"""First-party uses of the legacy `recall` and `record capture` commands (migration guard).
+"""Guard: nothing in the project invokes the removed `recall` and `record capture` commands.
 
-`search` replaces `recall` and `remember` replaces `record capture`. Every file that still names a
-legacy command is listed below; a new use fails, and so does a listed file that no longer has
-one, so the lists only shrink. `PENDING_MIGRATION` must be empty before the commands are removed.
+`search` replaced `recall` and `remember` replaced `record capture`, and both old commands were
+deleted. Only the `HISTORICAL` files may still mention them; a new use fails, and so does a listed
+file that no longer has one.
 """
 
 import re
@@ -46,32 +46,12 @@ HISTORICAL: Final[frozenset[str]] = frozenset(
         "CHANGELOG.md",  # release history
         "docs/adr/0007-remember.md",  # decision record
         "docs/adr/0008-legacy-command-retirement.md",  # decision record
+        "tests/integration/interfaces/test_legacy_commands_removed.py",  # asserts they are gone
         "tests/fixtures/vault_import/repos/alpha/howtos/capture.md",  # imported note text
         "tests/fixtures/vault_import_expected/B2.txt",  # expected import of that note
     }
 )
-"""Kept for good: they describe the past or are data, not invocations."""
-
-PENDING_MIGRATION: Final[frozenset[str]] = frozenset()
-"""Files still to move to `search` / `remember`; empty, so a new use must go to `LEGACY_SHIMS` or fail."""
-
-LEGACY_SHIMS: Final[frozenset[str]] = frozenset(
-    {
-        "docs/commands/recall.md",  # documents the deprecated command
-        "docs/commands/record.md",  # documents the deprecated `record capture`
-        "src/noesis/interfaces/cli/app.py",  # registers the `recall` shim
-        "src/noesis/interfaces/cli/commands/recall_commands.py",  # the `recall` shim
-        "src/noesis/interfaces/cli/commands/record_commands.py",  # holds the `record capture` shim
-        "src/noesis/interfaces/cli/responses/record_response.py",  # output of `record capture`
-        "tests/e2e/knowledge/test_record_capture_shim_neo4j.py",  # tests the capture shim
-        "tests/e2e/retrieval/test_recall_cli.py",  # tests the recall shim
-        "tests/integration/interfaces/test_record_cli_neo4j.py",  # tests `record capture` itself
-        "tests/integration/interfaces/test_record_cli_offline.py",  # tests `record capture` usage
-        "tests/support/knowledge_cli_support.py",  # `capture_args`, used only by those record tests
-        "tests/support/noesis_process_support.py",  # `capture_command`, used by the shim tests
-    }
-)
-"""Kept until the commands are removed (Stage R): the shims, their docs, and tests of them."""
+"""Kept for good: they describe the past, are data, or assert the commands are gone."""
 
 
 def legacy_users() -> set[str]:
@@ -94,8 +74,8 @@ def legacy_users() -> set[str]:
     return users
 
 
-def test_no_new_legacy_command_use() -> None:
-    unlisted: set[str] = legacy_users() - HISTORICAL - PENDING_MIGRATION - LEGACY_SHIMS
+def test_no_legacy_command_use() -> None:
+    unlisted: set[str] = legacy_users() - HISTORICAL
 
     assert not unlisted, (
         f"Use `noesis search` / `noesis remember` instead of the legacy commands in: {sorted(unlisted)}"
@@ -103,7 +83,7 @@ def test_no_new_legacy_command_use() -> None:
 
 
 def test_allow_list_has_no_stale_entry() -> None:
-    stale: set[str] = (HISTORICAL | PENDING_MIGRATION | LEGACY_SHIMS) - legacy_users()
+    stale: set[str] = HISTORICAL - legacy_users()
 
     assert not stale, f"No legacy command use left; remove from the allow-list: {sorted(stale)}"
 
