@@ -1,0 +1,42 @@
+# Benchmark tasks. `needs` are the --need facets the agent would derive; `target_root` is a new folder.
+# optional_resources are acceptable extras (not noise). forbidden_records are record keys (records.yaml)
+# that must not be presented as current: out-of-scope project records, superseded records as authoritative.
+tasks:
+  - id: golden-new-project
+    task: "Create a brand-new project at ~/Desktop/new-test-project, using uv, implemented as a Python CLI, and following my DDD conventions."
+    needs: [scaffold, python-ddd, cli, uv]
+    expected_resources: [design-suite:ddd-foundation, design-suite:cli-interface, design-suite:project-scaffolder]
+    optional_resources: [design-suite:python-ddd]
+    expected_load_order: [[design-suite:ddd-foundation, design-suite:python-ddd], [design-suite:ddd-foundation, design-suite:cli-interface]]
+    expected_missing: [uv]
+    forbidden_records: [legacy-conventions, ddd-layering-old]
+  - id: python-cli
+    task: "Add a Typer command to my Python CLI."
+    needs: [cli]
+    expected_resources: [design-suite:cli-interface, design-suite:ddd-foundation]
+    optional_resources: [design-suite:python-ddd]
+    expected_load_order: [[design-suite:ddd-foundation, design-suite:cli-interface]]
+    expected_missing: []
+    forbidden_records: [legacy-conventions, ddd-layering-old]
+  - id: typescript-types
+    task: "Tighten the TypeScript typing of a React component."
+    needs: [typescript]
+    expected_resources: [web-suite:typescript-syntax]
+    expected_load_order: []
+    expected_missing: []
+    forbidden_records: [legacy-conventions]
+  - id: uv-only
+    task: "Pin dependencies with uv."
+    needs: [uv]
+    expected_resources: []
+    expected_load_order: []
+    expected_missing: [uv]
+    forbidden_records: [legacy-conventions]
+  - id: pdf-recommended
+    task: "Extract the text of a pdf."
+    needs: [pdf]
+    expected_resources: [pdf-toolkit]
+    expected_load_order: []
+    expected_missing: []
+    expected_endorsement: {pdf-toolkit: user}
+    forbidden_records: [legacy-conventions]

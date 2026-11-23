@@ -20,6 +20,12 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         default=None,
         help="Path of a vault to measure the import against; only ever read and copied.",
     )
+    parser.addoption(
+        "--discovery-latency",
+        action="store_true",
+        default=False,
+        help="Also run the NFR-004 overlay latency benchmark (100 sequential processes).",
+    )
 
 
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
@@ -30,7 +36,7 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
         reason="--vault-source was not given; the NFR-005 harness runs on request"
     )
     for item in items:
-        if "measurement" in item.keywords:
+        if item.get_closest_marker("measurement") is not None:
             item.add_marker(skip)
 
 
@@ -44,3 +50,10 @@ def vault_source(request: pytest.FixtureRequest) -> Path:
     if not source.is_dir():
         pytest.fail(f"--vault-source is not a folder: {source}")
     return source
+
+
+@pytest.fixture
+def discovery_latency(request: pytest.FixtureRequest) -> None:
+    """Skip the NFR-004 latency benchmark unless `--discovery-latency` was given."""
+    if not request.config.getoption("--discovery-latency"):
+        pytest.skip("--discovery-latency was not given; the NFR-004 benchmark runs on request")

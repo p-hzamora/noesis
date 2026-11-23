@@ -1,0 +1,18 @@
+# Fake runtimes of the discovery benchmark; skills live in skills/<name>/SKILL.md.
+# There is deliberately no uv skill anywhere.
+claude-code:
+  plugins:
+    - plugin: design-suite
+      marketplace: market
+      version: "1.0"
+      skills: [ddd-foundation, python-ddd, cli-interface, project-scaffolder]
+    - plugin: web-suite
+      marketplace: market
+      version: "1.0"
+      skills: [typescript-syntax]
+codex:
+  plugins:
+    - plugin: design-suite
+      marketplace: market
+      version: "1.0"
+      skills: [ddd-foundation, project-scaffolder]

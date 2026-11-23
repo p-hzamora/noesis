@@ -1,0 +1,46 @@
+# Seeded knowledge. status: accepted = accepted by the user; proposed = left as the agent captured it.
+# `project: null` is space-wide. Relations name other keys; the object of recommends is a catalog entry.
+records:
+  - key: ddd-layering
+    title: DDD layering convention for python projects
+    body: Domain code never imports infrastructure; every aggregate sits behind a repository port.
+    status: accepted
+    project: null
+  - key: cli-typer
+    title: Python CLI tools use Typer with JSON output
+    body: Command line interfaces are Typer apps that print a JSON envelope and map errors to exit codes.
+    status: accepted
+    project: null
+  - key: small-aggregates
+    title: Keep DDD aggregates small
+    body: Proposed lesson - that a python aggregate should guard one consistency boundary.
+    status: proposed
+    project: null
+  - key: ddd-layering-old
+    title: Old DDD layering convention allowing ORM models in the domain
+    body: Superseded rule that python domain code may import ORM models.
+    status: accepted
+    project: null
+  - key: cli-argv-by-hand
+    title: Python CLI tools parse argv by hand
+    body: Contradicted rule that a python command line tool should parse argv without a framework.
+    status: accepted
+    project: null
+  - key: legacy-conventions
+    title: Legacy app python DDD and CLI conventions
+    body: Project convention of the legacy app - python ddd modules are named after Django apps.
+    status: accepted
+    project: legacy-app
+  - key: pdf-extraction
+    title: PDF text extraction needs a toolkit
+    body: Lesson - extracting pdf text is done with the pdf toolkit skill.
+    status: accepted
+    project: null
+relations:
+  - {predicate: supersedes, subject: ddd-layering, object: ddd-layering-old, accepted: true}
+  - {predicate: contradicts, subject: cli-typer, object: cli-argv-by-hand, accepted: true}
+  - {predicate: supports, subject: small-aggregates, object: ddd-layering, accepted: false}
+catalog_entries:
+  - {name: pdf-toolkit, kind: skill, purpose: "Extract text and tables from pdf files", location: "https://example.invalid/pdf-toolkit"}
+recommends:
+  - {subject: pdf-extraction, object: pdf-toolkit, accepted: true}
