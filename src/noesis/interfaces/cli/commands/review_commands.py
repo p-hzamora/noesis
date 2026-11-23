@@ -60,8 +60,8 @@ from noesis.exceptions import RecordNotFoundError, RecordNotReviewableError
 from noesis.interfaces.cli import output
 from noesis.interfaces.cli.actor import resolve_actor
 from noesis.interfaces.cli.bootstrap import KnowledgeHandlers, with_knowledge
-from noesis.interfaces.cli.commands.record_commands import _usage
 from noesis.interfaces.cli.options import JsonOption
+from noesis.interfaces.cli.record_inputs import usage
 from noesis.interfaces.cli.responses import (
     ReviewAcceptResponse,
     ReviewBulkAcceptResponse,
@@ -146,7 +146,7 @@ def queue(
 ) -> None:
     """List proposed knowledge and assertions, ascending id, and who may decide each."""
     if project is not None and global_only:
-        raise _usage(context, "--project and --global exclude each other.", "--global")
+        raise usage(context, "--project and --global exclude each other.", "--global")
     env: Environment = cli_state(context).environment()
     query = ListReviewQueueQuery(
         space_key=Key(value=env.knowledge.knowledge_space),
@@ -164,7 +164,7 @@ def queue(
     output.emit(ReviewQueueResponse.from_dto(page))
 
 
-def _check_accept_usage(
+def _check_acceptusage(
     context: typer.Context,
     record_id: str | None,
     tag: str | None,
@@ -176,18 +176,18 @@ def _check_accept_usage(
     """Validate the shape of `review accept`; True for the bulk form."""
     if tag is None and not all_records:
         if record_id is None:
-            raise _usage(context, "Give a record id, or --tag with --all.", "ID")
+            raise usage(context, "Give a record id, or --tag with --all.", "ID")
         if yes and not idempotency_key:
-            raise _usage(context, "--idempotency-key is required with --yes.", "--idempotency-key")
+            raise usage(context, "--idempotency-key is required with --yes.", "--idempotency-key")
         return False
     if tag is None or not all_records:
-        raise _usage(context, "The bulk accept needs both --tag and --all.", "--tag")
+        raise usage(context, "The bulk accept needs both --tag and --all.", "--tag")
     if record_id is not None:
-        raise _usage(context, "--tag cannot be combined with a record id.", "ID")
+        raise usage(context, "--tag cannot be combined with a record id.", "ID")
     if expected_revision is not None:
-        raise _usage(context, "--expected-revision does not apply to --tag.", "--expected-revision")
+        raise usage(context, "--expected-revision does not apply to --tag.", "--expected-revision")
     if idempotency_key is not None:
-        raise _usage(context, "--idempotency-key does not apply to --tag.", "--idempotency-key")
+        raise usage(context, "--idempotency-key does not apply to --tag.", "--idempotency-key")
     return True
 
 
@@ -227,7 +227,7 @@ def accept(
     Without --yes nothing is written: the result shows what would happen. Only the user
     applies the bulk accept, in a terminal.
     """
-    bulk: bool = _check_accept_usage(
+    bulk: bool = _check_acceptusage(
         context, record_id, tag, all_records, expected_revision, yes, idempotency_key
     )
     env: Environment = cli_state(context).environment()
@@ -295,9 +295,9 @@ def retract(
     Without --yes nothing is written: the result shows what would happen.
     """
     if not reason.strip():
-        raise _usage(context, "Give a non-empty reason.", "--reason")
+        raise usage(context, "Give a non-empty reason.", "--reason")
     if yes and not idempotency_key:
-        raise _usage(context, "--idempotency-key is required with --yes.", "--idempotency-key")
+        raise usage(context, "--idempotency-key is required with --yes.", "--idempotency-key")
     env: Environment = cli_state(context).environment()
     actor: Actor = resolve_actor(env.identity)
     require_user_presence(actor, applying=yes)

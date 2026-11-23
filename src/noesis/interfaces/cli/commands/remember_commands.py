@@ -25,14 +25,16 @@ from noesis.interfaces.cli.commands.record_commands import (
     BodyOption,
     SourceIdOption,
     SourceOption,
-    _experience_subtype,
-    _parse_occurred,
-    _read_body,
-    _required,
-    _usage,
     parse_sources,
 )
 from noesis.interfaces.cli.options import JsonOption
+from noesis.interfaces.cli.record_inputs import (
+    experience_subtype,
+    parse_occurred,
+    read_body,
+    required,
+    usage,
+)
 from noesis.interfaces.cli.remember_support import execute_remember, resolve_scope
 from noesis.interfaces.cli.responses import RememberResponse
 from noesis.interfaces.cli.state import cli_state
@@ -118,16 +120,16 @@ def remember(
     as_json: JsonOption = False,
 ) -> None:
     """Remember knowledge (proposed) or an experience; at least one source is required."""
-    text: str = _read_body(context, body, required=True) or ""
+    text: str = read_body(context, body, required=True) or ""
     sources: tuple[SourceInput, ...] = parse_sources(context, source, source_id)
     if not sources:
-        raise _usage(context, "Cite at least one source.", "--source")
+        raise usage(context, "Cite at least one source.", "--source")
     if sum((project is not None, target_root is not None, space_wide)) > 1:
-        raise _usage(
+        raise usage(
             context, "Choose only one of --project, --target-root and --space-wide.", "--project"
         )
     if kind is RememberKindEnum.EXPERIENCE and (supersedes or tag or title):
-        raise _usage(context, "--title, --tag and --supersedes apply to knowledge only.", "--as")
+        raise usage(context, "--title, --tag and --supersedes apply to knowledge only.", "--as")
     env: Environment = cli_state(context).environment()
     scope_project, scope_source = resolve_scope(project, target_root, space_wide=space_wide)
     knowledge: bool = kind is RememberKindEnum.KNOWLEDGE
@@ -138,17 +140,15 @@ def remember(
         project=scope_project,
         sources=sources,
         body=text,
-        title=_required(context, title, "--title") if knowledge else None,
-        knowledge_subtype=Slug(value=_required(context, subtype, "--subtype"))
+        title=required(context, title, "--title") if knowledge else None,
+        knowledge_subtype=Slug(value=required(context, subtype, "--subtype"))
         if knowledge
         else None,
         tags=tuple(Tag(value=item) for item in tag or ()),
         experience_subtype=(
-            ExperienceSubtypeEnum.OBSERVATION
-            if knowledge
-            else _experience_subtype(context, subtype)
+            ExperienceSubtypeEnum.OBSERVATION if knowledge else experience_subtype(context, subtype)
         ),
-        occurred_at=_parse_occurred(context, occurred),
+        occurred_at=parse_occurred(context, occurred),
         session=session,
         environment=environment,
         refines=tuple(refines or ()),

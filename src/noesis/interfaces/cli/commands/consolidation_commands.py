@@ -63,14 +63,13 @@ from noesis.interfaces.cli.actor import resolve_actor
 from noesis.interfaces.cli.bootstrap import ConsolidationHandlers, with_consolidation
 from noesis.interfaces.cli.bootstrap.retrieval_handlers_builder import trigger_index_sync
 from noesis.interfaces.cli.commands.record_commands import (
-    STDIN_MARKER,
     BodyOption,
     SourceIdOption,
     SourceOption,
-    _usage,
     parse_sources,
 )
 from noesis.interfaces.cli.options import JsonOption
+from noesis.interfaces.cli.record_inputs import STDIN_MARKER, usage
 from noesis.interfaces.cli.responses import (
     ConsolidationDecisionResponse,
     ConsolidationListResponse,
@@ -111,16 +110,14 @@ def _record_id(context: typer.Context, value: str, hint: str) -> RecordId:
     try:
         return RecordId(value=value)
     except InvalidRecordIdError:
-        raise _usage(
-            context, f"{value!r} is not a record id (a 26-character ULID).", hint
-        ) from None
+        raise usage(context, f"{value!r} is not a record id (a 26-character ULID).", hint) from None
 
 
 def _consolidation_id(context: typer.Context, value: str, hint: str = "ID") -> ConsolidationId:
     try:
         return ConsolidationId(value=value)
     except InvalidRecordIdError:
-        raise _usage(
+        raise usage(
             context, f"{value!r} is not a consolidation id (a 26-character ULID).", hint
         ) from None
 
@@ -129,18 +126,18 @@ def _key(context: typer.Context, value: str, hint: str) -> Key:
     try:
         return Key(value=value)
     except InvalidKeyError:
-        raise _usage(context, f"{value!r} is not a valid project key.", hint) from None
+        raise usage(context, f"{value!r} is not a valid project key.", hint) from None
 
 
 def _text(context: typer.Context, value: str | None, hint: str) -> str:
     if value is None or not value.strip():
-        raise _usage(context, f"Give a non-empty {hint}.", hint)
+        raise usage(context, f"Give a non-empty {hint}.", hint)
     return value
 
 
 def _require_key(context: typer.Context, applying: bool, key: str | None) -> None:
     if applying and not (key and key.strip()):
-        raise _usage(context, "--idempotency-key is required to apply.", "--idempotency-key")
+        raise usage(context, "--idempotency-key is required to apply.", "--idempotency-key")
 
 
 @consolidation_app.command("scan")
@@ -177,9 +174,9 @@ def scan(
     """Rank accepted records that may overlap; nothing is written and ranks are not scores."""
     chosen: int = sum((record is not None, project is not None, global_scope))
     if chosen != 1:
-        raise _usage(context, "Give exactly one of --record, --project or --global.", "--record")
+        raise usage(context, "Give exactly one of --record, --project or --global.", "--record")
     if cursor is not None and record is not None:
-        raise _usage(context, "--cursor does not apply to --record.", "--cursor")
+        raise usage(context, "--cursor does not apply to --record.", "--cursor")
     anchor: RecordId | None = _record_id(context, record, "--record") if record else None
     project_key: Key | None = _key(context, project, "--project") if project else None
     env: Environment = cli_state(context).environment()
@@ -232,13 +229,13 @@ def propose(
     """Propose a new successor and one proposed `supersedes` for each original; accepts nothing."""
     ids: list[str] = list(member or [])
     if not MIN_MEMBERS <= len(ids) <= MAX_MEMBERS:
-        raise _usage(context, f"Give {MIN_MEMBERS} to {MAX_MEMBERS} --member values.", "--member")
+        raise usage(context, f"Give {MIN_MEMBERS} to {MAX_MEMBERS} --member values.", "--member")
     members: tuple[RecordId, ...] = tuple(_record_id(context, item, "--member") for item in ids)
     if len(set(members)) != len(members):
-        raise _usage(context, "Each --member must be given once.", "--member")
+        raise usage(context, "Each --member must be given once.", "--member")
     text: str = _text(context, title, "--title")
     if body is None:
-        raise _usage(context, "Give the text with --body (use `-` for stdin).", "--body")
+        raise usage(context, "Give the text with --body (use `-` for stdin).", "--body")
     content: str = _text(context, sys.stdin.read() if body == STDIN_MARKER else body, "--body")
     why: str = _text(context, rationale, "--rationale")
     _require_key(context, not dry_run, idempotency_key)
@@ -246,7 +243,7 @@ def propose(
     try:
         tags: tuple[Tag, ...] = tuple(Tag(value=item) for item in tag or ())
     except InvalidSlugError:
-        raise _usage(
+        raise usage(
             context, "A tag is lowercase letters, digits and single hyphens.", "--tag"
         ) from None
     earlier: ConsolidationId | None = (
@@ -325,7 +322,7 @@ def list_consolidations(
 ) -> None:
     """List consolidations of one project or of the space-wide records, ascending id."""
     if (project is not None) == global_scope:
-        raise _usage(context, "Give exactly one of --project or --global.", "--project")
+        raise usage(context, "Give exactly one of --project or --global.", "--project")
     project_key: Key | None = _key(context, project, "--project") if project else None
     env: Environment = cli_state(context).environment()
 

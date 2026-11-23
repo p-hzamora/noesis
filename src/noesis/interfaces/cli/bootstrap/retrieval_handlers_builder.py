@@ -371,7 +371,6 @@ class RetrievalHandlers:
         index_status: Report cursors, lag and divergences.
         searcher: The search pipeline (for other contexts' adapters).
         projection_kinds: Names of the registered projections.
-        recall: The recall pipeline, also the briefing of the unified search.
         unified_search: Records, resources, requirements and next actions in one answer.
     """
 
@@ -382,7 +381,6 @@ class RetrievalHandlers:
     index_status: GetIndexStatusHandler
     searcher: RecordSearcher
     projection_kinds: tuple[str, ...]
-    recall: TaskBriefingService | None = None
     unified_search: UnifiedSearchHandler | None = None
 
 
@@ -429,7 +427,7 @@ def build_retrieval(
     settings = environment.retrieval
     ttl: int = settings.index_lock_ttl_seconds
     availability = build_catalog_availability_adapter(client, environment)
-    recall = TaskBriefingService(
+    briefing = TaskBriefingService(
         searcher,
         indexables,
         reviews=reviews,
@@ -444,7 +442,6 @@ def build_retrieval(
         max_evidence_chars=settings.retrieval_briefing_max_evidence_chars,
     )
     return RetrievalHandlers(
-        recall=recall,
         unified_search=UnifiedSearchHandler(
             searcher,
             resources=build_resource_catalog_reader(client, environment),
@@ -454,7 +451,7 @@ def build_retrieval(
                 assertions=reviews,
                 availability=availability,
             ),
-            briefing=recall,
+            briefing=briefing,
             clock=clock,
         ),
         search=SearchRecordsHandler(searcher),

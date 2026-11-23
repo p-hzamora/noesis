@@ -94,7 +94,6 @@ from .integration_response import (
 from .record_response import (
     RecordActorResponse,
     RecordApplicabilityResponse,
-    RecordCaptureResponse,
     RecordEndpointResponse,
     RecordResponse,
     RecordReviseResponse,
@@ -213,7 +212,6 @@ __all__ = [
     "IRenderableResponse",
     "RecordActorResponse",
     "RecordApplicabilityResponse",
-    "RecordCaptureResponse",
     "RecordEndpointResponse",
     "RecordResponse",
     "RecordReviseResponse",

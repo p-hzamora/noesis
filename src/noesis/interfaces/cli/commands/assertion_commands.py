@@ -32,10 +32,10 @@ from noesis.interfaces.cli.commands.record_commands import (
     IdempotencyKeyOption,
     SourceIdOption,
     SourceOption,
-    _usage,
     parse_sources,
 )
 from noesis.interfaces.cli.options import JsonOption
+from noesis.interfaces.cli.record_inputs import usage
 from noesis.interfaces.cli.responses import AssertionListResponse, AssertionProposeResponse
 from noesis.interfaces.cli.state import cli_state
 
@@ -75,9 +75,9 @@ def propose(
     """Propose an assertion (status proposed); at least one source is required."""
     sources: tuple[SourceInput, ...] = parse_sources(context, source, source_id)
     if not sources:
-        raise _usage(context, "Cite at least one source.", "--source")
+        raise usage(context, "Cite at least one source.", "--source")
     if not rationale.strip():
-        raise _usage(context, "Give a non-empty rationale.", "--rationale")
+        raise usage(context, "Give a non-empty rationale.", "--rationale")
     env: Environment = cli_state(context).environment()
     command = ProposeAssertionCommand(
         idempotency_key=idempotency_key,

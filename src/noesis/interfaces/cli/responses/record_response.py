@@ -9,35 +9,6 @@ from noesis.utils import FrozenObject
 from .i_renderable_response import IRenderableResponse
 
 
-class RecordCaptureResponse(IRenderableResponse):
-    """`noesis record capture`: the record created, or the one an identical earlier call created.
-
-    Attributes:
-        record_id: The record's id.
-        record_type: `knowledge` or `experience`.
-        revision: Head revision (knowledge); None for an experience.
-        status: `proposed` (knowledge); None for an experience.
-        space_id: Space it lives in.
-        project_id: Its project, when any.
-        replayed: True when the idempotency key was already used and nothing was written.
-    """
-
-    record_id: str
-    record_type: str
-    revision: int | None = None
-    status: str | None = None
-    space_id: str
-    project_id: str | None = None
-    replayed: bool = False
-
-    def render(self) -> str:
-        head: str = f"{self.record_type} {self.record_id}"
-        if self.revision is not None:
-            head += f" revision {self.revision} ({self.status})"
-        note: str = " (replayed: nothing written)" if self.replayed else ""
-        return f"captured {head}{note}"
-
-
 class RecordReviseResponse(IRenderableResponse):
     """`noesis record revise`: the new head revision.
 
