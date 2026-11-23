@@ -20,6 +20,7 @@ _MATRIX: dict[AssertionPredicateEnum, dict[RecordTypeEnum, frozenset[RecordTypeE
     _P.CONTRADICTS: {_K: frozenset({_K}), _E: frozenset({_K})},
     _P.SUPERSEDES: {_K: frozenset({_K}), _A: frozenset({_A})},
     _P.RECOMMENDS: {_K: frozenset({_K, _C}), _E: frozenset({_K, _C})},
+    _P.REFINES: {_K: frozenset({_K, _C}), _E: frozenset({_K, _C})},
 }
 
 

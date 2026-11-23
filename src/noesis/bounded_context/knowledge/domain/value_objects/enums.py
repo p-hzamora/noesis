@@ -49,6 +49,7 @@ class AssertionPredicateEnum(StrEnum):
     CONTRADICTS = "contradicts"
     SUPERSEDES = "supersedes"
     RECOMMENDS = "recommends"
+    REFINES = "refines"
 
 
 class RecordRelationEnum(StrEnum):
