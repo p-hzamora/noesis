@@ -23,8 +23,9 @@ consolidation) all need that model and store, and are built in parallel.
 - **D-002 Responsibilities are not each a context.** Retrieval and indexing are one later
   context, import/export another; review, catalog and curation are modules of Knowledge.
 - **D-003 Cross-context integration** goes only through JSON-native contracts in
-  `shared_kernel/contracts/<publisher>/` that carry `contract_version`, a consumer-owned port typed
-  with them, satisfied by an inbound adapter of the providing context and wired in the composition
+  `shared_kernel/contracts/<publisher>/` that carry `contract_version`, a port typed
+  with them (an ABC in `shared_kernel/contracts/ports/<consumer>/`, amended from a consumer-owned
+  `Protocol`), inherited by an inbound adapter of the providing context and wired in the composition
   root. No context imports another and import-linter has no exception for it. Naming a kernel
   package after its publisher is a deliberate, recorded exception to a small kernel. The rule is in
   [architecture-rules.md](../architecture-rules.md).

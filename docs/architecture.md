@@ -119,7 +119,7 @@ options: [curate workflow](workflows/curate.md), [curate command](commands/curat
 ```text
 WorkBriefContract ──► IngestWorkBriefHandler                  (`curate brief`)
                         ├─ stage in ICurationInbox (redacted, submission key, ticket lock)
-                        ├─ related records through IRelatedRecordFinder (a Protocol; Retrieval's adapter satisfies it)
+                        ├─ related records through IRelatedRecordFinder (a kernel ABC; Retrieval's adapter inherits it)
                         ├─ ICurator.judge(brief, related)               LLM judgment, one automatic retry
                         ├─ save the plan once (write-once), register it in the idempotency ledger
                         └─ write steps: experience, knowledge, revise, supersedes, supports-N

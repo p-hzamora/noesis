@@ -12,8 +12,10 @@ Decided in chunk C2 (`c2-core-model-neo4j-store`, D-003, confirmed as a project 
 
 1. The providing context publishes a contract under `noesis/shared_kernel/contracts/<publisher>/`.
    It is a data-only model of JSON-native fields and carries a `contract_version`.
-2. The consuming context owns a port, typed with those contracts, in its own application layer.
-3. An inbound adapter of the providing context satisfies that port. The composition root
+2. The port, typed with those contracts, is an `abc.ABC` under
+   `noesis/shared_kernel/contracts/ports/<consumer>/` (amended: it no longer lives in the
+   consumer's application layer as a `typing.Protocol`). Both sides import it from the kernel.
+3. An inbound adapter of the providing context inherits that port. The composition root
    (`interfaces/cli/bootstrap/`) wires the adapter into the consumer.
 4. No context imports another, and no import-linter exception is allowed.
 
