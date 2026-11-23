@@ -25,6 +25,8 @@ CHECKED = (
     "load_order_policy.py",
     "endorsement_policy.py",
     "coverage_status_policy.py",
+    "facet_match_policy.py",
+    "resource_ref_policy.py",
 )
 MIN_WORDS = 4
 GRAMMAR_ALLOWLIST: frozenset[tuple[str, str]] = frozenset(

@@ -60,7 +60,10 @@ from noesis.bounded_context.knowledge.infrastructure.outbound.runtime import (
     CodexRuntimeInventoryAdapter,
 )
 from noesis.exceptions import StoreNotInitialisedError
-from noesis.shared_kernel.contracts.knowledge import CatalogResourceQueryContract
+from noesis.shared_kernel.contracts.knowledge import (
+    CatalogResourceLookupContract,
+    CatalogResourceQueryContract,
+)
 from noesis.shared_kernel.infrastructure.outbound.neo4j import Neo4jConnectionSettings
 
 pytestmark = [pytest.mark.integration, pytest.mark.neo4j]
@@ -343,6 +346,37 @@ async def test_reader_is_scoped_to_its_space_and_filters_by_kind(
     assert [h.name for h in theirs] == ["theirs-quokka"]
     assert all(h.cataloged and 0 < h.score <= 1 for h in everything)
     assert max(h.score for h in everything) == 1.0
+
+
+async def test_lookup_by_ref_and_id_is_exact_and_never_invents(
+    env: Neo4jKnowledgeEnv, world: CatalogWorld, neo4j_settings: Neo4jConnectionSettings
+) -> None:
+    _install(world, skills={"cli": skill_manifest("Builds a cli"), "base": "# plain"})
+    await _sync(env, world)
+    _install(world, skills={"cli": "# plain", "base": "# plain", "fresh": skill_manifest("New")})
+    before = _graph_shape(neo4j_settings)
+    reader = _reader(env, world)
+    space_id = await _space_id(env)
+
+    by_ref = await reader.get_by_refs(
+        CatalogResourceLookupContract(
+            space_id=space_id,
+            refs=("skill:plug:cli", "skill:plug:fresh", "skill:plug:ghost"),
+            runtimes=("claude-code",),
+            include_unsynced=True,
+        )
+    )
+    by_id = await reader.get_by_refs(
+        CatalogResourceLookupContract(
+            space_id=space_id, entry_ids=tuple(h.catalog_id for h in by_ref if h.catalog_id)
+        )
+    )
+    nothing = await reader.get_by_refs(CatalogResourceLookupContract(space_id=space_id))
+
+    assert {h.name: h.cataloged for h in by_ref} == {"plug:cli": True, "plug:fresh": False}
+    assert [h.name for h in by_id] == ["plug:cli"]
+    assert nothing == []
+    assert _graph_shape(neo4j_settings) == before
 
 
 async def test_search_text_with_lucene_operators_is_treated_as_plain_terms(

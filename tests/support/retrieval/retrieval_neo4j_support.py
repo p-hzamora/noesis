@@ -58,7 +58,7 @@ from noesis.bounded_context.retrieval.application.services.record_searcher impor
 from noesis.bounded_context.retrieval.infrastructure.outbound.persistence.neo4j_index_cursor_store_adapter import (
     Neo4jIndexCursorStoreAdapter,
 )
-from noesis.interfaces.cli.bootstrap.retrieval_handlers_builder import RETRIEVAL_SCHEMA_STEPS
+from noesis.interfaces.cli.bootstrap.knowledge_handlers_builder import EXTRA_SCHEMA_STEPS
 from noesis.shared_kernel.infrastructure.outbound.neo4j import Neo4jConnectionSettings
 
 T1: Final[datetime] = datetime(2026, 1, 1, tzinfo=UTC)
@@ -83,7 +83,7 @@ async def initialised_env(
     With `with_retrieval_steps` false only C2's `core` step is registered (AC-028's setup).
     """
     env: Neo4jKnowledgeEnv = make_neo4j_env(
-        settings, extra_steps=RETRIEVAL_SCHEMA_STEPS if with_retrieval_steps else ()
+        settings, extra_steps=EXTRA_SCHEMA_STEPS if with_retrieval_steps else ()
     )
     await env.initialise_store.handle(InitialiseStoreCommand(default_space_key=DEFAULT_SPACE_KEY))
     try:

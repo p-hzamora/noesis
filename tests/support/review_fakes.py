@@ -459,6 +459,27 @@ class FakeAssertionReadRepository(IAssertionReadRepository):
             )
         return summaries
 
+    async def list_by_objects(
+        self,
+        object_ids: Sequence[RecordId],
+        *,
+        space_id: SpaceId,
+        predicates: Sequence[AssertionPredicateEnum] = (),
+        statuses: Sequence[RecordStatusEnum] = (),
+    ) -> list[AssertionSummaryDto]:
+        """Assertions whose object is in `object_ids`, ascending id; empty filters match all."""
+        wanted = set(object_ids)
+        return [
+            summary
+            for summary in await self.list_by_subjects(
+                [a.subject_id for a in self._store.assertions.values()],
+                space_id=space_id,
+                predicates=predicates,
+                statuses=statuses,
+            )
+            if RecordId(value=summary.object_id) in wanted
+        ]
+
 
 type PageHook = Callable[[list[TaggedProposalDto]], Awaitable[None]]
 

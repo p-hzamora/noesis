@@ -103,7 +103,9 @@ async def test_ac027_default_project(
             "git_root",
             False,
         )
-        assert found.result["warnings"] == []
+        assert [str(w) for w in found.result["warnings"]] == [  # type: ignore[attr-defined]
+            "semantic search is absent; results come from the catalog and lexical search only"
+        ]
 
     outside = search(plain)
     scope = outside.result["scope"]
