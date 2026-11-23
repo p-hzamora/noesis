@@ -1,5 +1,9 @@
 # Recall
 
+> Deprecated: use [`noesis search --briefing synthesis`](search.md) (`--briefing digest` for
+> `--no-synthesis`). This command keeps its options and stdout unchanged; stderr gets
+> `DEPRECATED: use noesis search --briefing ...`. Set `NOESIS_SILENCE_DEPRECATION=1` to mute it.
+
 `noesis recall "task"` prepares a read-only briefing from Knowledge and Experience
 records in the active space. It uses lexical search and live graph neighbours, plus semantic
 candidates when the optional resident embedder is set up (see

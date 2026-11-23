@@ -23,8 +23,8 @@ installed skills.
   are added within depth 3 and 10 items, truncation is warned.
 - Requirement facets come from `--need` (the agent decomposes its own task) or, without it, from
   salient query terms. No topic vocabulary lives in code.
-- The recall pipeline moves into `TaskBriefingService`; `RecallHandler` is a delegate during the
-  deprecation stage and is then removed. Nothing is copied.
+- The recall pipeline moves into `TaskBriefingService`; `RecallHandler` is removed; the `recall`
+  shim calls `TaskBriefingService` directly. Nothing is copied.
 - `next_actions` uses a closed action enum (`load_skill`, `use_agent`, `use_cli_tool`,
   `use_mcp_server`, `read_record`) and canonical refs (`catalog:<kind>:<name>`,
   `record:<ulid>@<rev>`); no shell text from stored content.
