@@ -3,7 +3,6 @@ imports `shared_kernel.contracts`)."""
 
 from dataclasses import dataclass
 
-from noesis.bounded_context.interop.application.ports import IKnowledgeImporter
 from noesis.bounded_context.interop.domain.value_objects import (
     ImportActor,
     NoteMapping,
@@ -22,6 +21,7 @@ from noesis.shared_kernel.contracts.knowledge.import_link_set_contract import (
     ImportLinkSetRequestContract,
     ImportRelationContract,
 )
+from noesis.shared_kernel.contracts.ports.interop import IKnowledgeImporter
 
 OUTCOMES: dict[str, NoteOutcomeEnum] = {
     "created": NoteOutcomeEnum.CREATED,

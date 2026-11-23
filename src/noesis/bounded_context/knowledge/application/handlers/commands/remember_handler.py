@@ -32,7 +32,6 @@ from noesis.bounded_context.knowledge.application.handlers.commands.propose_asse
 from noesis.bounded_context.knowledge.application.handlers.types import (
     KnowledgeUnitOfWorkFactory,
 )
-from noesis.bounded_context.knowledge.application.ports.curation import IRelatedRecordFinder
 from noesis.bounded_context.knowledge.application.ports.ids import IRecordIdGenerator
 from noesis.bounded_context.knowledge.application.ports.ledger import LedgerEntry
 from noesis.bounded_context.knowledge.application.ports.read_repositories import (
@@ -80,6 +79,7 @@ from noesis.exceptions import (
 )
 from noesis.shared_kernel.application.handlers import IHandler
 from noesis.shared_kernel.application.ports.clock import IClock
+from noesis.shared_kernel.contracts.ports.knowledge import IRelatedRecordFinder
 from noesis.shared_kernel.contracts.retrieval import RecordSearchHitContract
 from noesis.shared_kernel.domain import JsonValue
 from noesis.utils import FrozenObject

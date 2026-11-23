@@ -2,6 +2,8 @@
 
 import re
 
+from ..ports.briefing import IBriefingRedactor
+
 REDACTED: str = "[REDACTED]"
 
 _PRIVATE_KEY: re.Pattern[str] = re.compile(
@@ -18,7 +20,7 @@ _ASSIGNED: re.Pattern[str] = re.compile(
 )
 
 
-class BriefingRedactor:
+class BriefingRedactor(IBriefingRedactor):
     """Masks secrets in text."""
 
     @staticmethod

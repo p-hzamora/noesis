@@ -5,13 +5,14 @@ Structurally matches Knowledge's `IRelatedRecordFinder`; Retrieval imports nothi
 
 from datetime import UTC, datetime
 
+from noesis.shared_kernel.contracts.ports.knowledge import IRelatedRecordFinder
 from noesis.shared_kernel.contracts.retrieval import RecordSearchHitContract, RecordSearchHitItem
 
 from ....application.dtos.record_search_dtos import RecordSearchHitDto, RecordSearchRequestDto
 from ....application.services.record_searcher import RecordSearcher
 
 
-class RelatedRecordFinderAdapter:
+class RelatedRecordFinderAdapter(IRelatedRecordFinder):
     """Searches the space for records related to a text and returns the kernel contract."""
 
     def __init__(self, searcher: RecordSearcher) -> None:

@@ -28,7 +28,6 @@ from noesis.bounded_context.knowledge.application.ports.curation import (
     CurationTicket,
     ICurationInbox,
     ICurator,
-    IRelatedRecordFinder,
     StepOutcome,
 )
 from noesis.bounded_context.knowledge.application.ports.ledger import LedgerEntry
@@ -81,6 +80,7 @@ from noesis.exceptions import (
     SpaceNotFoundError,
 )
 from noesis.shared_kernel.application.handlers import IHandler
+from noesis.shared_kernel.contracts.ports.knowledge import IRelatedRecordFinder
 from noesis.shared_kernel.domain import JsonValue
 from noesis.utils import FrozenObject
 

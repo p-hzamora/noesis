@@ -14,6 +14,7 @@ from noesis.shared_kernel.contracts.knowledge import (
     CatalogResourceLookupContract,
     CatalogResourceQueryContract,
 )
+from noesis.shared_kernel.contracts.ports.retrieval import IResourceCatalogReader
 
 from ....domain.enums import (
     AuthorityTierEnum,
@@ -50,7 +51,6 @@ from ...ports.candidates.i_candidate_source import (
     CandidateSourceUnavailableError,
     ICandidateSource,
 )
-from ...ports.catalog import IResourceCatalogReader
 from ...services.record_searcher import RecordSearcher
 from ...services.resource_facts_service import (
     AssertionFacts,

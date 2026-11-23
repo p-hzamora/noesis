@@ -10,7 +10,6 @@ from noesis.bounded_context.knowledge.application.dtos import (
 )
 from noesis.bounded_context.knowledge.application.ports.consolidation import (
     IConsolidationReadRepository,
-    ISimilarRecordFinder,
 )
 from noesis.bounded_context.knowledge.application.ports.read_repositories import (
     IRecordReadRepository,
@@ -48,6 +47,7 @@ from noesis.exceptions import (
     SimilarityUnavailableError,
 )
 from noesis.shared_kernel.application.handlers import IHandler
+from noesis.shared_kernel.contracts.ports.knowledge import ISimilarRecordFinder
 from noesis.shared_kernel.contracts.retrieval import SimilarRecordHitItem, SimilarRecordsContract
 from noesis.utils import FrozenObject
 

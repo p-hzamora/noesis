@@ -4,11 +4,7 @@ import shlex
 from collections.abc import Mapping
 
 from noesis.bounded_context.interop.application.dtos import ImportFileResultDto
-from noesis.bounded_context.interop.application.ports import (
-    IFileReader,
-    IHeaderParser,
-    IKnowledgeImporter,
-)
+from noesis.bounded_context.interop.application.ports import IFileReader, IHeaderParser
 from noesis.bounded_context.interop.application.services import (
     ImportPayload,
     KnowledgeAnswer,
@@ -30,6 +26,7 @@ from noesis.bounded_context.interop.domain.value_objects import (
 )
 from noesis.exceptions import FileNotImportableError
 from noesis.shared_kernel.application.handlers import IHandler
+from noesis.shared_kernel.contracts.ports.interop import IKnowledgeImporter
 from noesis.utils import FrozenObject
 
 ORIGIN_TAG: str = "origin:imported"

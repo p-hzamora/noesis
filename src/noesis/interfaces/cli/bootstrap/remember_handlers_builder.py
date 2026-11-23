@@ -19,7 +19,6 @@ from noesis.bounded_context.knowledge.application.handlers.commands.propose_asse
 from noesis.bounded_context.knowledge.application.handlers.commands.remember_handler import (
     RememberHandler,
 )
-from noesis.bounded_context.knowledge.application.ports.curation import IRelatedRecordFinder
 from noesis.bounded_context.knowledge.infrastructure.outbound.persistence import (
     KnowledgePersistence,
     build_knowledge_persistence,
@@ -29,6 +28,7 @@ from noesis.bounded_context.retrieval.infrastructure.inbound.knowledge import (
 )
 from noesis.core import Environment
 from noesis.shared_kernel.application.ports.clock import IClock
+from noesis.shared_kernel.contracts.ports.knowledge import IRelatedRecordFinder
 from noesis.shared_kernel.infrastructure.outbound.clock import SystemClockAdapter
 from noesis.shared_kernel.infrastructure.outbound.neo4j import Neo4jClient
 

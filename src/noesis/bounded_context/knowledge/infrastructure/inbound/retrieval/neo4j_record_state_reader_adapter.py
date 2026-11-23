@@ -1,9 +1,10 @@
-"""Record state reader (structural `IRecordStateReader`): head revision, status, scope, times."""
+"""Record state reader (`IRecordStateReader`): head revision, status, scope, times."""
 
 from collections.abc import Sequence
 from typing import Any, LiteralString
 
 from noesis.shared_kernel.contracts.knowledge import RecordStateContract
+from noesis.shared_kernel.contracts.ports.retrieval import IRecordStateReader
 from noesis.shared_kernel.infrastructure.outbound.neo4j import Neo4jClient
 
 from .record_node_contracts import NodeProperties, ownership_of, record_type_of
@@ -31,7 +32,7 @@ RETURN project.id AS id
 """
 
 
-class Neo4jRecordStateReaderAdapter:
+class Neo4jRecordStateReaderAdapter(IRecordStateReader):
     """Reads states of Knowledge, Experience and catalog entry records, always inside one space."""
 
     def __init__(self, client: Neo4jClient) -> None:

@@ -1,4 +1,4 @@
-"""Lexical search (structural `IRecordTextSearch`) over the `knowledge_fulltext` index."""
+"""Lexical search (`IRecordTextSearch`) over the `knowledge_fulltext` index."""
 
 import re
 from typing import Any, Final, LiteralString
@@ -7,6 +7,7 @@ from noesis.bounded_context.knowledge.infrastructure.outbound.persistence.retrie
     KNOWLEDGE_FULLTEXT_INDEX,
 )
 from noesis.shared_kernel.contracts.knowledge import RecordHitContract
+from noesis.shared_kernel.contracts.ports.retrieval import IRecordTextSearch
 from noesis.shared_kernel.infrastructure.outbound.neo4j import Neo4jClient
 
 _SPECIALS: Final[re.Pattern[str]] = re.compile(r'[+\-&|!(){}\[\]^"~*?:\\/]')
@@ -34,7 +35,7 @@ def escape_lucene(text: str) -> str:
     return _OPERATORS.sub(lambda match: match.group(0).lower(), escaped).strip()
 
 
-class Neo4jRecordTextSearchAdapter:
+class Neo4jRecordTextSearchAdapter(IRecordTextSearch):
     """Searches Knowledge's full-text index; hits are ranked 1..n by score."""
 
     def __init__(self, client: Neo4jClient) -> None:

@@ -7,6 +7,12 @@ from noesis.shared_kernel.contracts.knowledge import (
     RecordBodyMissingError,
     RecordReviewStateContract,
 )
+from noesis.shared_kernel.contracts.ports.retrieval import (
+    ICatalogAvailability,
+    IIndexableRecordReader,
+    IRecommendationReader,
+    IReviewReader,
+)
 
 from ...domain.policies.briefing_policy import BriefingPolicy
 from ..dtos.briefing_dtos import (
@@ -18,14 +24,7 @@ from ..dtos.briefing_dtos import (
     RecallResultDto,
     RecommendedToolDto,
 )
-from ..ports.briefing import (
-    IBriefingModel,
-    IBriefingRedactor,
-    ICatalogAvailability,
-    IRecommendationReader,
-    IReviewReader,
-)
-from ..ports.record_source.i_indexable_record_reader import IIndexableRecordReader
+from ..ports.briefing import IBriefingModel, IBriefingRedactor
 from .record_searcher import RecordSearcher
 
 NO_PROJECT_WARNING: str = "no project resolved; searched space-wide records only"

@@ -9,6 +9,13 @@ from noesis.shared_kernel.contracts.knowledge import (
     RecordHitContract,
     RecordStateContract,
 )
+from noesis.shared_kernel.contracts.ports.retrieval import (
+    IIndexableRecordReader,
+    IRecordChangeFeed,
+    IRecordNeighbourReader,
+    IRecordStateReader,
+    IRecordTextSearch,
+)
 from noesis.shared_kernel.domain import JsonValue
 
 from ...domain.enums import (
@@ -32,11 +39,6 @@ from ..ports.candidates.i_candidate_source import (
     RankedCandidatesDto,
 )
 from ..ports.indexing.i_index_cursor_store import IIndexCursorStore, ProjectionManifestDto
-from ..ports.record_source.i_indexable_record_reader import IIndexableRecordReader
-from ..ports.record_source.i_record_change_feed import IRecordChangeFeed
-from ..ports.record_source.i_record_neighbour_reader import IRecordNeighbourReader
-from ..ports.record_source.i_record_state_reader import IRecordStateReader
-from ..ports.record_source.i_record_text_search import IRecordTextSearch
 
 FIRST_FETCH_FACTOR: int = 3
 RETRY_FETCH_FACTOR: int = 10

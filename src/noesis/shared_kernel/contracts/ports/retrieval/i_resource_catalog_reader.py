@@ -1,6 +1,6 @@
 """Resources (skills, agents, CLI tools, MCP servers) that match a request."""
 
-from typing import Protocol
+import abc
 
 from noesis.shared_kernel.contracts.knowledge import (
     CatalogResourceHitContract,
@@ -9,9 +9,10 @@ from noesis.shared_kernel.contracts.knowledge import (
 )
 
 
-class IResourceCatalogReader(Protocol):
+class IResourceCatalogReader(abc.ABC):
     """Read-only search over the catalog and, on request, over what runtimes have installed."""
 
+    @abc.abstractmethod
     async def search(self, query: CatalogResourceQueryContract) -> list[CatalogResourceHitContract]:
         """Up to `query.limit` hits of the space, best score first.
 
@@ -20,6 +21,7 @@ class IResourceCatalogReader(Protocol):
         """
         ...
 
+    @abc.abstractmethod
     async def get_by_refs(
         self, lookup: CatalogResourceLookupContract
     ) -> list[CatalogResourceHitContract]:

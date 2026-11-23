@@ -6,6 +6,11 @@ from noesis.shared_kernel.contracts.knowledge import (
     AssertionSummaryContract,
     RecordReviewStateContract,
 )
+from noesis.shared_kernel.contracts.ports.retrieval import (
+    IRecommendationReader,
+    IResourceAssertionReader,
+    IReviewReader,
+)
 from noesis.shared_kernel.infrastructure.outbound.neo4j import Neo4jClient
 
 from ....application.dtos import AssertionSummaryDto
@@ -14,7 +19,7 @@ from ...outbound.persistence.neo4j_assertion_read_adapter import Neo4jAssertionR
 from ...outbound.persistence.neo4j_review_state_read_adapter import Neo4jReviewStateReadAdapter
 
 
-class ReviewReadersAdapter:
+class ReviewReadersAdapter(IReviewReader, IRecommendationReader, IResourceAssertionReader):
     """Knowledge's read-only doors for Retrieval's review and recommendation ports."""
 
     def __init__(self, client: Neo4jClient) -> None:

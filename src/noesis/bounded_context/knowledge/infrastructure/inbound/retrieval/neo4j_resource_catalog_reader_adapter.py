@@ -36,6 +36,7 @@ from noesis.shared_kernel.contracts.knowledge import (
     CatalogResourceLookupContract,
     CatalogResourceQueryContract,
 )
+from noesis.shared_kernel.contracts.ports.retrieval import IResourceCatalogReader
 from noesis.shared_kernel.infrastructure.outbound.neo4j import Neo4jClient
 
 from .neo4j_record_text_search_adapter import escape_lucene
@@ -68,7 +69,7 @@ RETURN entry.entry_kind AS kind, entry.name AS name
 type _Key = tuple[str, str]
 
 
-class Neo4jResourceCatalogReaderAdapter:
+class Neo4jResourceCatalogReaderAdapter(IResourceCatalogReader):
     """Retrieval's door to the catalog's resources.
 
     Args:

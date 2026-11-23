@@ -59,6 +59,7 @@ from noesis.shared_kernel.contracts.knowledge.import_link_set_contract import (
     ImportLinkSetOutcomeContract,
     ImportLinkSetRequestContract,
 )
+from noesis.shared_kernel.contracts.ports.interop import IKnowledgeImporter
 
 _INVALID_METADATA: tuple[type[AppException], ...] = (
     InvalidRecordIdError,
@@ -69,8 +70,8 @@ _INVALID_METADATA: tuple[type[AppException], ...] = (
 )
 
 
-class KnowledgeImporterAdapter:
-    """Satisfies the interop `IKnowledgeImporter` protocol structurally."""
+class KnowledgeImporterAdapter(IKnowledgeImporter):
+    """Implements the interop `IKnowledgeImporter` interface."""
 
     def __init__(
         self,

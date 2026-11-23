@@ -1,8 +1,9 @@
-"""Change feed reader over `:Change` and `:ChangeCounter` nodes (structural `IRecordChangeFeed`)."""
+"""Change feed reader over `:Change` and `:ChangeCounter` nodes (`IRecordChangeFeed`)."""
 
 from typing import Any, LiteralString
 
 from noesis.shared_kernel.contracts.knowledge import RecordChangedContract
+from noesis.shared_kernel.contracts.ports.retrieval import IRecordChangeFeed
 from noesis.shared_kernel.infrastructure.outbound.neo4j import Neo4jClient
 
 _AFTER: LiteralString = """
@@ -18,7 +19,7 @@ RETURN coalesce(counter.value, 0) AS head
 """
 
 
-class Neo4jRecordChangeFeedAdapter:
+class Neo4jRecordChangeFeedAdapter(IRecordChangeFeed):
     """Reads the feed of one space in its own read transaction."""
 
     def __init__(self, client: Neo4jClient) -> None:

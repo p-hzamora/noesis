@@ -3,6 +3,7 @@
 Structurally matches Knowledge's `ISimilarRecordFinder`; Retrieval imports nothing from Knowledge.
 """
 
+from noesis.shared_kernel.contracts.ports.knowledge import ISimilarRecordFinder
 from noesis.shared_kernel.contracts.retrieval import SimilarRecordHitItem, SimilarRecordsContract
 
 from ....application.dtos.record_search_dtos import RecordSearchHitDto
@@ -12,7 +13,7 @@ from ....application.handlers.queries.find_similar_records_handler import (
 )
 
 
-class SimilarRecordFinderAdapter:
+class SimilarRecordFinderAdapter(ISimilarRecordFinder):
     """Runs the shared pipeline for an anchor and returns the kernel contract.
 
     Errors of the pipeline propagate unchanged; the caller decides how to report them.

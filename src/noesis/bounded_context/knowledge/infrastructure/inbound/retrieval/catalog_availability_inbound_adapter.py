@@ -21,11 +21,12 @@ from noesis.shared_kernel.contracts.knowledge import (
     CatalogAvailabilityResultContract,
     CatalogAvailabilityRuntimeContract,
 )
+from noesis.shared_kernel.contracts.ports.retrieval import ICatalogAvailability
 
 RUNTIME_UNRESOLVED: str = "runtime_unresolved"
 
 
-class CatalogAvailabilityInboundAdapter:
+class CatalogAvailabilityInboundAdapter(ICatalogAvailability):
     """Retrieval's door to catalog availability.
 
     Args:

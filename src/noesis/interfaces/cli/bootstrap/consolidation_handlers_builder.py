@@ -25,7 +25,6 @@ from noesis.bounded_context.knowledge.application.handlers.queries.show_consolid
     ListConsolidationsHandler,
     ShowConsolidationHandler,
 )
-from noesis.bounded_context.knowledge.application.ports.consolidation import ISimilarRecordFinder
 from noesis.bounded_context.knowledge.application.services.schema_steps import require_steps
 from noesis.bounded_context.knowledge.infrastructure.outbound.persistence import (
     KnowledgePersistence,
@@ -36,6 +35,7 @@ from noesis.bounded_context.retrieval.infrastructure.inbound.knowledge import (
 )
 from noesis.core import Environment
 from noesis.shared_kernel.application.ports.clock import IClock
+from noesis.shared_kernel.contracts.ports.knowledge import ISimilarRecordFinder
 from noesis.shared_kernel.infrastructure.outbound.clock import SystemClockAdapter
 from noesis.shared_kernel.infrastructure.outbound.neo4j import Neo4jClient
 

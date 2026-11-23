@@ -1,9 +1,10 @@
-"""Body reader (structural `IIndexableRecordReader`): the only path a body leaves Knowledge."""
+"""Body reader (`IIndexableRecordReader`): the only path a body leaves Knowledge."""
 
 from typing import Any, LiteralString
 
 from noesis.exceptions import RecordNotFoundError
 from noesis.shared_kernel.contracts.knowledge import IndexableRecordContract, RecordBodyMissingError
+from noesis.shared_kernel.contracts.ports.retrieval import IIndexableRecordReader
 from noesis.shared_kernel.infrastructure.outbound.neo4j import Neo4jClient
 
 from .record_node_contracts import NodeProperties, ownership_of
@@ -28,7 +29,7 @@ RETURN properties(record) AS record, properties(revision) AS revision
 """
 
 
-class Neo4jIndexableRecordReaderAdapter:
+class Neo4jIndexableRecordReaderAdapter(IIndexableRecordReader):
     """Reads one revision (Knowledge or catalog entry) or one Experience with its text."""
 
     def __init__(self, client: Neo4jClient) -> None:

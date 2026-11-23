@@ -15,11 +15,7 @@ from noesis.bounded_context.interop.application.dtos.vault_import_result_dto imp
     AmbiguousLinkDto,
     UnresolvedRelationDto,
 )
-from noesis.bounded_context.interop.application.ports import (
-    IHeaderParser,
-    IKnowledgeImporter,
-    IVaultReader,
-)
+from noesis.bounded_context.interop.application.ports import IHeaderParser, IVaultReader
 from noesis.bounded_context.interop.application.services.knowledge_import_translator import (
     ImportPayload,
     KnowledgeAnswer,
@@ -52,6 +48,7 @@ from noesis.bounded_context.interop.domain.value_objects import (
 )
 from noesis.bounded_context.interop.domain.value_objects.vault_link import VaultLink
 from noesis.exceptions import BlockingFindingsError
+from noesis.shared_kernel.contracts.ports.interop import IKnowledgeImporter
 
 LINK_CLASSES: tuple[str, ...] = (
     "resolved",

@@ -43,11 +43,7 @@ from noesis.bounded_context.knowledge.application.handlers.commands.revise_knowl
 from noesis.bounded_context.knowledge.application.handlers.queries.list_parked_curations_handler import (
     ListParkedCurationsHandler,
 )
-from noesis.bounded_context.knowledge.application.ports.curation import (
-    ICurationInbox,
-    ICurator,
-    IRelatedRecordFinder,
-)
+from noesis.bounded_context.knowledge.application.ports.curation import ICurationInbox, ICurator
 from noesis.bounded_context.knowledge.application.services.curation_process_manager import (
     CurationProcessManager,
     StepHook,
@@ -77,6 +73,7 @@ from noesis.bounded_context.retrieval.infrastructure.inbound.knowledge.related_r
 from noesis.core import CuratorRelatedLookupEnum, Environment
 from noesis.exceptions import CuratorPromptUnreadableError
 from noesis.shared_kernel.application.ports.clock import IClock
+from noesis.shared_kernel.contracts.ports.knowledge import IRelatedRecordFinder
 from noesis.shared_kernel.infrastructure.outbound.clock import SystemClockAdapter
 from noesis.shared_kernel.infrastructure.outbound.neo4j import Neo4jClient
 

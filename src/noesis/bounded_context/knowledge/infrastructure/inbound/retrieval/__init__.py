@@ -1,6 +1,6 @@
 """Knowledge adapters for the Retrieval context (D17).
 
-They satisfy Retrieval's ports structurally, return kernel contracts only and import nothing from
+They implement the Retrieval-facing kernel port interfaces, return kernel contracts only and import nothing from
 the Retrieval context.
 """
 

@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 from typing import LiteralString
 
 from noesis.shared_kernel.contracts.knowledge import GraphNeighbourContract, GraphNeighboursContract
+from noesis.shared_kernel.contracts.ports.retrieval import IRecordNeighbourReader
 from noesis.shared_kernel.domain import JsonValue
 from noesis.shared_kernel.infrastructure.outbound.neo4j import Neo4jClient, Neo4jTransaction
 
@@ -77,7 +78,7 @@ class _TraversalBudget:
         return True
 
 
-class Neo4jRecordNeighbourReaderAdapter:
+class Neo4jRecordNeighbourReaderAdapter(IRecordNeighbourReader):
     """Same-space structural paths; absence of imported edges is an empty contribution."""
 
     def __init__(self, client: Neo4jClient) -> None:

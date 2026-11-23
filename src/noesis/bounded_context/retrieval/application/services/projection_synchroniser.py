@@ -14,6 +14,11 @@ from noesis.shared_kernel.contracts.knowledge import (
     RecordChangedContract,
     RecordStateContract,
 )
+from noesis.shared_kernel.contracts.ports.retrieval import (
+    IIndexableRecordReader,
+    IRecordChangeFeed,
+    IRecordStateReader,
+)
 
 from ...domain.enums import BuildStateEnum
 from ...domain.value_objects import ProjectionKey
@@ -21,9 +26,6 @@ from ..dtos.index_dtos import ProjectionSyncDto
 from ..ports.indexing.i_index_cursor_store import IIndexCursorStore, ProjectionManifestDto
 from ..ports.indexing.i_index_writer import IIndexWriter, ProjectionEntryDto
 from ..ports.indexing.i_staged_index_writer import IStagedIndexWriter
-from ..ports.record_source.i_indexable_record_reader import IIndexableRecordReader
-from ..ports.record_source.i_record_change_feed import IRecordChangeFeed
-from ..ports.record_source.i_record_state_reader import IRecordStateReader
 
 BATCH_SIZE: int = 100
 INDEXABLE_TYPES: frozenset[str] = frozenset({"knowledge", "experience", "catalog_entry"})

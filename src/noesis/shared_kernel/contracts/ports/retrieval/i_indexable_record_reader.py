@@ -1,15 +1,16 @@
 """The only path by which a record body reaches Retrieval."""
 
-from typing import Protocol
+import abc
 
 from noesis.shared_kernel.contracts.knowledge import IndexableRecordContract, RecordBodyMissingError
 
 __all__ = ["IIndexableRecordReader", "RecordBodyMissingError"]
 
 
-class IIndexableRecordReader(Protocol):
+class IIndexableRecordReader(abc.ABC):
     """Reads one record revision with its text."""
 
+    @abc.abstractmethod
     async def get(
         self, record_id: str, revision: int | None, *, space_id: str
     ) -> IndexableRecordContract:

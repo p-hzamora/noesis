@@ -1,14 +1,11 @@
 """Preview `import run`: read, map and assess every note; write nothing."""
 
 from noesis.bounded_context.interop.application.dtos import VaultImportResultDto
-from noesis.bounded_context.interop.application.ports import (
-    IHeaderParser,
-    IKnowledgeImporter,
-    IVaultReader,
-)
+from noesis.bounded_context.interop.application.ports import IHeaderParser, IVaultReader
 from noesis.bounded_context.interop.application.services import VaultImportPipeline
 from noesis.bounded_context.interop.domain.value_objects import ImportActor
 from noesis.shared_kernel.application.handlers import IHandler
+from noesis.shared_kernel.contracts.ports.interop import IKnowledgeImporter
 from noesis.utils import FrozenObject
 
 

@@ -5,6 +5,7 @@ from collections.abc import Sequence
 from noesis.exceptions import IndexNotInitialisedError
 from noesis.shared_kernel.application.handlers import IHandler
 from noesis.shared_kernel.contracts.knowledge import RecordStateContract
+from noesis.shared_kernel.contracts.ports.retrieval import IRecordChangeFeed, IRecordStateReader
 from noesis.shared_kernel.domain import JsonValue
 from noesis.utils import FrozenObject
 
@@ -13,8 +14,6 @@ from ...dtos.index_dtos import DivergenceDto, IndexStatusResultDto, ProjectionSt
 from ...ports.embedding.i_semantic_runtime_probe import ISemanticRuntimeProbe
 from ...ports.indexing.i_index_cursor_store import IIndexCursorStore, ProjectionManifestDto
 from ...ports.indexing.i_index_writer import IIndexWriter
-from ...ports.record_source.i_record_change_feed import IRecordChangeFeed
-from ...ports.record_source.i_record_state_reader import IRecordStateReader
 from ...services.projection_synchroniser import BATCH_SIZE, INDEXABLE_TYPES
 
 

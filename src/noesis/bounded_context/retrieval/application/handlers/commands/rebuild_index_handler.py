@@ -6,15 +6,17 @@ from collections.abc import Sequence
 from noesis.exceptions import InvalidConfigurationError
 from noesis.shared_kernel.application.handlers import IHandler
 from noesis.shared_kernel.contracts.knowledge import RecordStateContract
+from noesis.shared_kernel.contracts.ports.retrieval import (
+    IIndexableRecordReader,
+    IRecordChangeFeed,
+    IRecordStateReader,
+)
 from noesis.utils import FrozenObject
 
 from ...dtos.index_dtos import ProjectionRebuildDto, RebuildIndexResultDto
 from ...ports.indexing.i_index_cursor_store import IIndexCursorStore
 from ...ports.indexing.i_index_writer import IIndexWriter
 from ...ports.indexing.i_staged_index_writer import IStagedIndexWriter
-from ...ports.record_source.i_indexable_record_reader import IIndexableRecordReader
-from ...ports.record_source.i_record_change_feed import IRecordChangeFeed
-from ...ports.record_source.i_record_state_reader import IRecordStateReader
 from ...services.projection_lock import DEFAULT_LOCK_TTL_SECONDS, projection_lock
 from ...services.projection_synchroniser import BATCH_SIZE, ProjectionSynchroniser
 

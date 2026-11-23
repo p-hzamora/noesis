@@ -1,17 +1,18 @@
 """Related-record lookup port, answered by Retrieval's text search."""
 
-from typing import Protocol
+import abc
 
 from noesis.shared_kernel.contracts.retrieval import RecordSearchHitContract
 
 
-class IRelatedRecordFinder(Protocol):
+class IRelatedRecordFinder(abc.ABC):
     """Finds records on the same topic as a text.
 
-    A structural port: Retrieval's inbound adapter satisfies it without importing Knowledge, and
-    Knowledge imports nothing from Retrieval (D17), only the kernel contract.
+    Retrieval's inbound adapter inherits this interface; Knowledge imports nothing from
+    Retrieval (D17), only the kernel.
     """
 
+    @abc.abstractmethod
     async def find(
         self, text: str, *, space_id: str, project_key: str | None, limit: int
     ) -> RecordSearchHitContract:

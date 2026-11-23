@@ -12,6 +12,12 @@ from noesis.shared_kernel.contracts.knowledge import (
     CatalogAvailabilityRequestContract,
     RecordReviewStateContract,
 )
+from noesis.shared_kernel.contracts.ports.retrieval import (
+    ICatalogAvailability,
+    IRecommendationReader,
+    IResourceAssertionReader,
+    IReviewReader,
+)
 from noesis.utils import FrozenObject
 
 from ...domain.enums import DecisionBasisEnum, EndorsementEnum
@@ -20,12 +26,6 @@ from ...domain.policies.resource_ref_policy import ResourceRefPolicy
 from ...domain.value_objects.endorsement_fact import EndorsementFact
 from ..dtos.record_search_dtos import RecordSearchHitDto
 from ..dtos.search_dtos import RefinementDto, SearchRuntime
-from ..ports.briefing import (
-    ICatalogAvailability,
-    IRecommendationReader,
-    IResourceAssertionReader,
-    IReviewReader,
-)
 
 RECOMMENDS: str = "recommends"
 REFINES: str = "refines"

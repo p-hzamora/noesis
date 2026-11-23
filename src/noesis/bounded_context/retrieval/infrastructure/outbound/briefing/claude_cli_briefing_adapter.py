@@ -12,13 +12,14 @@ from noesis.exceptions.retrieval_errors import BriefingRunFailedError
 from noesis.shared_kernel.domain import JsonValue
 
 from ....application.dtos.briefing_dtos import BriefingDraftDto, EvidenceDto
+from ....application.ports.briefing import IBriefingModel
 
 _ENV_KEYS = frozenset(
     {"PATH", "HOME", "LANG", "LC_ALL", "SSL_CERT_FILE", "SSL_CERT_DIR", "ANTHROPIC_API_KEY"}
 )
 
 
-class ClaudeCliBriefingAdapter:
+class ClaudeCliBriefingAdapter(IBriefingModel):
     """Use a fresh working directory and a minimal explicit environment per invocation."""
 
     def __init__(
