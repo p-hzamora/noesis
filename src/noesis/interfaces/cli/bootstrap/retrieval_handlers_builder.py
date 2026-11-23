@@ -60,9 +60,6 @@ from noesis.bounded_context.retrieval.application.handlers.queries.find_similar_
 from noesis.bounded_context.retrieval.application.handlers.queries.get_index_status_handler import (
     GetIndexStatusHandler,
 )
-from noesis.bounded_context.retrieval.application.handlers.queries.recall_handler import (
-    RecallHandler,
-)
 from noesis.bounded_context.retrieval.application.handlers.queries.search_records_handler import (
     SearchRecordsHandler,
 )
@@ -84,6 +81,9 @@ from noesis.bounded_context.retrieval.application.services.briefing_redactor imp
 from noesis.bounded_context.retrieval.application.services.record_searcher import RecordSearcher
 from noesis.bounded_context.retrieval.application.services.resource_facts_service import (
     ResourceFactsService,
+)
+from noesis.bounded_context.retrieval.application.services.task_briefing_service import (
+    TaskBriefingService,
 )
 from noesis.bounded_context.retrieval.domain.enums import SemanticModeEnum
 from noesis.bounded_context.retrieval.domain.value_objects import EmbeddingProfile
@@ -382,7 +382,7 @@ class RetrievalHandlers:
     index_status: GetIndexStatusHandler
     searcher: RecordSearcher
     projection_kinds: tuple[str, ...]
-    recall: RecallHandler | None = None
+    recall: TaskBriefingService | None = None
     unified_search: UnifiedSearchHandler | None = None
 
 
@@ -429,7 +429,7 @@ def build_retrieval(
     settings = environment.retrieval
     ttl: int = settings.index_lock_ttl_seconds
     availability = build_catalog_availability_adapter(client, environment)
-    recall = RecallHandler(
+    recall = TaskBriefingService(
         searcher,
         indexables,
         reviews=reviews,

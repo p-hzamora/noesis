@@ -18,6 +18,7 @@ from noesis.interfaces.cli.bootstrap.retrieval_handlers_builder import (
     RetrievalHandlers,
     with_retrieval,
 )
+from noesis.interfaces.cli.deprecation import warn_deprecated
 from noesis.interfaces.cli.options import JsonOption
 from noesis.interfaces.cli.responses.recall_response import RecallRecordResponse, RecallResponse
 from noesis.interfaces.cli.runtime_resolution import parse_runtimes, resolve_runtimes
@@ -59,6 +60,11 @@ def recall(
     key, source = resolve_project(project, False, target_root)
     env = cli_state(context).environment()
     runtimes = resolve_runtimes(runtime or [], env.identity)
+    warn_deprecated(
+        "noesis search --briefing digest ..."
+        if no_synthesis
+        else "noesis search --briefing synthesis ..."
+    )
 
     async def run(handlers: RetrievalHandlers, space_id: str) -> RecallResultDto:
         if handlers.recall is None:
@@ -72,7 +78,7 @@ def recall(
                 "no_synthesis": no_synthesis,
             }
         )
-        return await handlers.recall.handle(request)
+        return await handlers.recall.brief(request)
 
     result = asyncio.run(with_retrieval(env, run))
     search = search_response(
