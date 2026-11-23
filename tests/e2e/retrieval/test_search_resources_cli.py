@@ -182,3 +182,43 @@ async def test_search_overlay_cold_start(
     assert result["index"]["catalog"]["unsynced_installed"] == 1
     assert any("noesis catalog sync" in str(w) for w in result["warnings"])
     assert graph_counts(neo4j_settings) == before
+
+
+async def test_remember_refines_scoped(
+    env: Neo4jKnowledgeEnv, world: CatalogWorld, run: Callable[..., ProcessResult]
+) -> None:
+    """AC-014: a project memory refining a skill shows in `refined_by` only on that project."""
+    _install_and_sync(world, run)
+    remembered = _result(
+        run(
+            "remember",
+            "--as",
+            "knowledge",
+            "--subtype",
+            "decision",
+            "--title",
+            "Zanzibar cli exit codes",
+            "--body",
+            "Zanzibar cli tools exit 2 on usage errors.",
+            "--project",
+            "demo",
+            "--source",
+            "commit:" + "b" * 40,
+            "--refines",
+            "catalog:skill:plug:ddd-interface-cli",
+        )
+    )
+    assert [(item["predicate"], item["status"]) for item in remembered["assertions"]] == [
+        ("refines", "proposed")
+    ]
+
+    def refined_by(project: str) -> list[dict[str, Any]]:
+        result = _result(run("search", "zanzibar cli", "--need", "cli", "--project", project))
+        (skill,) = [
+            item for item in result["resources"] if item["name"] == "plug:ddd-interface-cli"
+        ]
+        return list(skill["refined_by"])
+
+    (refinement,) = refined_by("demo")
+    assert refinement["ref"].startswith(f"record:{remembered['record_id']}@")
+    assert refined_by("other") == []
