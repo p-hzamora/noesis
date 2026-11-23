@@ -1,37 +1,42 @@
-# noesis search
+# `noesis search`
 
-Find knowledge and experience records of the active space. Needs `NOESIS_NEO4J_PASSWORD` and an
-initialised store (`noesis store init`); `--help` and usage errors never connect.
+Unified search over the record store and the resource catalog: one call returns matching records,
+the skills, agents, CLI tools and MCP servers that cover the task, and an ordered list of next
+actions. `noesis recall` stays available for briefings alone.
 
 ```text
-noesis search <query> [--project <key> | --target-root <path> | --all-projects] [--tag <tag>]...
-              [--type knowledge|experience]... [--status <status>]... [--limit 1..50]
-              [--include-stale] [--require-semantic] [--semantic] [--json]
+noesis search <query> [--project <key> | --target-root <path> | --all-projects] [--tag <t>]...
+              [--type knowledge|experience]... [--status <s>]... [--limit 1..50] [--include-stale]
+              [--require-semantic] [--semantic]
+              [--need <facet>]... [--runtime claude-code|codex]... [--resource-limit 0..20]
+              [--no-resources] [--briefing none|digest|synthesis] [--budget-chars <n>] [--json]
 ```
 
-- The default project is the git repository of the working directory (the name `record capture`
-  uses). Outside a repository, or for a project the space does not have, only space-wide records are
-  searched and `result.warnings` says so. Search never creates a project.
-- `result.hits[]`: `id`, `type`, `subtype`, `title`, `revision`, `status`, `authority`, `project`,
-  `sources`, `revised_at`, `rank`. `result.scope`: `space`, `project`, `project_source`
-  (`option`, `target_root`, `git_root`, `all_projects`, `none`), `space_wide_only`, `invocation_project` (the project detected from the working directory, even when
-  `--target-root` scopes elsewhere; null outside a git repository). `result.index`:
-  `pending_changes`, `stale_hits`, `semantic.state`, `filter_shortfall`.
-- Semantic (optional, English only; see [index](index.md#semantic-search-setup-english-only)):
-  in `resident` mode a running `noesis index embedder serve` adds `semantic` candidates
-  automatically; `--semantic` opts into loading the model in this process in `per-call` mode (a
-  usage error, exit 2, in `off` mode). Queries that look like identifiers (backticks, `--flags`,
-  paths, dotted names, snake_case, camelCase, UUIDs, `KEY-123`) keep the lexical+graph order and
-  only append semantic-only records (authority tiers order the lexical+graph hits, then the
-  appended ones, so an exact match is never pushed out by a semantic neighbour); other queries
-  fuse lexical, graph and semantic with equal RRF weight, then order by authority tier. Semantic-only failures never fail a search;
-  store failures do.
-- Errors: `RETRIEVAL_101_SEMANTIC_INDEX_UNAVAILABLE`, `RETRIEVAL_202_INDEX_REBUILD_REQUIRED`,
-  `INTEGRATION_103_GRAPH_STORE_UNAVAILABLE`. An empty query, `--limit` outside 1..50 and `--project`
-  with `--all-projects` exit 2.
+## Options added for resources
 
-When the task targets another checkout or a planned project, pass its repository root with
-`--target-root <path>` to search or recall. A linked worktree uses its main repository key.
-A planned or uninitialized root searches only space-wide records, even inside another checkout.
-The scope reports `project_source: target_root` and keeps the invoking project in
-`invocation_project`. Paths mentioned in task text do not select scope.
+| Option | Meaning |
+| --- | --- |
+| `--need <facet>` | A capability the task must cover (repeatable, 1..64 characters). Default: the query words. |
+| `--runtime` | Runtimes whose availability is reported (default: the current session). |
+| `--resource-limit` | Maximum selected resources, 0..20 (default 8; 0 selects none). |
+| `--no-resources` | Records only. The JSON keeps exactly the record-search keys. |
+| `--briefing` | `none` (default), `digest` (equal to `recall --no-synthesis`) or `synthesis`. |
+| `--budget-chars` | Evidence budget for the briefing. |
+
+## Result
+
+- `requirements[]`: `id`, `source` (`need` or `query`), `coverage` (`covered`, `partial`, `missing`),
+  `supported_by`. A missing facet is reported as a gap; no resource is invented for it.
+- `resources[]`: in load order, prerequisites first. Fields: `ref`, `name`, `kind`, `load_order`,
+  `requires`, `why.channels` (`catalog_text`, `recommends`, `prerequisite`), `cataloged`, `discovered`,
+  `available` (runtime to `available` or `unavailable`), `endorsement` (`user`, `project`,
+  `proposed`, `none`), `recommended_by`, `refined_by`.
+- `next_actions[]`: `{order, action, ref}` with `action` in `load_skill`, `use_agent`,
+  `use_cli_tool`, `use_mcp_server`, `read_record`. Refs are `catalog:<kind>:<name>` or
+  `record:<id>@<revision>`; never shell text from stored content.
+- `index.catalog`: whether the catalog is synced and how many installed resources are not in it.
+- `briefing`: present only with `--briefing digest|synthesis`. Without it no record bodies are returned.
+- `warnings`: semantic search absent or unavailable (resources still return), unsynced installed
+  resources (`noesis catalog sync`), prerequisites not found, prerequisite cycles.
+
+`--no-resources` without a briefing returns the record-search JSON unchanged.

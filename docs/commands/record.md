@@ -8,6 +8,10 @@ nothing and never connect.
 
 ## record capture
 
+> Deprecated: use [`noesis remember`](remember.md). This command forwards to it: stdout is
+> unchanged and stderr gets `DEPRECATED: use noesis remember --as <type> ...`
+> (silence it with `NOESIS_SILENCE_DEPRECATION=1`). It is removed in 0.3.0.
+
 ```text
 noesis record capture --type knowledge  --title <text> --body <text|-> --subtype <slug>
                       (--source <kind>:<locator> | --source-id <id>)...

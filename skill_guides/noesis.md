@@ -195,11 +195,39 @@ noesis record get <ID> [--revision <N>] --json
   `KNOWLEDGE_204` store not initialised, `KNOWLEDGE_205` a `--source-id` not in the space,
   `KNOWLEDGE_207` not revisable, `KNOWLEDGE_208` space missing (`store init`).
 
+## Remember something on purpose
+
+`noesis remember` is the way to record a lesson, decision or observation yourself (it replaces
+`record capture`, which still works but prints `DEPRECATED` on stderr). It checks the store for
+records that resemble yours before writing, and never merges or promotes anything.
+
+```bash
+noesis remember --as knowledge --subtype gotcha --title "<short>" --body "<text>" \
+  --source commit:<full sha> [--refines catalog:skill:<name>] [--supersedes <ID>] --json
+noesis remember --as experience --body "<what happened>" --source agent_session:<id> --json
+noesis remember --as knowledge ... --check --json         # report duplicates, write nothing
+```
+
+- Same sources, actor and redaction rules as `record capture`; knowledge is written `proposed`.
+- Scope: the repository of the working directory by default; `--space-wide`, `--project <key>` or
+  `--target-root <dir>` choose another. `result.scope` says what applied.
+- `--idempotency-key` is optional: by default repeating the same command replays the first result
+  (`replayed: true`). `KNOWLEDGE_203` still means the key was used for a different request.
+- `result.reconciliation.duplicates` lists records that say almost the same: do not write it
+  again; run with `--check` first when unsure, and let the user decide via `noesis consolidation
+  propose`. `related` lists weaker matches.
+- `--refines` / `--supersedes` propose assertions (status `proposed`) from the new record; a person
+  accepts them. If the record was written but an assertion failed
+  (`KNOWLEDGE_296_REMEMBER_PARTIALLY_APPLIED`), rerun the same command with the key in
+  `error.metadata.idempotency_key` instead of writing a new record.
+
 ## Search the record store
 
 ```text
 noesis search <query> [--project <key> | --target-root <path> | --all-projects] [--tag <t>]... [--type knowledge|experience]...
-                      [--status <s>]... [--limit 1..50] [--include-stale] [--require-semantic] [--semantic] [--json]
+                      [--status <s>]... [--limit 1..50] [--include-stale] [--require-semantic] [--semantic]
+                      [--need <facet>]... [--runtime claude-code|codex]... [--resource-limit 0..20] [--no-resources]
+                      [--briefing none|digest|synthesis] [--budget-chars <n>] [--json]
 ```
 
 - Scope: the active space. Default project: the git repository you run it in (the same name
@@ -222,6 +250,24 @@ noesis search <query> [--project <key> | --target-root <path> | --all-projects] 
   `unavailable`), `RETRIEVAL_202_INDEX_REBUILD_REQUIRED` (run `noesis index rebuild --yes`),
   `INTEGRATION_103_GRAPH_STORE_UNAVAILABLE` (Neo4j is down). An empty query, `--limit` outside 1..50, or
   `--project` with `--all-projects` is a usage error (exit 2).
+
+- Resources (default on): besides records, search ranks installed or cataloged skills, agents, CLI tools
+  and MCP servers for the task. `--need <facet>` (repeatable, 1..64 chars) names what the task must
+  cover; without it the query words are the facets. `result.requirements[]` gives each facet's
+  `coverage` (`covered`, `partial`, `missing`) and `supported_by`; a `missing` facet is a gap, no
+  resource is invented for it. `result.resources[]` (at most `--resource-limit`, default 8; 0 selects
+  none) is in load order, prerequisites first: `ref` (`catalog:<kind>:<name>`), `name`, `kind`,
+  `load_order`, `requires`, `why.channels`, `cataloged`, `discovered`, `available` (per runtime:
+  `available` or `unavailable`), `endorsement` (`user`, `project`, `proposed`, `none`),
+  `recommended_by` and `refined_by` (memories that refine the resource, with `ref` and `authority`).
+  `result.next_actions[]` is an ordered list of `{order, action, ref}`; `action` is one of `load_skill`,
+  `use_agent`, `use_cli_tool`, `use_mcp_server`, `read_record`. Refs are canonical ids, never shell text
+  taken from stored content. Installed but unsynced resources are flagged (`cataloged: false`) and
+  `result.warnings` suggests `noesis catalog sync`. A missing semantic index is a warning; resources
+  still return. `--no-resources` returns exactly the record-only JSON keys.
+- Briefing: record bodies are not returned unless `--briefing digest` (deterministic, equal to
+  `noesis recall --no-synthesis`) or `--briefing synthesis` is given; `--budget-chars` caps the evidence.
+  `result.briefing` holds the recall sections. `noesis recall` remains available for briefings alone.
 
 ## Index commands
 
