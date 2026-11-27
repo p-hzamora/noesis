@@ -241,14 +241,15 @@ def test_registration_follows_the_mode_and_opt_in(
 
 
 def test_the_resident_socket_lives_under_the_runtime_dir(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, short_runtime_dir: Path
 ) -> None:
-    monkeypatch.setenv("NOESIS_RETRIEVAL_RUNTIME_DIR", str(tmp_path / "run"))
+    runtime = short_runtime_dir
+    monkeypatch.setenv("NOESIS_RETRIEVAL_RUNTIME_DIR", str(runtime))
     environment = load_environment(tmp_path / "missing.env")  # type: ignore[operator]
 
     socket = retrieval_handlers_builder.embedder_socket(environment)
 
-    assert socket.parent == tmp_path / "run" / "noesis"
+    assert socket.parent == runtime / "noesis"
     assert socket.name.startswith("embedder-")
     probe = retrieval_handlers_builder._probe(_client(), environment)
     assert probe is not None

@@ -1,5 +1,6 @@
 """Fixtures shared by every test: isolation from the real user configuration, and Neo4j."""
 
+import os
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -8,6 +9,10 @@ from tests.support.environment_support import drop_noesis_variables
 from tests.support.neo4j_container import docker_unavailable_reason, running_neo4j, wipe_database
 
 from noesis.shared_kernel.infrastructure.outbound.neo4j import Neo4jConnectionSettings
+
+# Typer forces a Rich terminal when GITHUB_ACTIONS, FORCE_COLOR or PY_COLORS is set, and it reads
+# this at import time; ANSI styling then splits option names like "--idempotency-key" in help text.
+os.environ["_TYPER_FORCE_DISABLE_TERMINAL"] = "1"
 
 
 @pytest.fixture(autouse=True)
