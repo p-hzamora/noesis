@@ -50,7 +50,7 @@ uninstall: ## Remove the `noesis` command from your PATH
 	uv tool uninstall noesis
 
 ## --- playground (never touches your real config, vault, or Claude settings) --
-sandbox: ## Create the sandbox git repo (.sandbox/, or FILE=/new/path): make sandbox FILE=~/tmp/noesis-test
+sandbox: ## Create the sandbox git repo (sandbox/, or FILE=/new/path): make sandbox FILE=~/tmp/noesis-test
 	scripts/sandbox.sh init $(if $(FILE),--file "$(FILE)")
 
 sandbox-hook: ## Simulate a Claude Code commit + Stop hook: make sandbox-hook MODE=live|dry-run

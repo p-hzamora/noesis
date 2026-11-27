@@ -14,8 +14,8 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-SANDBOX="${SANDBOX:-$ROOT/.sandbox}"
-# --file PATH (any position) points the sandbox at PATH instead of .sandbox/.
+SANDBOX="${SANDBOX:-$ROOT/sandbox}"
+# --file PATH (any position) points the sandbox at PATH instead of sandbox/ (a folder name that is a valid project key).
 POSITIONAL=()
 while [ $# -gt 0 ]; do
   case "$1" in

@@ -30,7 +30,7 @@ make check       # everything CI runs
 | `make test` | tests only |
 | `make format-fix` | apply ruff format and safe fixes |
 | `make run ARGS="doctor --json"` | run the CLI from the source tree |
-| `make sandbox` | create `.sandbox/` with its own state and config |
+| `make sandbox` | create `sandbox/` with its own state and config |
 
 The sandbox never touches your real config, vault, or Claude settings. Use it to try
 the hooks and curator by hand.

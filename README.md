@@ -78,7 +78,7 @@ For the Neo4j architecture, configuration reference and an end-to-end checklist,
 ## Playground
 
 ```bash
-make sandbox-hook              # simulate a Claude Code session in .sandbox/ (dry run)
+make sandbox-hook              # simulate a Claude Code session in sandbox/ (dry run)
 make sandbox-hook MODE=live    # the same, with the real curator (haiku)
 make run ARGS="capture --help"
 ```
